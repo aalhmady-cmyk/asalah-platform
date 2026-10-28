@@ -315,11 +315,12 @@ function renderReels() {
   if (!S.reels.length) return render(el, html`<div class="empty">ما رفعت ريلز للحين. ريل من 10 إلى ${S.reel_limits.max} ثانية عن منتجك يجيب لك مشاهدات أكثر 🔥</div>`);
   render(el, html`<div class="st-reels">${S.reels.map(
     (r) => html`<article class="st-reel ${r.status === 'hidden' ? 'off' : ''}">
-      <div class="st-reel-media">${r.poster_url ? html`<img src="${r.poster_url}" alt="" loading="lazy">` : ''}<span class="st-dur">${r.duration} ث</span></div>
+      <div class="st-reel-media">${r.video_url ? html`<video src="${r.video_url}" poster="${r.poster_url || ''}" preload="none" playsinline controls></video>` : r.poster_url ? html`<img src="${r.poster_url}" alt="" loading="lazy">` : ''}<span class="st-dur">${r.duration} ث</span></div>
+      ${r.status === 'active' ? html`<a class="small" href="/stores/?v=reels&r=${r.id}" target="_blank" rel="noopener">✅ منشور في المتاجر ↗</a>` : r.status === 'uploading' ? html`<span class="small" style="color:var(--danger,#b42318)">⚠️ الفيديو ما وصل كامل. احذفه وارفعه مرة ثانية</span>` : html`<span class="small muted">مخفي عن المتاجر</span>`}
       <b>${r.title}</b>
       <div class="small muted">👁 ${num(r.views)} · 🛒 ${num(r.clicks)}</div>
       <div class="actions">
-        <button class="btn btn-sm" type="button" data-st="reel-toggle" data-id="${r.id}">${r.status === 'hidden' ? 'إظهار' : 'إخفاء'}</button>
+        ${r.status === 'uploading' ? '' : html`<button class="btn btn-sm" type="button" data-st="reel-toggle" data-id="${r.id}">${r.status === 'hidden' ? 'إظهار' : 'إخفاء'}</button>`}
         <button class="btn btn-sm btn-danger" type="button" data-st="reel-del" data-id="${r.id}">حذف</button>
       </div>
     </article>`

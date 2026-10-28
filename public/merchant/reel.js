@@ -30,7 +30,12 @@ export async function cutReel(file, stage) {
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) throw new Error('متصفحك ما يدعم قص الفيديو. جرّب Chrome أو Safari بآخر تحديث');
   const v = document.createElement('video');
   v.playsInline = true;
+  v.setAttribute('playsinline', '');
   v.preload = 'auto';
+  // بعض الجوالات (خصوصاً أندرويد) ما ترسم إطارات فيديو مو موجود في الصفحة، فيطلع الريل أسود.
+  // نحطه في الصفحة صغير وشبه شفاف بدل ما يكون معلّق برا
+  v.style.cssText = 'position:fixed;left:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none;z-index:-1';
+  document.body.append(v);
   v.src = URL.createObjectURL(file);
   await new Promise((resolve, reject) => { v.onloadeddata = resolve; v.onerror = () => reject(new Error('ما قدرنا نفتح الفيديو')); });
   const sctx = stage.getContext('2d');
@@ -119,28 +124,62 @@ export async function cutReel(file, stage) {
       v.muted = false;
       rec.start(500);
       await v.play().catch(() => { v.muted = true; return v.play(); });
-      await new Promise((resolve) => {
-        const tick = () => {
+      // نرسم كل ~33 ملي ثانية بمؤقت، لأن requestVideoFrameCallback أحياناً ما يشتغل والفيديو مخفي
+      let bright = brightness(out), lastT = -1, stuck = 0;
+      await new Promise((resolve, reject) => {
+        const timer = setInterval(() => {
           const t = v.currentTime - st.start;
           draw(octx, OUT_W, OUT_H);
-          onProgress?.(Math.min(1, t / st.dur));
-          if (t >= st.dur || v.ended) return resolve();
-          if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(tick);
-          else requestAnimationFrame(tick);
-        };
-        tick();
-      });
+          onProgress?.(Math.min(1, Math.max(0, t) / st.dur));
+          if (Math.floor(t) !== Math.floor(lastT)) bright = Math.max(bright, brightness(out));
+          stuck = t === lastT ? stuck + 1 : 0;
+          lastT = t;
+          if (t >= st.dur || v.ended) { clearInterval(timer); resolve(); }
+          // الفيديو واقف أكثر من 8 ثواني: المتصفح وقفه (غالباً الصفحة صارت بالخلفية)
+          else if (stuck > 240) { clearInterval(timer); reject(new Error('القص وقف. خل الصفحة مفتوحة قدامك وحاول مرة ثانية')); }
+        }, 33);
+      }).catch((e) => { v.pause(); rec.stop(); throw e; });
       v.pause();
       rec.stop();
       await done;
       stream.getVideoTracks().forEach((t) => t.stop());
       const type = (rec.mimeType || mime || 'video/webm').split(';')[0];
-      return { video: new Blob(chunks, { type }), poster };
+      const video = new Blob(chunks, { type });
+      if (bright < 6) throw new Error('الفيديو طلع أسود بعد القص. جرّب متصفح Chrome أو Safari بآخر تحديث، أو فيديو ثاني');
+      if (video.size < 20_000) throw new Error('ما انحفظ الفيديو بشكل صحيح. حاول مرة ثانية');
+      await playable(video);
+      return { video, poster };
     },
-    dispose() { stopPreview(); audio?.ac.close(); URL.revokeObjectURL(v.src); v.removeAttribute('src'); v.load(); },
+    dispose() { stopPreview(); audio?.ac.close(); URL.revokeObjectURL(v.src); v.removeAttribute('src'); v.load(); v.remove(); },
   };
   paint();
   return api;
+}
+
+// متوسط إضاءة الصورة (0 أسود تماماً، 255 أبيض)
+function brightness(canvas) {
+  const c = Object.assign(document.createElement('canvas'), { width: 16, height: 28 });
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.drawImage(canvas, 0, 0, 16, 28);
+  const d = x.getImageData(0, 0, 16, 28).data;
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 4) sum += d[i] + d[i + 1] + d[i + 2];
+  return sum / (d.length / 4) / 3;
+}
+
+// نتأكد إن المتصفح يقدر يفتح الفيديو الناتج قبل ما نرفعه
+function playable(blob) {
+  return new Promise((resolve, reject) => {
+    const t = document.createElement('video');
+    t.muted = true;
+    t.preload = 'auto';
+    const url = URL.createObjectURL(blob);
+    const end = (ok) => { clearTimeout(to); URL.revokeObjectURL(url); t.removeAttribute('src'); t.load(); ok ? resolve() : reject(new Error('الفيديو الناتج ما يشتغل. حاول مرة ثانية أو جرّب متصفح ثاني')); };
+    const to = setTimeout(() => end(true), 6000);
+    t.onloadeddata = () => end(t.videoWidth > 0);
+    t.onerror = () => end(false);
+    t.src = url;
+  });
 }
 
 async function posterOf(canvas) {

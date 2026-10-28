@@ -43,7 +43,7 @@ export async function handleMerchantStore(req, env, path, user) {
   if (path === '/api/m/store' && m === 'GET') {
     const [products, reels, totals] = await Promise.all([
       db.prepare('SELECT * FROM store_products WHERE merchant_id=? ORDER BY id DESC').bind(mid).all(),
-      db.prepare('SELECT * FROM reels WHERE merchant_id=? AND status<>? ORDER BY id DESC').bind(mid, 'uploading').all(),
+      db.prepare('SELECT * FROM reels WHERE merchant_id=? ORDER BY id DESC').bind(mid).all(),
       db.prepare('SELECT COALESCE(SUM(views),0) AS views, COALESCE(SUM(clicks),0) AS clicks FROM store_products WHERE merchant_id=?').bind(mid).first(),
     ]);
     const reelStats = reels.results.reduce((a, r) => ({ views: a.views + r.views, clicks: a.clicks + r.clicks }), { views: 0, clicks: 0 });

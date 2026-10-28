@@ -24,7 +24,7 @@ const T = {
     askBtn: '✨ اسأل المساعد', reelsBtn: '🎬 شوف الريلز', stores: 'المتاجر', products: (n) => `${n} منتج`, all: 'الكل', newIn: 'وصل جديد', noCat: 'ما فيه منتجات في هذي الفئة حالياً',
     soon: 'المتاجر الأصلية في الطريق', soonP: 'قريب بتلقى هنا منتجات العلامات السعودية الموثّقة بعلامة أصالة.', demo: 'جرّب نسخة العرض', haveBrand: 'عندك علامة تجارية؟',
     results: (q) => `نتائج «${q}»`, noResults: 'ما لقينا شي بهالاسم', noResultsP: 'جرّب كلمة ثانية، أو خل المساعد يدوّر لك.', askAbout: (q) => `✨ اسأل المساعد عن «${q}»`,
-    verified: '🛡️ أصلي موثّق', verifiedT: 'أصلي وموثّق من أصالة', trust: (m) => `الدفع والشحن من متجر ${m} الرسمي`, buy: (m) => `اشتر الآن من ${m} ↗`, buyShort: 'اشتر', share: '↗ شارك',
+    verified: '🛡️ أصلي موثّق', verifiedT: 'أصلي وموثّق من أصالة', trust: (m) => `الدفع والشحن من متجر ${m} الرسمي`, buy: (m) => `اشتر الآن من ${m} ↗`, buyNow: 'اشتر الآن ↗', from: (m) => `من متجر ${m}`, buyShort: 'اشتر', share: '↗ شارك',
     save: '♡ حفظ', unsave: '♥ محفوظ', save_aria: 'أضف للمفضلة', productReels: 'ريلز المنتج', youMayLike: 'ممكن يعجبك', save_pct: (n) => `وفّر ${n}٪`,
     coupon: 'كوبون أصالة', copy: 'انسخ', copied: 'نسخنا الكود ✅ الصقه وقت الدفع', shared: 'نسخنا الرابط ✅', shareText: (p, m) => `${p} من ${m}، أصلي وموثّق في متاجر أصالة 🛡️`,
     noReels: 'ما فيه ريلز للحين', noReelsP: 'التجار بيبدون ينزلون ريلز منتجاتهم قريب.', browse: 'تصفّح المنتجات', newest: 'الأحدث', popular: 'الأكثر مشاهدة', savedTab: 'المحفوظة',
@@ -42,7 +42,7 @@ const T = {
     askBtn: '✨ Ask the assistant', reelsBtn: '🎬 Watch reels', stores: 'Stores', products: (n) => `${n} products`, all: 'All', newIn: 'New arrivals', noCat: 'No products in this category yet',
     soon: 'Genuine stores are on the way', soonP: 'Soon you will find verified Saudi brands here, protected by Asalah tags.', demo: 'Try the demo', haveBrand: 'Own a brand?',
     results: (q) => `Results for “${q}”`, noResults: 'Nothing found', noResultsP: 'Try another word, or let the assistant look for you.', askAbout: (q) => `✨ Ask the assistant about “${q}”`,
-    verified: '🛡️ Verified original', verifiedT: 'Verified original by Asalah', trust: (m) => `Payment and shipping by ${m}’s official store`, buy: (m) => `Buy now from ${m} ↗`, buyShort: 'Buy', share: '↗ Share',
+    verified: '🛡️ Verified original', verifiedT: 'Verified original by Asalah', trust: (m) => `Payment and shipping by ${m}’s official store`, buy: (m) => `Buy now from ${m} ↗`, buyNow: 'Buy now ↗', from: (m) => `from ${m}`, buyShort: 'Buy', share: '↗ Share',
     save: '♡ Save', unsave: '♥ Saved', save_aria: 'Save to favourites', productReels: 'Product reels', youMayLike: 'You may also like', save_pct: (n) => `Save ${n}%`,
     coupon: 'Asalah coupon', copy: 'Copy', copied: 'Code copied ✅ paste it at checkout', shared: 'Link copied ✅', shareText: (p, m) => `${p} by ${m}, verified original on Asalah Stores 🛡️`,
     noReels: 'No reels yet', noReelsP: 'Brands will start posting reels of their products soon.', browse: 'Browse products', newest: 'Newest', popular: 'Most viewed', savedTab: 'Saved',
@@ -277,7 +277,7 @@ function drawProduct(p, d) {
   render(sheet, html`<div class="mk-sheet-bg" data-close></div>
   <article class="mk-sheet-in" role="dialog" aria-modal="true" aria-label="${p.title}">
     <button type="button" class="mk-x" data-close aria-label="${t('close')}">×</button>
-    <div class="mk-p-img">${p.image_url ? html`<img src="${p.image_url}" alt="${p.title}">` : raw('<span aria-hidden="true">🛍️</span>')}</div>
+    <div class="mk-p-img">${p.image_url ? html`<div class="mk-p-blur" style="background-image:url('${p.image_url}')" aria-hidden="true"></div><img src="${p.image_url}" alt="${p.title}">` : raw('<span aria-hidden="true">🛍️</span>')}</div>
     <div class="mk-p-b">
       <button type="button" class="mk-p-m" data-merchant="${p.merchant_slug}">${p.merchant_name} ›</button>
       <h1>${p.title}</h1>
@@ -286,9 +286,9 @@ function drawProduct(p, d) {
       ${p.coupon ? html`<div class="mk-coupon"><span class="mk-coupon-ic" aria-hidden="true">🎟️</span><div><small>${t('coupon')}${p.coupon.note ? ' · ' + p.coupon.note : ''}</small><b class="ltr">${p.coupon.code}</b></div><button type="button" class="mk-btn ghost-d" data-coupon="${p.id}">${t('copy')}</button></div>` : ''}
       ${p.description ? html`<p class="mk-p-desc">${p.description}</p>` : ''}
       <div class="mk-buy-bar">
-        <a class="mk-btn gold big" href="${p.buy_url}" target="_blank" rel="noopener" data-buy="${p.id}">${t('buy', p.merchant_name)}</a>
-        <button type="button" class="mk-btn ghost-d mk-fav-btn ${fav ? 'on' : ''}" data-fav="${p.id}" aria-pressed="${fav}">${fav ? t('unsave') : t('save')}</button>
-        <button type="button" class="mk-btn ghost-d" data-share="${p.id}">${t('share')}</button>
+        <a class="mk-btn gold big" href="${p.buy_url}" target="_blank" rel="noopener" data-buy="${p.id}">${t('buyNow')}<small>${t('from', p.merchant_name)}</small></a>
+        <button type="button" class="mk-btn ghost-d mk-icon-btn mk-fav-btn ${fav ? 'on' : ''}" data-fav="${p.id}" aria-pressed="${fav}" aria-label="${t('save_aria')}">${fav ? '♥' : '♡'}</button>
+        <button type="button" class="mk-btn ghost-d mk-icon-btn" data-share="${p.id}" aria-label="${t('share')}">↗</button>
       </div>
       ${d && d.reels.length ? html`<h2>${t('productReels')}</h2><div class="mk-row">${d.reels.map(reelTile)}</div>` : ''}
       ${d && d.more.length ? html`<h2>${t('youMayLike')}</h2><div class="mk-row cards">${d.more.map(card)}</div>` : ''}
@@ -495,7 +495,7 @@ document.addEventListener('click', async (e) => {
     document.querySelectorAll(`[data-fav="${id}"]`).forEach((b) => {
       b.classList.toggle('on', on);
       b.setAttribute('aria-pressed', String(on));
-      b.textContent = b.classList.contains('mk-fav-btn') ? (on ? t('unsave') : t('save')) : on ? '♥' : '♡';
+      b.textContent = on ? '♥' : '♡';
     });
     return;
   }

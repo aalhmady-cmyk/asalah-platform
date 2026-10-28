@@ -119,8 +119,9 @@ button { font: inherit; color: inherit; }
 .mk-sheet.open .mk-sheet-bg { opacity: 1; }
 .mk-sheet.open .mk-sheet-in { transform: none; }
 .mk-x { position: absolute; top: 12px; inset-inline-end: 12px; z-index: 2; width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.92); font-size: 24px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
-.mk-p-img { background: var(--ground); display: flex; align-items: center; justify-content: center; font-size: 80px; min-height: 320px; }
-.mk-p-img img { width: 100%; height: 100%; object-fit: cover; max-height: 92vh; }
+.mk-p-img { position: relative; overflow: hidden; background: var(--ground); display: flex; align-items: center; justify-content: center; font-size: 80px; min-height: 420px; }
+.mk-p-blur { position: absolute; inset: -20px; background-size: cover; background-position: center; filter: blur(24px) saturate(1.2); opacity: .55; }
+.mk-p-img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .mk-p-b { padding: 28px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .mk-p-b h1 { margin: 0; font-size: 26px; line-height: 1.3; }
 .mk-p-b h2 { margin: 16px 0 0; font-size: 18px; }
@@ -128,10 +129,15 @@ button { font: inherit; color: inherit; }
 .mk-p-price { font-size: 26px; font-weight: 700; color: var(--green-ink); }
 .mk-trust { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); padding: 10px 12px; background: var(--ground); border-radius: 12px; }
 .mk-p-desc { margin: 0; white-space: pre-line; color: #33403A; line-height: 1.8; }
-.mk-buy-bar { display: flex; gap: 10px; position: sticky; bottom: 0; padding: 12px 0; background: linear-gradient(transparent, var(--surface) 30%); }
+.mk-buy-bar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; position: sticky; bottom: 0; padding: 12px 0; background: linear-gradient(transparent, var(--surface) 30%); }
+.mk-buy-bar .mk-btn.big { flex-direction: column; gap: 0; line-height: 1.25; padding: 6px 16px; min-width: 0; }
+.mk-buy-bar .mk-btn.big small { font-size: 12px; font-weight: 600; opacity: .8; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mk-icon-btn { width: 54px; height: 54px; min-height: 54px; padding: 0; font-size: 20px; }
 @media (max-width: 760px) {
   .mk-sheet-in { grid-template-columns: 1fr; max-height: 94vh; }
-  .mk-p-img { min-height: 220px; aspect-ratio: 1; }
+  .mk-p-img { min-height: 0; aspect-ratio: 1; max-height: 58vh; width: 100%; }
+  .mk-p-b h1 { font-size: 22px; }
+  .mk-p-price { font-size: 24px; }
   .mk-p-b { padding: 20px 16px calc(16px + env(safe-area-inset-bottom)); }
 }
 
