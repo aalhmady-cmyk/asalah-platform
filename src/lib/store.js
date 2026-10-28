@@ -19,6 +19,8 @@ export const CATEGORIES = {
 export const REEL_MIN = 10;
 export const REEL_MAX = 30;
 export const VIDEO_MAX_BYTES = 25 * 1024 * 1024;
+// الفيديو الأصلي (بدون إعادة تسجيل) يكون أكبر. حد طلب Workers 100 ميجا
+export const ORIGINAL_MAX_BYTES = 95 * 1024 * 1024;
 
 // السعر يجي بالريال (ويقبل كسور)، ويتخزن بالهللة
 export function halalas(v, label, { optional = false } = {}) {
@@ -154,8 +156,10 @@ export async function proxyImage(link) {
 }
 
 // ---------- الفيديو ----------
+// MP4 و MOV (فيديو الآيفون) يبدأون بصندوق ftyp، وبعض MOV القديمة بـ moov أو wide أو mdat
+const MP4_BOXES = new Set(['ftyp', 'moov', 'mdat', 'wide', 'free', 'skip']);
 export function videoType(buf) {
-  if (buf.length > 12 && buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) return { type: 'video/mp4', ext: 'mp4' };
+  if (buf.length > 12 && MP4_BOXES.has(String.fromCharCode(buf[4], buf[5], buf[6], buf[7]))) return { type: 'video/mp4', ext: 'mp4' };
   if (buf.length > 4 && buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) return { type: 'video/webm', ext: 'webm' };
   return null;
 }

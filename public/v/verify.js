@@ -205,7 +205,7 @@ function setupShop(s) {
       ...s.reels.map((r) => {
         const a = el('a', 'shop-reel');
         a.href = base + 'v=reels&r=' + r.id;
-        if (r.poster_url) a.append(img(r.poster_url));
+        if (r.poster_url || r.product_image) a.append(img(r.poster_url || r.product_image));
         a.append(el('span', '', r.title));
         return a;
       })

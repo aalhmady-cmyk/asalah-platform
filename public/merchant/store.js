@@ -1,6 +1,7 @@
 // تبويب "متجري": التاجر يضيف منتجاته لمتاجر أصالة بالذكاء الاصطناعي، ويرفع ريلز بمقاس 9:16.
 import { api, html, num, raw, render, toast } from '/assets/common.js';
-import { cutReel, reelDuration } from '/merchant/reel.js';
+import { clipReel, cutReel, reelDuration } from '/merchant/reel.js';
+import { bindClip } from '/stores/clip.js';
 
 const $ = (id) => document.getElementById(id);
 let S = null; // بيانات المتجر من الخادم
@@ -315,7 +316,7 @@ function renderReels() {
   if (!S.reels.length) return render(el, html`<div class="empty">ما رفعت ريلز للحين. ريل من 10 إلى ${S.reel_limits.max} ثانية عن منتجك يجيب لك مشاهدات أكثر 🔥</div>`);
   render(el, html`<div class="st-reels">${S.reels.map(
     (r) => html`<article class="st-reel ${r.status === 'hidden' ? 'off' : ''}">
-      <div class="st-reel-media">${r.video_url ? html`<video src="${r.video_url}" poster="${r.poster_url || ''}" preload="none" playsinline controls></video>` : r.poster_url ? html`<img src="${r.poster_url}" alt="" loading="lazy">` : ''}<span class="st-dur">${r.duration} ث</span></div>
+      <div class="st-reel-media">${r.video_url ? html`<video data-rid="${r.id}" src="${r.video_url}${r.clip ? '#t=' + r.clip.start : ''}" poster="${r.poster_url || ''}" preload="${r.poster_url ? 'none' : 'metadata'}" playsinline></video><span class="st-tap" aria-hidden="true">▶</span>` : r.poster_url ? html`<img src="${r.poster_url}" alt="" loading="lazy">` : ''}<span class="st-dur">${r.duration} ث</span></div>
       ${r.status === 'active' ? html`<a class="small" href="/stores/?v=reels&r=${r.id}" target="_blank" rel="noopener">✅ منشور في المتاجر ↗</a>` : r.status === 'uploading' ? html`<span class="small" style="color:var(--danger,#b42318)">⚠️ الفيديو ما وصل كامل. احذفه وارفعه مرة ثانية</span>` : html`<span class="small muted">مخفي عن المتاجر</span>`}
       <b>${r.title}</b>
       <div class="small muted">👁 ${num(r.views)} · 🛒 ${num(r.clicks)}</div>
@@ -325,17 +326,27 @@ function renderReels() {
       </div>
     </article>`
   )}</div>`);
+  for (const v of el.querySelectorAll('video[data-rid]')) {
+    const r = S.reels.find((x) => x.id === Number(v.dataset.rid));
+    bindClip(v, r.clip, r.duration);
+    // ضغطة تشغّل وضغطة توقف
+    v.parentElement.addEventListener('click', () => {
+      if (v.paused) { v.muted = false; v.play().catch(() => { v.muted = true; v.play().catch(() => {}); }); } else v.pause();
+    });
+    v.addEventListener('play', () => v.parentElement.classList.add('playing'));
+    v.addEventListener('pause', () => v.parentElement.classList.remove('playing'));
+  }
 }
 
 // ---------- محرر الريل ----------
-function reelDialog(file, duration) {
+function reelDialog(file, duration, original) {
   const dlg = Object.assign(document.createElement('dialog'), { className: 'st-reel-dlg' });
   const maxDur = Math.min(S.reel_limits.max, Math.floor(duration));
   render(dlg, html`<form method="dialog" class="st-editor">
     <div class="card-head"><h2>ريل جديد 🎬</h2><button class="btn btn-sm" type="button" data-x>إغلاق</button></div>
     <div class="st-ed-grid">
       <div class="st-stage-wrap">
-        <canvas class="st-stage" width="360" height="640" aria-label="معاينة الريل بمقاس 9:16"></canvas>
+        ${original ? html`<div class="st-stage st-clip" role="img" aria-label="معاينة الريل بمقاس 9:16"></div>` : html`<canvas class="st-stage" width="360" height="640" aria-label="معاينة الريل بمقاس 9:16"></canvas>`}
         <p class="small muted" style="margin:0;text-align:center">اسحب الفيديو بإصبعك عشان تختار الجزء اللي يظهر</p>
       </div>
       <div class="st-ed-side">
@@ -344,7 +355,7 @@ function reelDialog(file, duration) {
         <label class="field"><span>يبدأ من الثانية <b data-out="start">0</b></span><input name="start" type="range" min="0" max="${Math.max(0, Math.floor(duration - S.reel_limits.min))}" step="0.5" value="0"></label>
         <label class="field"><span>المدة <b data-out="dur">${maxDur}</b> ثانية <small class="muted">(من ${S.reel_limits.min} إلى ${S.reel_limits.max})</small></span><input name="dur" type="range" min="${S.reel_limits.min}" max="${maxDur}" step="1" value="${maxDur}"></label>
         <label class="field"><span>التكبير</span><input name="zoom" type="range" min="1" max="2.5" step="0.05" value="1"></label>
-        <div class="actions"><button class="btn" type="button" data-play>▶︎ شغّل المقطع</button><button class="btn btn-gold" type="submit">قص وانشر</button></div>
+        <div class="actions"><button class="btn" type="button" data-play>▶︎ شغّل المقطع</button><button class="btn btn-gold" type="submit">${original ? 'انشر الريل' : 'قص وانشر'}</button></div>
         <div class="st-progress" hidden><div class="bar"><i></i></div><span></span></div>
       </div>
     </div>
@@ -364,9 +375,18 @@ async function newReel() {
     return toast('ما قدرنا نقرأ الفيديو، جرّب فيديو ثاني', true);
   }
   if (duration < S.reel_limits.min) return toast(`الفيديو لازم يكون ${S.reel_limits.min} ثواني على الأقل`, true);
-  const dlg = reelDialog(file, duration);
+  // الأساس: نرفع الفيديو الأصلي ونحفظ القص كأرقام (يشتغل على كل الجوالات).
+  // لو الملف أكبر من الحد، نعيد تسجيله في المتصفح بحجم أصغر
+  const original = file.size <= S.reel_limits.original_bytes;
+  const dlg = reelDialog(file, duration, original);
   const form = dlg.querySelector('form');
-  const editor = await cutReel(file, dlg.querySelector('.st-stage'));
+  let editor;
+  try {
+    editor = await (original ? clipReel : cutReel)(file, dlg.querySelector('.st-stage'));
+  } catch (err) {
+    dlg.close(); dlg.remove();
+    return toast(err.message || 'ما قدرنا نفتح الفيديو، جرّب فيديو ثاني', true);
+  }
   const state = () => ({ start: Number(form.start.value), dur: Number(form.dur.value), zoom: Number(form.zoom.value) });
   const sync = () => {
     const s = state();
@@ -395,12 +415,18 @@ async function newReel() {
     const step = (p, t) => { const n = Math.round(p * 100); bar.style.width = n + '%'; render(label, html`<b class="st-pct">${n}٪</b> ${t}`); };
     try {
       const s = state();
-      step(0, 'نقص الفيديو… خل الصفحة مفتوحة');
-      const out = await editor.render(s, (p) => step(p * 0.7, `نقص الفيديو… ${Math.round(p * s.dur)} من ${s.dur} ثانية`));
-      if (out.video.size > S.reel_limits.bytes) throw new Error('الفيديو طلع كبير، قلل المدة');
-      step(0.72, 'نرفع الريل…');
-      const { id } = await api('/api/m/store/reels', { method: 'POST', body: { title: form.title.value, product_id: form.product_id.value ? Number(form.product_id.value) : null, duration: s.dur, poster: out.poster } });
-      await upload(`/api/m/store/reels/${id}/video`, out.video, (p) => step(0.72 + p * 0.28, `نرفع الريل… ${Math.round(p * 100)}٪`));
+      let out;
+      if (original) out = await editor.render(s);
+      else {
+        step(0, 'نقص الفيديو… خل الصفحة مفتوحة');
+        out = await editor.render(s, (p) => step(p * 0.5, `نقص الفيديو… ${Math.round(p * s.dur)} من ${s.dur} ثانية`));
+        if (out.video.size > S.reel_limits.bytes) throw new Error('الفيديو طلع كبير، قلل المدة');
+      }
+      const base = original ? 0 : 0.5;
+      step(base, 'نجهّز الرفع…');
+      const { id } = await api('/api/m/store/reels', { method: 'POST', body: { title: form.title.value, product_id: form.product_id.value ? Number(form.product_id.value) : null, duration: s.dur, poster: out.poster, clip: out.clip || null } });
+      const mb = (out.video.size / 1048576).toFixed(1);
+      await upload(`/api/m/store/reels/${id}/video`, out.video, (p) => step(base + p * (1 - base) * 0.98, `نرفع الريل… ${(p * mb).toFixed(1)} من ${mb} ميجا. خل الصفحة مفتوحة`));
       step(1, 'تم! 🎉');
       working = false;
       close();
@@ -409,7 +435,9 @@ async function newReel() {
     } catch (err) {
       working = false;
       btns.forEach((b) => (b.disabled = false));
-      prog.hidden = true;
+      // نخلي سبب الخطأ ظاهر داخل النافذة بدل ما ترجع كأن ما صار شي
+      bar.style.width = '0';
+      render(label, html`<span class="st-err">⚠️ ${err.message || 'صار خطأ، حاول مرة ثانية'}</span>`);
       toast(err.message || 'صار خطأ، حاول مرة ثانية', true);
     }
   });
@@ -419,7 +447,7 @@ function upload(path, blob, onProgress) {
   return new Promise((resolve, reject) => {
     const x = new XMLHttpRequest();
     x.open('PUT', path);
-    x.setRequestHeader('Content-Type', blob.type.split(';')[0] || 'video/mp4');
+    x.setRequestHeader('Content-Type', /webm/.test(blob.type) ? 'video/webm' : 'video/mp4');
     x.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
     x.onload = () => {
       let d = {};

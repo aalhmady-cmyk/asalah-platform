@@ -1,6 +1,7 @@
 // متاجر أصالة: منتجات التجار الحقيقية، الريلز، المفضلة، ومساعد التسوق. الشراء يكمل في متجر التاجر (سلة).
 // الواجهة بالعربي والإنجليزي، ومحتوى المنتجات يبقى مثل ما كتبه التاجر.
 import { html, raw, render } from '/assets/common.js';
+import { bindClip } from '/stores/clip.js';
 
 const $ = (s) => document.querySelector(s);
 const view = $('#view'), sheet = $('#sheet');
@@ -151,7 +152,7 @@ function card(p) {
 const grid = (list) => html`<div class="mk-grid">${list.map(card)}</div>`;
 function reelTile(r, i = 0) {
   return html`<button type="button" class="mk-reel-tile" data-reel="${r.id}" aria-label="${t('reelOf')}: ${r.title}" style="--i:${i}">
-    ${r.poster_url ? html`<img src="${r.poster_url}" alt="" loading="lazy">` : ''}
+    ${r.poster_url || r.product_image ? html`<img src="${r.poster_url || r.product_image}" alt="" loading="lazy">` : ''}
     <span class="mk-play" aria-hidden="true">▶</span>
     ${r.views ? html`<span class="mk-views" aria-hidden="true">👁 ${compact(r.views)}</span>` : ''}
     <span class="mk-reel-cap"><b>${r.title}</b><small>${r.merchant_name}</small></span>
@@ -329,7 +330,9 @@ async function showReels(startId, sort) {
     <div class="mk-reels" id="reels">${list.map((r) => {
       const lk = liked.has(r.id), sv = savedReels.has(r.id);
       return html`<section class="mk-reel" data-rid="${r.id}">
-      <video src="${r.video_url}" poster="${r.poster_url || ''}" playsinline muted loop preload="metadata" aria-label="${r.title}"></video>
+      ${r.clip
+        ? html`<div class="mk-clip"><video data-clip="${r.id}" src="${r.video_url}#t=${r.clip.start}" poster="${r.poster_url || ''}" playsinline muted preload="metadata" aria-label="${r.title}"></video></div>`
+        : html`<video src="${r.video_url}" poster="${r.poster_url || ''}" playsinline muted loop preload="metadata" aria-label="${r.title}"></video>`}
       <button type="button" class="mk-sound" data-sound aria-label="${t('sound_on')}">🔇</button>
       <div class="mk-reel-side">
         <button type="button" class="mk-side-btn ${lk ? 'on' : ''}" data-like="${r.id}" aria-pressed="${lk}" aria-label="${t('like')}"><span aria-hidden="true">${lk ? '❤️' : '🤍'}</span><small>${compact(r.likes || 0)}</small></button>
@@ -349,6 +352,10 @@ async function showReels(startId, sort) {
     </section>`;
     })}</div></div>`);
   const reelBox = $('#reels');
+  for (const v of reelBox.querySelectorAll('video[data-clip]')) {
+    const r = list.find((x) => x.id === Number(v.dataset.clip));
+    bindClip(v, r.clip, r.duration);
+  }
   let sound = false;
   const seen = new Set();
   io = new IntersectionObserver(

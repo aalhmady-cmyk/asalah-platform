@@ -217,3 +217,5 @@ body[data-view="reels"] .mk-view { max-width: none; padding: 0; }
 .mk-demo-card > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .mk-demo-card small { color: var(--muted, #667); }
 [dir=ltr] .mk-demo-card > span:last-child { transform: scaleX(-1); }
+.mk-clip { position: relative; overflow: hidden; height: 100%; width: 100%; max-width: calc((100dvh - 62px) * 9 / 16); background: #000; }
+.mk-clip video { max-width: none; }

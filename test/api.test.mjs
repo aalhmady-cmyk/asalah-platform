@@ -465,6 +465,27 @@ test('متجر التاجر: الاشتراك والمنتجات والريلز 
   assert.equal(vid.headers.get('Content-Range'), 'bytes 0-99/4096');
   assert.equal((await vid.arrayBuffer()).byteLength, 100);
 
+  // ريل أصلي (فيديو الآيفون MOV) مع أرقام القص، والملف اللي مو فيديو ينرفض
+  const c = await post('/api/m/store/reels', { title: 'ريل من الآيفون', duration: 15, clip: { start: 4.5, zoom: 1.4, x: 0.2, y: 9 } }, S.merchant);
+  assert.equal(c.status, 201);
+  const mov = new Uint8Array(30 * 1024 * 1024);
+  mov.set([0, 0, 0, 0x14, 0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20]);
+  const cu = await fetch(`${BASE}/api/m/store/reels/${c.data.id}/video`, { method: 'PUT', headers: { Cookie: S.merchant, Origin: BASE, 'Content-Type': 'video/mp4' }, body: mov });
+  assert.equal(cu.status, 200, await cu.clone().text());
+  const clipReel = (await cu.json()).reel;
+  assert.deepEqual(clipReel.clip, { start: 4.5, zoom: 1.4, x: 0.2, y: 1 });
+  assert.equal(clipReel.video_bytes, mov.length);
+  const pubClip = (await call('/api/public/store/reels')).data.reels.find((x) => x.id === c.data.id);
+  assert.equal(pubClip.clip.start, 4.5);
+  const n = await post('/api/m/store/reels', { title: 'مو فيديو', duration: 15 }, S.merchant);
+  const nu = await fetch(`${BASE}/api/m/store/reels/${n.data.id}/video`, { method: 'PUT', headers: { Cookie: S.merchant, Origin: BASE, 'Content-Type': 'video/mp4' }, body: new Uint8Array(5000) });
+  assert.equal(nu.status, 415);
+  // الريل المقصوص مسبقاً حده أصغر
+  const big = await fetch(`${BASE}/api/m/store/reels/${n.data.id}/video`, { method: 'PUT', headers: { Cookie: S.merchant, Origin: BASE, 'Content-Type': 'video/mp4' }, body: mov });
+  assert.equal(big.status, 413);
+  assert.equal((await call(`/api/m/store/reels/${c.data.id}`, { method: 'DELETE', cookie: S.merchant })).status, 200);
+  assert.equal((await call(`/api/m/store/reels/${n.data.id}`, { method: 'DELETE', cookie: S.merchant })).status, 200);
+
   // الإيقاف من المدير يخفي المتجر كامل
   assert.equal((await patch(`/api/admin/merchants/${S.mid}`, { store_enabled: false }, S.admin)).status, 200);
   pub = await call('/api/public/store');

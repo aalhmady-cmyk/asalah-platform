@@ -2,7 +2,7 @@
 import { assistantEnabled } from '../lib/assistant.js';
 import { deleteImage, imageUrl, ownsImage, saveImage, saveImageBytes } from '../lib/images.js';
 import { draftProduct, storeChat } from '../lib/shop.js';
-import { CATEGORIES, REEL_MAX, REEL_MIN, VIDEO_MAX_BYTES, discoverProducts, importLink, productFields, proxyImage, videoType } from '../lib/store.js';
+import { CATEGORIES, ORIGINAL_MAX_BYTES, REEL_MAX, REEL_MIN, VIDEO_MAX_BYTES, discoverProducts, importLink, productFields, proxyImage, videoType } from '../lib/store.js';
 import { audit, fail, int, ipHash, json, now, randomHex, rateLimit, readJson, str, url } from '../lib/util.js';
 
 const MAX_PRODUCTS = 500;
@@ -16,9 +16,13 @@ function productOut(p) {
   return { ...rest, price: sar(price), old_price: sar(old_price), image_url: imageUrl(image_key) };
 }
 function reelOut(r) {
-  const { video_key, poster_key, ...rest } = r;
-  return { ...rest, video_url: mediaUrl(video_key), poster_url: imageUrl(poster_key) };
+  const { video_key, poster_key, clip_mode, clip_start, clip_zoom, clip_x, clip_y, ...rest } = r;
+  // clip: الفيديو أصلي، والعرض يبدأ من start لمدة duration ويقص بـ zoom و x و y
+  const clip = clip_mode ? { start: clip_start, zoom: clip_zoom, x: clip_x, y: clip_y } : null;
+  return { ...rest, clip, video_url: mediaUrl(video_key), poster_url: imageUrl(poster_key) };
 }
+
+const clamp = (v, lo, hi, d) => (Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Number(v))) : d);
 
 function b64bytes(s) {
   if (typeof s !== 'string' || s.length > 1_500_000 || !/^[A-Za-z0-9+/=]+$/.test(s)) fail(400, 'الصورة غير صالحة');
@@ -57,7 +61,7 @@ export async function handleMerchantStore(req, env, path, user) {
       categories: CATEGORIES,
       ai: assistantEnabled(env),
       media: !!env.MEDIA,
-      reel_limits: { min: REEL_MIN, max: REEL_MAX, bytes: VIDEO_MAX_BYTES },
+      reel_limits: { min: REEL_MIN, max: REEL_MAX, bytes: VIDEO_MAX_BYTES, original_bytes: ORIGINAL_MAX_BYTES },
       stats: { products: products.results.length, views: totals.views, clicks: totals.clicks, reel_views: reelStats.views, reel_clicks: reelStats.clicks },
       products: products.results.map(productOut),
       reels: reels.results.map(reelOut),
@@ -187,9 +191,12 @@ export async function handleMerchantStore(req, env, path, user) {
       await deleteReelFiles(env, r);
       await db.prepare('DELETE FROM reels WHERE id=?').bind(r.id).run();
     }
+    const c = b.clip && typeof b.clip === 'object' ? b.clip : null;
     const row = await db
-      .prepare("INSERT INTO reels(merchant_id,product_id,title,poster_key,duration,status,created_at) VALUES(?,?,?,?,?,'uploading',?) RETURNING id")
-      .bind(mid, product_id, title, poster_key, duration, now())
+      .prepare(
+        "INSERT INTO reels(merchant_id,product_id,title,poster_key,duration,status,created_at,clip_mode,clip_start,clip_zoom,clip_x,clip_y) VALUES(?,?,?,?,?,'uploading',?,?,?,?,?,?) RETURNING id"
+      )
+      .bind(mid, product_id, title, poster_key, duration, now(), c ? 1 : 0, c ? clamp(c.start, 0, 3600, 0) : 0, c ? clamp(c.zoom, 1, 3, 1) : 1, c ? clamp(c.x, 0, 1, 0.5) : 0.5, c ? clamp(c.y, 0, 1, 0.5) : 0.5)
       .first();
     return json({ ok: true, id: row.id }, 201);
   }
@@ -197,18 +204,33 @@ export async function handleMerchantStore(req, env, path, user) {
     if (!env.MEDIA) fail(503, 'رفع الريلز يحتاج تفعيل التخزين', 'media_disabled');
     const reel = await db.prepare("SELECT * FROM reels WHERE id=? AND merchant_id=? AND status='uploading'").bind(Number(match[1]), mid).first();
     if (!reel) fail(404, 'ما لقينا الريل');
-    if (Number(req.headers.get('Content-Length') || 0) > VIDEO_MAX_BYTES) fail(413, 'الفيديو كبير، قصّره أو قلل جودته');
-    const buf = new Uint8Array(await req.arrayBuffer());
-    if (buf.length > VIDEO_MAX_BYTES) fail(413, 'الفيديو كبير، قصّره أو قلل جودته');
-    const vt = videoType(buf);
-    if (!vt) fail(415, 'الملف مو فيديو MP4 أو WEBM');
-    const key = `reels/${mid}/${randomHex(12)}.${vt.ext}`;
-    await env.MEDIA.put(key, buf, { httpMetadata: { contentType: vt.type } });
+    const max = reel.clip_mode ? ORIGINAL_MAX_BYTES : VIDEO_MAX_BYTES;
+    const size = Number(req.headers.get('Content-Length') || 0);
+    if (size > max) fail(413, 'الفيديو كبير، قصّره أو قلل جودته');
+    if (!size || !req.body) fail(411, 'الفيديو ما وصل، حاول مرة ثانية');
+    // نرسله لـ R2 مباشرة بدون ما نحمله كله في الذاكرة، وبعدها نتأكد من أوله إنه فيديو
+    const key = `reels/${mid}/${randomHex(12)}.mp4`;
+    await env.MEDIA.put(key, req.body, { httpMetadata: { contentType: 'video/mp4' } });
+    const head = await env.MEDIA.get(key, { range: { offset: 0, length: 16 } });
+    const vt = head && videoType(new Uint8Array(await head.arrayBuffer()));
+    const stored = head?.size || 0;
+    if (!vt || stored > max) {
+      await env.MEDIA.delete(key);
+      fail(vt ? 413 : 415, vt ? 'الفيديو كبير، قصّره أو قلل جودته' : 'الملف مو فيديو MP4 أو MOV أو WEBM');
+    }
+    let finalKey = key;
+    if (vt.ext !== 'mp4') {
+      // webm: ننسخه بالامتداد الصحيح عشان المتصفح يعرف نوعه
+      finalKey = `reels/${mid}/${randomHex(12)}.${vt.ext}`;
+      const obj = await env.MEDIA.get(key);
+      await env.MEDIA.put(finalKey, await obj.arrayBuffer(), { httpMetadata: { contentType: vt.type } });
+      await env.MEDIA.delete(key);
+    }
     const row = await db
       .prepare("UPDATE reels SET video_key=?,video_type=?,video_bytes=?,status='active' WHERE id=? RETURNING *")
-      .bind(key, vt.type, buf.length, reel.id)
+      .bind(finalKey, vt.type, stored, reel.id)
       .first();
-    await audit(db, user, 'reel_published', { id: reel.id, title: reel.title, bytes: buf.length });
+    await audit(db, user, 'reel_published', { id: reel.id, title: reel.title, bytes: stored });
     return json({ ok: true, reel: reelOut(row) });
   }
   if ((match = path.match(/^\/api\/m\/store\/reels\/(\d+)$/)) && (m === 'PATCH' || m === 'DELETE')) {
@@ -276,7 +298,7 @@ async function listReels(db, { merchant, product, sort, limit = 20, offset = 0 }
   if (product) { where.push('r.product_id=?'); args.push(product); }
   const r = await db
     .prepare(
-      `SELECT r.id,r.title,r.video_key,r.poster_key,r.duration,r.product_id,r.created_at,r.likes,r.views,m.name AS merchant_name,m.slug AS merchant_slug,m.logo_key AS merchant_logo,
+      `SELECT r.id,r.title,r.video_key,r.poster_key,r.duration,r.clip_mode,r.clip_start,r.clip_zoom,r.clip_x,r.clip_y,r.product_id,r.created_at,r.likes,r.views,m.name AS merchant_name,m.slug AS merchant_slug,m.logo_key AS merchant_logo,
               p.title AS product_title,p.price AS product_price,p.buy_url AS product_buy_url,p.image_key AS product_image
        FROM reels r JOIN merchants m ON m.id=r.merchant_id LEFT JOIN store_products p ON p.id=r.product_id AND p.status='active'
        WHERE ${where.join(' AND ')} ORDER BY ${sort === 'popular' ? 'r.views + r.likes * 5 DESC, r.id DESC' : 'r.id DESC'} LIMIT ? OFFSET ?`

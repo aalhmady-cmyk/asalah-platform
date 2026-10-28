@@ -1,6 +1,8 @@
 // قص الريل في المتصفح: نختار جزء بمقاس 9:16 ومدة محددة، ونعيد تسجيله بـ canvas + MediaRecorder.
 // الناتج 720×1280 بحجم معقول (تقريباً 8 ميجا لكل 30 ثانية)، فما نحتاج سيرفر لمعالجة الفيديو.
 
+import { fitClip } from '/stores/clip.js';
+
 const OUT_W = 720, OUT_H = 1280;
 
 export function reelDuration(file) {
@@ -191,4 +193,79 @@ async function posterOf(canvas) {
     fr.onload = () => resolve(String(fr.result).split(',')[1]);
     fr.readAsDataURL(blob);
   });
+}
+
+// المحرر بدون إعادة تسجيل: نعرض الفيديو نفسه داخل إطار 9:16 ونحفظ القص كأرقام.
+// هذا اللي يشتغل على الآيفون، لأن سفاري ما يرسم الفيديو على canvas بشكل موثوق.
+export async function clipReel(file, box) {
+  const v = document.createElement('video');
+  v.playsInline = true;
+  v.setAttribute('playsinline', '');
+  v.muted = true;
+  v.preload = 'auto';
+  box.replaceChildren(v);
+  v.src = URL.createObjectURL(file);
+  await new Promise((resolve, reject) => { v.onloadedmetadata = resolve; v.onerror = () => reject(new Error('ما قدرنا نفتح الفيديو')); });
+  const st = { start: 0, dur: 10, zoom: 1, x: 0.5, y: 0.5 };
+  const fit = () => fitClip(v, st);
+  const ro = new ResizeObserver(fit);
+  ro.observe(box);
+  let previewing = false;
+  // الآيفون ما يعرض أول صورة إلا بعد ما يشتغل الفيديو لحظة
+  await v.play().then(() => v.pause()).catch(() => {});
+  await seek(v, 0);
+  fit();
+
+  let drag = null;
+  box.style.touchAction = 'none';
+  box.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, cx: st.x, cy: st.y }; box.setPointerCapture(e.pointerId); });
+  box.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const r = box.getBoundingClientRect(), vr = v.getBoundingClientRect();
+    const spareX = vr.width - r.width, spareY = vr.height - r.height;
+    if (spareX > 1) st.x = Math.min(1, Math.max(0, drag.cx - (e.clientX - drag.x) / spareX));
+    if (spareY > 1) st.y = Math.min(1, Math.max(0, drag.cy - (e.clientY - drag.y) / spareY));
+    fit();
+  });
+  const end = () => (drag = null);
+  box.addEventListener('pointerup', end);
+  box.addEventListener('pointercancel', end);
+  v.addEventListener('timeupdate', () => {
+    if (previewing && v.currentTime >= st.start + st.dur) { v.pause(); previewing = false; seek(v, st.start); }
+  });
+  const stop = () => { previewing = false; v.pause(); };
+
+  return {
+    async set(next) {
+      const moved = next.start !== st.start;
+      Object.assign(st, { start: next.start, dur: next.dur, zoom: next.zoom });
+      if (previewing) stop();
+      if (moved) await seek(v, st.start);
+      fit();
+    },
+    async preview() {
+      if (previewing) return stop();
+      await seek(v, st.start);
+      previewing = true;
+      v.muted = false;
+      await v.play().catch(() => { v.muted = true; return v.play(); }).catch(() => (previewing = false));
+    },
+    // ما فيه قص فعلي: نرجع الملف الأصلي مع أرقام القص، وغلاف لو قدرنا نرسمه
+    async render(opts, onProgress) {
+      Object.assign(st, { start: opts.start, dur: opts.dur, zoom: opts.zoom });
+      stop();
+      await seek(v, st.start);
+      onProgress?.(1);
+      let poster = null;
+      try {
+        const c = Object.assign(document.createElement('canvas'), { width: 360, height: 640 });
+        const ctx = c.getContext('2d');
+        const vw = v.videoWidth, vh = v.videoHeight, s = Math.max(360 / vw, 640 / vh) * st.zoom;
+        ctx.drawImage(v, (360 - vw * s) * st.x, (640 - vh * s) * st.y, vw * s, vh * s);
+        if (brightness(c) >= 6) poster = await posterOf(c);
+      } catch {}
+      return { video: file, poster, clip: { start: st.start, zoom: st.zoom, x: st.x, y: st.y } };
+    },
+    dispose() { stop(); ro.disconnect(); URL.revokeObjectURL(v.src); v.removeAttribute('src'); v.load(); },
+  };
 }
