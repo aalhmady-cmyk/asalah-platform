@@ -3,36 +3,112 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0F2A21">
 <title>تسجيل الدخول - أصالة</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/login/login.css">
 </head>
-<body>
-<main style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px">
-  <div class="card" style="width:100%;max-width:420px;gap:20px">
-    <div class="brand" style="color:var(--ink)">
-      <svg width="44" height="44" viewBox="0 0 40 40" aria-hidden="true"><rect x="2" y="2" width="36" height="36" rx="10" fill="var(--forest)"/><path d="M12 21l5 5 11-12" fill="none" stroke="#D9B45A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <div><b>أصالة</b><small class="muted">المنتجات الأصلية</small></div>
+<body class="auth">
+<main class="auth-wrap">
+  <!-- المشهد: جوال يمسح علامة أصالة على منتج، تطلع موجات NFC ثم ختم التحقق -->
+  <section class="scene" aria-hidden="true">
+    <div class="scene-glow"></div>
+    <svg class="scene-art" viewBox="0 0 360 360">
+      <defs>
+        <linearGradient id="box" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16805E"/><stop offset="1" stop-color="#0B5A42"/></linearGradient>
+        <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#143A2E"/><stop offset="1" stop-color="#0B2219"/></linearGradient>
+        <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9B45A" stop-opacity="0"/><stop offset=".5" stop-color="#F3D68C" stop-opacity=".9"/><stop offset="1" stop-color="#D9B45A" stop-opacity="0"/></linearGradient>
+        <clipPath id="screen-clip"><rect x="196" y="58" width="96" height="176" rx="14"/></clipPath>
+      </defs>
+      <!-- المنتج -->
+      <g class="product">
+        <ellipse cx="128" cy="318" rx="86" ry="12" fill="#000" opacity=".25"/>
+        <path d="M62 150 L128 128 L194 150 L194 306 L128 320 L62 306 Z" fill="url(#box)"/>
+        <path d="M128 128 L194 150 L194 306 L128 320 Z" fill="#000" opacity=".14"/>
+        <path d="M62 150 L128 128 L194 150 L128 170 Z" fill="#1E9670"/>
+        <rect x="80" y="236" width="70" height="6" rx="3" fill="#fff" opacity=".35"/>
+        <rect x="80" y="250" width="46" height="6" rx="3" fill="#fff" opacity=".22"/>
+        <!-- علامة NFC على المنتج -->
+        <g class="tag">
+          <circle cx="112" cy="200" r="22" fill="#D9B45A"/>
+          <circle cx="112" cy="200" r="16" fill="none" stroke="#0F2A21" stroke-width="2" opacity=".5"/>
+          <path d="M104 201l6 6 11-13" fill="none" stroke="#0F2A21" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+        <g class="waves" fill="none" stroke="#F3D68C" stroke-width="3" stroke-linecap="round">
+          <path class="w1" d="M142 182 a30 30 0 0 1 0 36"/>
+          <path class="w2" d="M156 170 a48 48 0 0 1 0 60"/>
+          <path class="w3" d="M170 158 a66 66 0 0 1 0 84"/>
+        </g>
+      </g>
+      <!-- الجوال -->
+      <g class="phone">
+        <rect x="188" y="46" width="112" height="200" rx="22" fill="#0A1A14" stroke="#D9B45A" stroke-opacity=".55" stroke-width="2"/>
+        <rect x="196" y="58" width="96" height="176" rx="14" fill="url(#screen)"/>
+        <rect x="228" y="64" width="32" height="5" rx="2.5" fill="#000" opacity=".6"/>
+        <g clip-path="url(#screen-clip)">
+          <rect class="beam" x="196" y="40" width="96" height="44" fill="url(#beam)"/>
+          <g class="scanning">
+            <circle cx="244" cy="140" r="26" fill="none" stroke="#2D5C4B" stroke-width="5"/>
+            <path class="spin" d="M244 114 a26 26 0 0 1 26 26" fill="none" stroke="#D9B45A" stroke-width="5" stroke-linecap="round"/>
+            <rect x="214" y="186" width="60" height="6" rx="3" fill="#2D5C4B"/>
+            <rect x="224" y="198" width="40" height="6" rx="3" fill="#2D5C4B"/>
+          </g>
+          <g class="ok">
+            <circle cx="244" cy="136" r="30" fill="#D9B45A"/>
+            <path d="M230 137l10 10 19-21" fill="none" stroke="#0F2A21" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="212" y="184" width="64" height="8" rx="4" fill="#F3D68C"/>
+            <rect x="224" y="198" width="40" height="6" rx="3" fill="#5E8A79"/>
+          </g>
+        </g>
+      </g>
+    </svg>
+    <div class="scene-copy">
+      <div class="scene-badge"><span class="dot"></span> تحقق فوري عبر NFC</div>
+      <h2>كل منتج أصلي له بصمة لا تتكرر</h2>
+      <p>العميل يقرّب جواله من العلامة، ويعرف خلال ثانية إن المنتج أصلي.</p>
     </div>
+  </section>
 
-    <form id="login" style="display:flex;flex-direction:column;gap:14px">
-      <h1 style="font-size:22px">تسجيل الدخول</h1>
-      <label class="field">البريد الإلكتروني<input name="email" type="email" autocomplete="username" required class="ltr"></label>
-      <label class="field">كلمة المرور<input name="password" type="password" autocomplete="current-password" required class="ltr"></label>
-      <button class="btn btn-primary" type="submit">دخول</button>
-    </form>
+  <section class="panel">
+    <div class="panel-inner">
+      <div class="auth-brand">
+        <svg width="48" height="48" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="11" fill="#0F2A21"/><path d="M12 21l5 5 11-12" fill="none" stroke="#D9B45A" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div><b>أصالة</b><small>المنتجات الأصلية</small></div>
+      </div>
 
-    <form id="setup" hidden style="display:flex;flex-direction:column;gap:14px">
-      <h1 style="font-size:22px">إعداد أول مدير عام</h1>
-      <p class="muted small" style="margin:0">هذي الصفحة تشتغل مرة وحدة فقط: أول حساب ينشأ هنا يصير المدير العام، وبعدها تقفل.</p>
-      <label class="field">مفتاح الإعداد (إذا أضفت SETUP_TOKEN)<input name="token" type="password" class="ltr"></label>
-      <label class="field">الاسم<input name="name" required></label>
-      <label class="field">البريد الإلكتروني<input name="email" type="email" required class="ltr"></label>
-      <label class="field">كلمة المرور (10 أحرف أو أكثر)<input name="password" type="password" minlength="10" autocomplete="new-password" required class="ltr"></label>
-      <button class="btn btn-primary" type="submit">إنشاء الحساب</button>
-    </form>
-  </div>
+      <form id="login" class="auth-form" novalidate>
+        <div>
+          <h1>أهلاً بك</h1>
+          <p class="muted">سجّل دخولك للوحة التحكم</p>
+        </div>
+        <label class="ifield">
+          <span>البريد الإلكتروني</span>
+          <div class="ibox"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z M4 7l8 6 8-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><input name="email" type="email" autocomplete="username" required class="ltr" placeholder="name@example.com"></div>
+        </label>
+        <label class="ifield">
+          <span>كلمة المرور</span>
+          <div class="ibox"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><input name="password" type="password" autocomplete="current-password" required class="ltr" placeholder="••••••••••"><button type="button" class="eye" aria-label="إظهار كلمة المرور" data-eye><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button></div>
+        </label>
+        <button class="scan-btn" type="submit"><span class="scan-label">دخول</span><span class="scan-bar" aria-hidden="true"></span></button>
+      </form>
+
+      <form id="setup" class="auth-form" hidden>
+        <div>
+          <h1>إعداد أول مدير عام</h1>
+          <p class="muted">هذي الصفحة تشتغل مرة وحدة: أول حساب ينشأ هنا يصير المدير العام، وبعدها تقفل.</p>
+        </div>
+        <label class="ifield"><span>الاسم</span><div class="ibox"><input name="name" required></div></label>
+        <label class="ifield"><span>البريد الإلكتروني</span><div class="ibox"><input name="email" type="email" required class="ltr"></div></label>
+        <label class="ifield"><span>كلمة المرور (10 أحرف أو أكثر)</span><div class="ibox"><input name="password" type="password" minlength="10" autocomplete="new-password" required class="ltr"></div></label>
+        <label class="ifield"><span>مفتاح الإعداد (اتركه فاضي إذا ما أضفته)</span><div class="ibox"><input name="token" type="password" class="ltr"></div></label>
+        <button class="scan-btn" type="submit"><span class="scan-label">إنشاء الحساب</span><span class="scan-bar" aria-hidden="true"></span></button>
+      </form>
+
+      <p class="auth-foot">محمي بواسطة <b>أصالة المنتجات الأصلية</b></p>
+    </div>
+  </section>
 </main>
 <script type="module" src="/login/login.js"></script>
 </body>

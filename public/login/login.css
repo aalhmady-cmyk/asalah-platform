@@ -1,0 +1,82 @@
+/* صفحة الدخول: مشهد مسح علامة على منتج + نموذج الدخول */
+body.auth { background: var(--forest); min-height: 100vh; }
+.auth-wrap { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+
+.scene { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 48px 32px; color: #fff;
+  background: radial-gradient(120% 80% at 70% 20%, #1C4436 0%, #0F2A21 55%, #0A1D17 100%); }
+.scene::before { content: ""; position: absolute; inset: 0; opacity: .5;
+  background-image: radial-gradient(rgba(217,180,90,.16) 1px, transparent 1px); background-size: 22px 22px;
+  mask-image: radial-gradient(70% 60% at 50% 40%, #000, transparent); }
+.scene-glow { position: absolute; width: 420px; height: 420px; border-radius: 50%; top: 12%; background: radial-gradient(circle, rgba(217,180,90,.22), transparent 65%); filter: blur(10px); animation: glow 5s ease-in-out infinite; }
+.scene-art { position: relative; width: min(400px, 82%); height: auto; overflow: visible; }
+.scene-copy { position: relative; text-align: center; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.scene-copy h2 { font-size: 28px; line-height: 1.35; }
+.scene-copy p { margin: 0; color: var(--forest-ink); font-size: 16px; }
+.scene-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(217,180,90,.45); color: #F3D68C; font-size: 13px; font-weight: 600; background: rgba(217,180,90,.08); }
+.scene-badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 0 rgba(217,180,90,.7); animation: ping 1.6s ease-out infinite; }
+
+/* حركة المشهد: الجوال يقرب، الموجات تطلع، الشاشة تمسح، ثم ختم التحقق */
+.scene-art * { transform-box: fill-box; }
+.phone { transform-origin: center; animation: phone 5s cubic-bezier(.5,0,.3,1) infinite; }
+.waves path { opacity: 0; transform-origin: left center; animation: wave 5s ease-out infinite; }
+.waves .w2 { animation-delay: .18s; }
+.waves .w3 { animation-delay: .36s; }
+.tag { transform-origin: center; animation: tag 5s ease-in-out infinite; }
+.beam { animation: beam 5s linear infinite; }
+.scanning { animation: scanning 5s step-end infinite; }
+.spin { transform-origin: 0% 100%; animation: spin .8s linear infinite; }
+.ok { opacity: 0; transform-origin: center; animation: ok 5s ease-out infinite; }
+
+@keyframes phone { 0%, 100% { transform: translate(26px, -26px) rotate(9deg); } 22%, 78% { transform: translate(-14px, 22px) rotate(-4deg); } }
+@keyframes wave { 0%, 24% { opacity: 0; transform: scale(.6); } 32% { opacity: 1; } 52% { opacity: 0; transform: scale(1.25); } 100% { opacity: 0; } }
+@keyframes tag { 0%, 24%, 60%, 100% { transform: scale(1); } 30% { transform: scale(1.1); } 40% { transform: scale(1); } }
+@keyframes beam { 0%, 24% { transform: translateY(0); opacity: 0; } 26% { opacity: 1; } 54% { transform: translateY(190px); opacity: 1; } 56%, 100% { opacity: 0; transform: translateY(190px); } }
+@keyframes scanning { 0% { opacity: 1; } 56% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes ok { 0%, 55% { opacity: 0; transform: scale(.6); } 62% { opacity: 1; transform: scale(1.06); } 66%, 88% { opacity: 1; transform: scale(1); } 96%, 100% { opacity: 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes glow { 0%, 100% { opacity: .7; transform: scale(1); } 60% { opacity: 1; transform: scale(1.08); } }
+@keyframes ping { to { box-shadow: 0 0 0 10px rgba(217,180,90,0); } }
+
+/* النموذج */
+.panel { background: var(--ground); display: flex; align-items: center; justify-content: center; padding: 40px 24px; border-start-start-radius: 0; }
+.panel-inner { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 32px; }
+.auth-brand { display: flex; align-items: center; gap: 12px; }
+.auth-brand b { display: block; font-size: 22px; line-height: 1.1; }
+.auth-brand small { color: var(--muted); font-size: 13px; }
+.auth-form { display: flex; flex-direction: column; gap: 18px; }
+.auth-form h1 { font-size: 30px; }
+.auth-form .muted { margin: 4px 0 0; }
+.ifield { display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 600; }
+.ibox { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 14px; border-radius: 14px; background: var(--surface); border: 1.5px solid var(--line); transition: border-color .15s, box-shadow .15s; }
+.ibox:focus-within { border-color: var(--green); box-shadow: 0 0 0 4px rgba(14,107,78,.12); }
+.ibox > svg { width: 20px; height: 20px; color: var(--muted); flex: none; }
+.ibox input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-weight: 400; font-size: 16px; color: var(--ink); min-height: 48px; }
+.eye { border: 0; background: transparent; padding: 6px; color: var(--muted); cursor: pointer; border-radius: 8px; display: flex; }
+.eye svg { width: 20px; height: 20px; }
+.eye:hover, .eye[aria-pressed="true"] { color: var(--green); }
+
+/* زر الدخول: عند الضغط يصير كأنه يمسح العلامة، وعند النجاح يطلع ختم */
+.scan-btn { position: relative; overflow: hidden; min-height: 54px; border: 0; border-radius: 14px; background: var(--forest); color: #fff; font: inherit; font-size: 17px; font-weight: 700; cursor: pointer; transition: background .2s, transform .1s; margin-top: 4px; }
+.scan-btn:hover { background: #163A2D; }
+.scan-btn:active { transform: scale(.99); }
+.scan-btn:disabled { cursor: progress; }
+.scan-bar { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: linear-gradient(90deg, transparent, rgba(243,214,140,.55), transparent); transform: translateX(100%); }
+.scan-btn.is-scanning .scan-bar { opacity: 1; animation: sweep 1s ease-in-out infinite; }
+.scan-btn.is-ok { background: var(--gold); color: var(--gold-ink); }
+@keyframes sweep { from { transform: translateX(100%); } to { transform: translateX(-100%); } }
+.auth-foot { margin: 0; text-align: center; font-size: 13px; color: var(--muted); }
+
+@media (max-width: 860px) {
+  .auth-wrap { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  .scene { padding: 28px 16px 36px; gap: 14px; }
+  .scene-art { width: min(240px, 70%); }
+  .scene-copy h2 { font-size: 20px; }
+  .scene-copy p { font-size: 14px; }
+  .panel { border-radius: 24px 24px 0 0; margin-top: -20px; position: relative; padding: 32px 16px 28px; align-items: flex-start; }
+  .panel-inner { gap: 24px; }
+  .auth-brand { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scene-art *, .scene-glow, .scene-badge .dot, .scan-bar { animation: none !important; }
+  .ok { opacity: 1; } .scanning, .waves path { opacity: 0; }
+}
