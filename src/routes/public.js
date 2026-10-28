@@ -1,6 +1,7 @@
 // المسارات العامة: التحقق من العلامة، المشاركة في المسابقة، بلاغ التقليد.
 import { assistantEnabled } from '../lib/assistant.js';
 import { guide } from '../lib/guide.js';
+import { shopForVerify } from './store.js';
 import { shopAI } from '../lib/shop.js';
 import { imageUrl } from '../lib/images.js';
 import { checkSignature, parseToken, publicId } from '../lib/tags.js';
@@ -52,7 +53,8 @@ async function resolve(env, db, raw) {
       `SELECT b.id,b.code,b.size,b.salt,b.status,b.is_test,b.product_name,b.produced_on,b.merchant_id,b.image_key,
               m.name,m.logo_url,m.logo_key,m.brand_color,m.store_url,m.whatsapp,m.status AS merchant_status,m.max_checks,
               m.contest_enabled,m.contest_title,m.contest_ends_at,m.contest_terms_url,b.expires_on,b.details,
-              m.loyalty_enabled,m.loyalty_mode,m.loyalty_per_tag,m.loyalty_min_redeem,m.loyalty_reward,m.ratings_enabled
+              m.loyalty_enabled,m.loyalty_mode,m.loyalty_per_tag,m.loyalty_min_redeem,m.loyalty_reward,m.ratings_enabled,
+              m.slug,m.store_enabled,m.store_coupon,m.store_coupon_note,b.store_product_id
        FROM batches b JOIN merchants m ON m.id=b.merchant_id WHERE b.id=?`
     )
     .bind(p.batchId)
@@ -276,6 +278,7 @@ export async function verify(req, env) {
     contest: open ? { title: b.contest_title, ends_at: b.contest_ends_at, terms_url: b.contest_terms_url, entered: Boolean(tag.entry_done) } : null,
     loyalty: b.loyalty_enabled ? { ...loyaltyInfo(b), claimed: Boolean(tag.loyalty_claimed) } : null,
     rating: b.ratings_enabled ? { done: Boolean(rated), stars: rated?.stars ?? null } : null,
+    shop: b.store_enabled && b.merchant_status === 'active' ? await shopForVerify(db, b) : null,
   });
 }
 

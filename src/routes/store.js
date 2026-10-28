@@ -2,7 +2,7 @@
 import { assistantEnabled } from '../lib/assistant.js';
 import { deleteImage, imageUrl, ownsImage, saveImage, saveImageBytes } from '../lib/images.js';
 import { draftProduct, storeChat } from '../lib/shop.js';
-import { CATEGORIES, REEL_MAX, REEL_MIN, VIDEO_MAX_BYTES, importLink, productFields, proxyImage, videoType } from '../lib/store.js';
+import { CATEGORIES, REEL_MAX, REEL_MIN, VIDEO_MAX_BYTES, discoverProducts, importLink, productFields, proxyImage, videoType } from '../lib/store.js';
 import { audit, fail, int, ipHash, json, now, randomHex, rateLimit, readJson, str, url } from '../lib/util.js';
 
 const MAX_PRODUCTS = 500;
@@ -38,7 +38,7 @@ export async function handleMerchantStore(req, env, path, user) {
   const db = env.DB;
   const mid = user.merchant_id;
   const m = req.method;
-  const merchant = await db.prepare('SELECT id,name,slug,store_url,store_enabled,store_since FROM merchants WHERE id=?').bind(mid).first();
+  const merchant = await db.prepare('SELECT id,name,slug,store_url,store_enabled,store_since,store_coupon,store_coupon_note,coupon_copies,store_auto_sync FROM merchants WHERE id=?').bind(mid).first();
 
   if (path === '/api/m/store' && m === 'GET') {
     const [products, reels, totals] = await Promise.all([
@@ -52,6 +52,8 @@ export async function handleMerchantStore(req, env, path, user) {
       enabled: !!merchant.store_enabled,
       store_url: merchant.store_url,
       slug: merchant.slug,
+      coupon: { code: merchant.store_coupon, note: merchant.store_coupon_note, copies: merchant.coupon_copies },
+      auto_sync: !!merchant.store_auto_sync,
       categories: CATEGORIES,
       ai: assistantEnabled(env),
       media: !!env.MEDIA,
@@ -75,10 +77,30 @@ export async function handleMerchantStore(req, env, path, user) {
 
   if (path === '/api/m/store' && m === 'PATCH') {
     const b = await readJson(req);
-    const store_url = url(b.store_url, 'متجرك في سلة');
-    await db.prepare('UPDATE merchants SET store_url=? WHERE id=?').bind(store_url, mid).run();
-    await audit(db, user, 'store_url_updated', { store_url });
-    return json({ ok: true, store_url });
+    const f = {};
+    if ('store_url' in b) f.store_url = url(b.store_url, 'متجرك في سلة');
+    if ('store_coupon' in b) {
+      f.store_coupon = str(b.store_coupon, 'الكوبون', { min: 2, max: 30, optional: true });
+      if (f.store_coupon && !/^[A-Za-z0-9_-]+$/.test(f.store_coupon)) fail(400, 'الكوبون: حروف إنجليزية وأرقام فقط');
+      if (f.store_coupon) f.store_coupon = f.store_coupon.toUpperCase();
+    }
+    if ('store_coupon_note' in b) f.store_coupon_note = str(b.store_coupon_note, 'وصف الخصم', { max: 80, optional: true });
+    if ('store_auto_sync' in b) f.store_auto_sync = b.store_auto_sync ? 1 : 0;
+    const keys = Object.keys(f);
+    if (!keys.length) fail(400, 'ما فيه تغييرات');
+    await db.prepare(`UPDATE merchants SET ${keys.map((k) => k + '=?').join(',')} WHERE id=?`).bind(...keys.map((k) => f[k]), mid).run();
+    await audit(db, user, 'store_settings_updated', f);
+    return json({ ok: true, ...f });
+  }
+
+  // ---------- مزامنة سلة: نلقى روابط المنتجات من خريطة الموقع، والمتصفح يستوردها وحدة وحدة ----------
+  if (path === '/api/m/store/discover' && m === 'POST') {
+    await rateLimit(db, 'storedisc:' + mid, 20, 3600);
+    const b = await readJson(req);
+    const links = await discoverProducts(b.url || merchant.store_url);
+    const have = new Set((await db.prepare('SELECT buy_url FROM store_products WHERE merchant_id=?').bind(mid).all()).results.map((r) => r.buy_url.replace(/\/$/, '')));
+    const fresh = links.filter((l) => !have.has(l.replace(/\/$/, '')));
+    return json({ ok: true, found: links.length, links: fresh.slice(0, 100) });
   }
 
   // ---------- الذكاء الاصطناعي والروابط ----------
@@ -110,8 +132,8 @@ export async function handleMerchantStore(req, env, path, user) {
     const image_key = b.image_key == null ? null : ownsImage(b.image_key, mid) ? b.image_key : fail(400, 'الصورة غير صالحة');
     const t = now();
     const row = await db
-      .prepare('INSERT INTO store_products(merchant_id,title,description,category,price,old_price,buy_url,image_key,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?) RETURNING *')
-      .bind(mid, f.title, f.description, f.category, f.price, f.old_price, f.buy_url, image_key, f.status, t, t)
+      .prepare('INSERT INTO store_products(merchant_id,title,description,category,price,old_price,buy_url,image_key,status,created_at,updated_at,synced_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?) RETURNING *')
+      .bind(mid, f.title, f.description, f.category, f.price, f.old_price, f.buy_url, image_key, f.status, t, t, b.imported ? t : null)
       .first();
     await audit(db, user, 'store_product_created', { id: row.id, title: row.title });
     return json({ ok: true, product: productOut(row) }, 201);
@@ -220,16 +242,17 @@ export async function handleMerchantStore(req, env, path, user) {
 
 // ================= الواجهة العامة =================
 const LIVE = "m.store_enabled=1 AND m.status='active'";
-const PRODUCT_COLS = 'p.id,p.title,p.description,p.category,p.price,p.old_price,p.buy_url,p.image_key,p.created_at,p.merchant_id,m.name AS merchant_name,m.slug AS merchant_slug,m.logo_key AS merchant_logo';
+const PRODUCT_COLS = 'p.id,p.title,p.description,p.category,p.price,p.old_price,p.buy_url,p.image_key,p.created_at,p.merchant_id,m.name AS merchant_name,m.slug AS merchant_slug,m.logo_key AS merchant_logo,m.store_coupon,m.store_coupon_note';
 
 function publicProduct(p) {
-  const { merchant_logo, ...rest } = productOut(p);
-  return { ...rest, merchant_logo: imageUrl(merchant_logo) };
+  const { merchant_logo, store_coupon, store_coupon_note, ...rest } = productOut(p);
+  return { ...rest, merchant_logo: imageUrl(merchant_logo), coupon: store_coupon ? { code: store_coupon, note: store_coupon_note } : null };
 }
 
-async function listProducts(db, { cat, merchant, q, limit = 60, offset = 0 }) {
+async function listProducts(db, { cat, merchant, q, ids, limit = 60, offset = 0 }) {
   const where = [LIVE, "p.status='active'"];
   const args = [];
+  if (ids?.length) { where.push(`p.id IN (${ids.map(() => '?').join(',')})`); args.push(...ids); }
   if (cat && CATEGORIES[cat]) { where.push('p.category=?'); args.push(cat); }
   if (merchant) { where.push('m.slug=?'); args.push(merchant); }
   if (q) {
@@ -246,17 +269,17 @@ async function listProducts(db, { cat, merchant, q, limit = 60, offset = 0 }) {
   return r.results.map(publicProduct);
 }
 
-async function listReels(db, { merchant, product, limit = 20, offset = 0 }) {
+async function listReels(db, { merchant, product, sort, limit = 20, offset = 0 }) {
   const where = [LIVE, "r.status='active'"];
   const args = [];
   if (merchant) { where.push('m.slug=?'); args.push(merchant); }
   if (product) { where.push('r.product_id=?'); args.push(product); }
   const r = await db
     .prepare(
-      `SELECT r.id,r.title,r.video_key,r.poster_key,r.duration,r.product_id,r.created_at,m.name AS merchant_name,m.slug AS merchant_slug,m.logo_key AS merchant_logo,
+      `SELECT r.id,r.title,r.video_key,r.poster_key,r.duration,r.product_id,r.created_at,r.likes,r.views,m.name AS merchant_name,m.slug AS merchant_slug,m.logo_key AS merchant_logo,
               p.title AS product_title,p.price AS product_price,p.buy_url AS product_buy_url,p.image_key AS product_image
        FROM reels r JOIN merchants m ON m.id=r.merchant_id LEFT JOIN store_products p ON p.id=r.product_id AND p.status='active'
-       WHERE ${where.join(' AND ')} ORDER BY r.id DESC LIMIT ? OFFSET ?`
+       WHERE ${where.join(' AND ')} ORDER BY ${sort === 'popular' ? 'r.views + r.likes * 5 DESC, r.id DESC' : 'r.id DESC'} LIMIT ? OFFSET ?`
     )
     .bind(...args, limit, offset)
     .all();
@@ -299,7 +322,8 @@ export async function handlePublicStore(req, env, path) {
   }
   if (path === '/api/public/store/products' && m === 'GET') {
     const q = (sp.get('q') || '').trim().slice(0, 80);
-    return json({ ok: true, products: await listProducts(db, { cat: sp.get('cat'), merchant: slug, q, offset, limit: 40 }) });
+    const ids = (sp.get('ids') || '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 60);
+    return json({ ok: true, products: await listProducts(db, { cat: sp.get('cat'), merchant: slug, q, ids, offset, limit: ids.length ? 60 : 40 }) });
   }
   let match;
   if ((match = path.match(/^\/api\/public\/store\/products\/(\d+)$/)) && m === 'GET') {
@@ -315,7 +339,12 @@ export async function handlePublicStore(req, env, path) {
     return json({ ok: true, product: publicProduct(p), more: more.results.map(publicProduct), reels });
   }
   if (path === '/api/public/store/reels' && m === 'GET') {
-    return json({ ok: true, reels: await listReels(db, { merchant: slug, offset, limit: 20 }) });
+    const ids = (sp.get('ids') || '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 60);
+    if (ids.length) {
+      const all = await listReels(db, { limit: 500 });
+      return json({ ok: true, reels: ids.map((id) => all.find((r) => r.id === id)).filter(Boolean) });
+    }
+    return json({ ok: true, reels: await listReels(db, { merchant: slug, sort: sp.get('sort'), offset, limit: 20 }) });
   }
   // عدّاد المشاهدات والضغطات (تقريبي، بحد طلبات لكل جهاز)
   if (path === '/api/public/store/track' && m === 'POST') {
@@ -326,6 +355,9 @@ export async function handlePublicStore(req, env, path) {
       click: 'UPDATE store_products SET clicks=clicks+1 WHERE id=?',
       reel_view: 'UPDATE reels SET views=views+1 WHERE id=?',
       reel_click: 'UPDATE reels SET clicks=clicks+1 WHERE id=?',
+      coupon: 'UPDATE merchants SET coupon_copies=coupon_copies+1 WHERE id=(SELECT merchant_id FROM store_products WHERE id=?)',
+      like: 'UPDATE reels SET likes=likes+1 WHERE id=?',
+      unlike: 'UPDATE reels SET likes=MAX(0,likes-1) WHERE id=?',
     }[b.type];
     if (!sql) fail(400, 'نوع غير معروف');
     try {
@@ -344,7 +376,7 @@ export async function handlePublicStore(req, env, path) {
         .prepare(`SELECT p.id,p.title,p.category,p.price,m.name AS merchant_name FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE ${LIVE} AND p.status='active' ORDER BY p.clicks DESC, p.id DESC LIMIT 250`)
         .all()
     ).results;
-    const r = await storeChat(env, b.messages, catalog);
+    const r = await storeChat(env, b.messages, catalog, b.lang === 'en' ? 'en' : 'ar');
     let products = [];
     if (r.ids.length) {
       const rows = await db.prepare(`SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE p.id IN (${r.ids.map(() => '?').join(',')})`).bind(...r.ids).all();
@@ -353,4 +385,20 @@ export async function handlePublicStore(req, env, path) {
     return json({ ok: true, reply: r.reply, products });
   }
   fail(404, 'المسار غير موجود');
+}
+
+// بعد التحقق من منتج أصلي: "اطلبه مرة ثانية" وريلز المنتج من متجر نفس التاجر
+export async function shopForVerify(db, b) {
+  const [linked, more] = await Promise.all([
+    b.store_product_id
+      ? db.prepare(`SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE p.id=? AND p.merchant_id=? AND p.status='active'`).bind(b.store_product_id, b.merchant_id).first()
+      : null,
+    listProducts(db, { merchant: b.slug, limit: 6 }),
+  ]);
+  const product = linked ? publicProduct(linked) : null;
+  let reels = product ? await listReels(db, { product: product.id, limit: 6 }) : [];
+  if (!reels.length) reels = await listReels(db, { merchant: b.slug, sort: 'popular', limit: 6 });
+  const others = more.filter((p) => p.id !== product?.id).slice(0, 4);
+  if (!product && !others.length && !reels.length) return null;
+  return { slug: b.slug, product, more: others, reels, coupon: b.store_coupon ? { code: b.store_coupon, note: b.store_coupon_note } : null };
 }

@@ -86,6 +86,10 @@ async function loadTags() {
   const sel = $('bd-code'), cur = sel.value;
   render(sel, html`${batches.map((b) => html`<option value="${b.code}">${b.code}${b.product_name ? ' · ' + b.product_name : ''}</option>`)}`);
   if (cur && batches.some((b) => b.code === cur)) sel.value = cur;
+  // منتجات المتجر لربطها بالدفعة
+  const shop = await api('/api/m/store').catch(() => null);
+  $('bd-shop-field').hidden = !(shop?.enabled && shop.products.length);
+  if (shop?.enabled) render($('bd-shop'), html`<option value="">بدون</option>${shop.products.map((p) => html`<option value="${p.id}">${p.title}</option>`)}`);
   fillBatchDetails();
 }
 let batchList = [];
@@ -94,10 +98,11 @@ function fillBatchDetails() {
   const b = batchList.find((x) => x.code === f.code.value);
   f.expires_on.value = b?.expires_on || '';
   f.details.value = b?.details || '';
+  f.store_product_id.value = b?.store_product_id ? String(b.store_product_id) : '';
 }
 $('bd-code').addEventListener('change', fillBatchDetails);
 onSubmit($('batch-details-form'), async (f) => {
-  await api('/api/m/batches/' + f.code, { method: 'PATCH', body: { expires_on: f.expires_on || null, details: f.details || null } });
+  await api('/api/m/batches/' + f.code, { method: 'PATCH', body: { expires_on: f.expires_on || null, details: f.details || null, ...($('bd-shop-field').hidden ? {} : { store_product_id: f.store_product_id ? Number(f.store_product_id) : null }) } });
   toast('تم حفظ تفاصيل الدفعة');
   loadTags();
 });
@@ -366,7 +371,28 @@ async function sendQuestion(q) {
 }
 $('chat-suggest').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) sendQuestion(b.dataset.q); });
 onSubmit($('chat-form'), async (f, form) => { form.reset(); await sendQuestion(f.q); });
+async function loadNotify() {
+  const n = await api('/api/m/notify');
+  const f = $('notify-form');
+  f.alert_phone.value = n.alert_phone ? '0' + n.alert_phone.slice(3) : '';
+  f.notify_whatsapp.checked = n.notify_whatsapp;
+  $('notify-off').hidden = n.enabled;
+  $('notify-test').hidden = !n.enabled;
+  const ST = { sent: ['وصلت', 'ok'], failed: ['ما وصلت', 'err'], pending: ['قيد الإرسال', ''], skipped: ['متخطاة', ''] };
+  render($('notify-log'), n.recent.length ? html`<div class="small muted">آخر الرسائل</div>${n.recent.map((r) => html`<div class="small" style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line-soft)">${pill(ST, r.status)}<span style="flex:1">${r.message}</span><span class="muted">${when(r.created_at)}</span></div>`)}` : html``);
+}
+onSubmit($('notify-form'), async (f) => {
+  await api('/api/m/notify', { method: 'PATCH', body: { alert_phone: f.alert_phone || null, notify_whatsapp: f.notify_whatsapp === 'on' } });
+  toast('تم حفظ إعدادات التنبيهات');
+  loadNotify();
+});
+$('notify-test').addEventListener('click', async () => {
+  try { toast((await api('/api/m/notify/test', { method: 'POST' })).message); } catch (e) { toast(e.message, true); }
+  loadNotify();
+});
+
 async function loadAccount() {
+  loadNotify().catch((e) => toast(e.message, true));
   if (!merchant) merchant = (await api('/api/m/overview')).merchant;
   render($('logo-box'), html`<div style="display:flex;align-items:center;gap:16px">
     ${merchant.logo_url ? html`<img src="${merchant.logo_url}" alt="" class="thumb" style="width:72px;height:72px">` : html`<span class="thumb thumb-empty" style="width:72px;height:72px;font-size:28px" aria-hidden="true">${initial(merchant.name)}</span>`}

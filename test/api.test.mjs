@@ -476,3 +476,48 @@ test('متجر التاجر: الاشتراك والمنتجات والريلز 
   assert.equal((await fetch(BASE + reel.video_url)).status, 404);
   assert.equal((await post('/api/public/store/chat', { messages: [{ role: 'user', content: 'شاي' }] })).status, 503);
 });
+
+test('تطويرات المتاجر: اطلبه مرة ثانية والكوبون واللايك والمفضلة والتنبيهات', async () => {
+  const st = await call('/api/m/store', { cookie: S.merchant });
+  const pid = st.data.products[0].id;
+  // كوبون أصالة يظهر مع المنتج
+  assert.equal((await patch('/api/m/store', { store_coupon: 'asalah10', store_coupon_note: 'خصم 10٪' }, S.merchant)).status, 200);
+  assert.equal((await patch('/api/m/store', { store_coupon: 'فيه مسافة' }, S.merchant)).status, 400);
+  let one = await call('/api/public/store/products/' + pid);
+  assert.deepEqual(one.data.product.coupon, { code: 'ASALAH10', note: 'خصم 10٪' });
+  await post('/api/public/store/track', { type: 'coupon', id: pid });
+  assert.equal((await call('/api/m/store', { cookie: S.merchant })).data.coupon.copies, 1);
+  // المفضلة بالأرقام
+  assert.equal((await call('/api/public/store/products?ids=' + pid + ',99999')).data.products.length, 1);
+
+  // ربط الدفعة بمنتج المتجر، وبعد التحقق يطلع "اطلبه مرة ثانية"
+  assert.equal((await patch('/api/m/batches/GK2610', { store_product_id: pid }, S.merchant)).status, 200);
+  assert.equal((await patch('/api/m/batches/GK2610', { store_product_id: 99999 }, S.merchant)).status, 404);
+  const v = await post('/api/verify', { t: tokenOf(S.urls[40]), sid: sid('e') });
+  assert.equal(v.data.result, 'original');
+  assert.equal(v.data.shop.product.id, pid);
+  assert.equal(v.data.shop.coupon.code, 'ASALAH10');
+
+  // ريل جديد: لايك وترتيب حسب الأكثر مشاهدة
+  const r = await post('/api/m/store/reels', { title: 'ريل اللايك', duration: 15 }, S.merchant);
+  const mp4 = new Uint8Array(2048);
+  mp4.set([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70]);
+  assert.equal((await fetch(`${BASE}/api/m/store/reels/${r.data.id}/video`, { method: 'PUT', headers: { Cookie: S.merchant, Origin: BASE, 'Content-Type': 'video/mp4' }, body: mp4 })).status, 200);
+  await post('/api/public/store/track', { type: 'like', id: r.data.id });
+  await post('/api/public/store/track', { type: 'reel_view', id: r.data.id });
+  const pop = await call('/api/public/store/reels?sort=popular');
+  assert.equal(pop.data.reels[0].likes, 1);
+  assert.equal(pop.data.reels[0].views, 1);
+  assert.equal((await call('/api/public/store/reels?ids=' + r.data.id)).data.reels.length, 1);
+  const v2 = await post('/api/verify', { t: tokenOf(S.urls[40]), sid: sid('e') });
+  // المنتج ما له ريلز، فتطلع ريلز التاجر بداله
+  assert.equal(v2.data.shop.reels[0].id, r.data.id);
+
+  // تنبيهات واتساب: الرقم ينحفظ، والإرسال متوقف بدون مفاتيح
+  assert.equal((await patch('/api/m/notify', { alert_phone: '0551234567', notify_whatsapp: true }, S.merchant)).data.alert_phone, '966551234567');
+  const n = await call('/api/m/notify', { cookie: S.merchant });
+  assert.equal(n.data.enabled, false);
+  assert.equal((await post('/api/m/notify/test', {}, S.merchant)).status, 503);
+  // تشغيل الفحص الدوري ما يتعطل بسبب الإشعارات والمزامنة
+  assert.equal((await fetch(BASE + '/cdn-cgi/local/scheduled?cron=0+*+*+*+*')).status, 200);
+});

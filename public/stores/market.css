@@ -176,3 +176,32 @@ body[data-view="reels"] .mk-view { max-width: none; padding: 0; }
 
 .mk-toast { position: fixed; bottom: calc(var(--bar) + 24px); left: 50%; transform: translateX(-50%); z-index: 60; background: var(--forest); color: #fff; padding: 10px 20px; border-radius: 999px; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- اللغة والمفضلة واللايكات والكوبون ---------- */
+.mk-lang { order: 2; flex: none; height: 36px; min-width: 40px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.25); background: none; color: #fff; font-weight: 700; cursor: pointer; }
+@media (min-width: 761px) { .mk-lang { order: 5; } }
+@media (max-width: 760px) { .mk-brand { flex: 1; } }
+.mk-heart { position: absolute; top: 8px; inset-inline-end: 8px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(255,255,255,.9); color: #B42318; font-size: 18px; line-height: 1; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.12); transition: transform .15s; }
+.mk-heart:active, .mk-side-btn:active { transform: scale(.85); }
+.mk-fav-btn.on { color: #B42318; border-color: #F3B8B1; }
+.mk-coupon { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1.5px dashed var(--gold); background: #FFFBEF; }
+.mk-coupon-ic { font-size: 26px; }
+.mk-coupon div { flex: 1; display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+.mk-coupon small { color: #5A4300; }
+.mk-coupon b { font-size: 20px; letter-spacing: 2px; color: var(--gold-ink); }
+.mk-coupon .mk-btn { min-height: 38px; padding: 0 16px; }
+.mk-views { position: absolute; top: 12px; inset-inline-end: 10px; z-index: 1; font-size: 11px; background: rgba(0,0,0,.45); padding: 1px 8px; border-radius: 999px; }
+.mk-reels-wrap { position: relative; }
+.mk-reel-sort { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(0,0,0,.4); backdrop-filter: blur(8px); }
+.mk-reel-sort button { white-space: nowrap; border: 0; background: none; color: #ddd; padding: 6px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; cursor: pointer; }
+.mk-reel-sort [aria-selected="true"] { background: #fff; color: var(--ink); }
+.mk-reel-side { position: absolute; inset-inline-end: max(10px, calc(50% - (100dvh - 62px) * 9 / 32 + 10px)); bottom: 150px; z-index: 3; display: flex; flex-direction: column; gap: 14px; }
+.mk-side-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; border: 0; background: none; color: #fff; cursor: pointer; text-shadow: 0 1px 4px rgba(0,0,0,.6); transition: transform .15s; }
+.mk-side-btn span { width: 46px; height: 46px; border-radius: 50%; background: rgba(0,0,0,.35); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.mk-side-btn small { font-size: 12px; font-weight: 600; }
+.mk-side-btn.static { cursor: default; }
+.mk-side-btn.on span { background: rgba(255,255,255,.2); }
+.mk-reel-info { padding-inline-end: 76px; }
+.mk-burst { position: absolute; top: 45%; left: 50%; z-index: 4; font-size: 96px; transform: translate(-50%, -50%) scale(.4); animation: mk-burst .8s ease-out forwards; pointer-events: none; }
+@keyframes mk-burst { 30% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; } 100% { transform: translate(-50%, -70%) scale(1); opacity: 0; } }
+[dir="ltr"] .mk-p-m::after { content: ""; }

@@ -194,3 +194,44 @@ export async function serveMedia(req, env, path) {
   const ranged = !!range;
   return new Response(req.method === 'HEAD' ? null : obj.body, { status: ranged ? 206 : 200, headers });
 }
+
+// ---------- سحب كل منتجات المتجر من خريطة الموقع (سلة وزد وشوبيفاي ينشرونها) ----------
+const PRODUCT_URL = /\/p\d{4,}(?:[/?#]|$)|\/products?\/[^/]+|\/product-[^/]+/i;
+
+async function fetchText(u, max = 3_000_000) {
+  try {
+    const res = await fetch(u, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AsalahBot/1.0)' }, redirect: 'follow', signal: AbortSignal.timeout(9000) });
+    if (!res.ok) return null;
+    return new TextDecoder().decode(await readCapped(res, max));
+  } catch {
+    return null;
+  }
+}
+const locs = (xml) => [...xml.matchAll(/<loc>\s*(?:<!\[CDATA\[)?([^<\]]+?)(?:\]\]>)?\s*<\/loc>/gi)].map((m) => decode(m[1]));
+
+export async function discoverProducts(storeUrl) {
+  const base = new URL(url(storeUrl, 'متجرك في سلة', { optional: false }));
+  const origin = base.origin;
+  const queue = [origin + '/sitemap.xml', origin + '/sitemap_index.xml'];
+  const robots = await fetchText(origin + '/robots.txt', 100_000);
+  if (robots) for (const m of robots.matchAll(/^sitemap:\s*(\S+)/gim)) queue.unshift(m[1]);
+  const seen = new Set(), products = new Set();
+  // نقرأ 8 خرائط كحد أقصى، ونبدأ باللي اسمها فيه product
+  while (queue.length && seen.size < 8 && products.size < 300) {
+    queue.sort((a, b) => /product/i.test(b) - /product/i.test(a));
+    const u = queue.shift();
+    if (seen.has(u)) continue;
+    seen.add(u);
+    const xml = await fetchText(u);
+    if (!xml) continue;
+    for (const l of locs(xml)) {
+      let lu;
+      try { lu = new URL(l); } catch { continue; }
+      if (lu.protocol !== 'https:') continue;
+      if (/\.xml(\.gz)?$/i.test(lu.pathname)) { if (!seen.has(l)) queue.push(l); }
+      else if (lu.origin === origin && PRODUCT_URL.test(lu.pathname)) products.add(lu.toString());
+    }
+  }
+  if (!products.size) fail(422, 'ما لقينا منتجات في خريطة متجرك. تأكد من رابط المتجر، أو أضف المنتجات بروابطها وحدة وحدة');
+  return [...products];
+}

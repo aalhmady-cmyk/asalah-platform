@@ -1,4 +1,6 @@
 // صفحة التحقق: تقرأ رمز العلامة من الرابط، تشيله من شريط العنوان، وتسأل الخادم.
+import { EN, onLangToggle, takeCachedResult, translatePage, tx } from '/v/i18n.js';
+
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => ($(id).hidden = !on);
 
@@ -29,15 +31,15 @@ const sid = deviceId();
 
 async function post(path, body) {
   const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const data = await res.json().catch(() => ({ ok: false, message: 'تعذر الاتصال، حاول مرة ثانية' }));
-  if (!res.ok && res.status !== 200) throw Object.assign(new Error(data.message || 'صار خطأ'), { data, status: res.status });
+  const data = await res.json().catch(() => ({ ok: false, message: tx('تعذر الاتصال، حاول مرة ثانية', 'Connection failed, please try again') }));
+  if (!res.ok && res.status !== 200) throw Object.assign(new Error(EN ? enError(data) : data.message || 'صار خطأ'), { data, status: res.status });
   return data;
 }
 
 function applyBrand(b) {
   if (!b) return;
   $('b-name').textContent = b.name;
-  document.title = `التحقق من ${b.name} - أصالة`;
+  document.title = tx(`التحقق من ${b.name} - أصالة`, `Verify ${b.name} - Asalah`);
   const logo = $('b-logo');
   if (b.logo_url) {
     const img = document.createElement('img');
@@ -69,41 +71,59 @@ function scanSteps() {
   });
 }
 
-let lastResult = 'unknown';
+// نصوص النتائج بالإنجليزي حسب رمز النتيجة، لأن رسائل الخادم بالعربي
+const RESULT_EN = {
+  unknown: 'This tag is not registered with us. Do not use the product before checking with the seller.',
+  blocked: 'This tag has been blocked. The product may be counterfeit, check with the seller.',
+  not_activated: 'This tag has not been activated yet. Check with the seller before using the product.',
+  locked: 'This tag has passed its allowed number of checks and was locked. The product may be counterfeit.',
+  other_device: 'This tag was already verified on another device. Continue on the device that scanned it first.',
+};
+const resultMsg = (d) => (EN && RESULT_EN[d.result] ? RESULT_EN[d.result] : d.message);
+function enError(data) {
+  const byCode = { rate_limited: 'Too many attempts, try again shortly', already_claimed: 'Already added to a balance', already_rated: 'Already rated', already_entered: 'You already entered with this tag', no_member: 'No balance for this number yet', contest_closed: 'The contest is not open' };
+  return byCode[data.code] || RESULT_EN[data.code] || 'Something went wrong, please try again';
+}
+
+let lastResult = 'unknown', lastData = null;
+translatePage();
+onLangToggle(() => lastData);
 async function run() {
-  const steps = scanSteps();
-  if (!token) { await steps; return bad('unknown', 'ما لقينا رمز العلامة في الرابط. امسح العلامة مرة ثانية.'); }
+  const cached = takeCachedResult();
+  const steps = cached ? Promise.resolve() : scanSteps();
+  if (!token && !cached) { await steps; return bad('unknown', tx('ما لقينا رمز العلامة في الرابط. امسح العلامة مرة ثانية.', 'We could not find the tag code in the link. Scan the tag again.')); }
   let d;
   try {
-    [d] = await Promise.all([post('/api/verify', { t: token, sid }), steps]);
+    [d] = cached ? [cached] : await Promise.all([post('/api/verify', { t: token, sid }), steps]);
   } catch (e) {
     await steps;
     show('loading', false);
     show('bad');
-    $('bad-title').textContent = e.status === 429 ? 'محاولات كثيرة' : 'تعذر التحقق';
+    $('bad-title').textContent = e.status === 429 ? tx('محاولات كثيرة', 'Too many attempts') : tx('تعذر التحقق', 'Could not verify');
     $('bad-msg').textContent = e.message;
     return;
   }
   show('loading', false);
+  lastData = d;
   applyBrand(d.brand);
   lastResult = d.result;
   if (d.result === 'original') return ok(d);
   if (d.result === 'other_device') {
-    $('other-msg').textContent = d.message;
+    $('other-msg').textContent = resultMsg(d);
     show('other');
     show('report');
     return;
   }
-  bad(d.result, d.message);
+  bad(d.result, resultMsg(d));
 }
 
 function ok(d) {
   const t = d.tag;
-  $('ok-sub').textContent = `تم التحقق من هذي العلامة وهي مسجلة باسم ${d.brand.name}`;
+  $('ok-sub').textContent = tx(`تم التحقق من هذي العلامة وهي مسجلة باسم ${d.brand.name}`, `This tag is verified and registered to ${d.brand.name}`);
   $('f-id').textContent = t.public_id;
   $('f-batch').textContent = t.batch;
-  $('f-product').textContent = t.product_name || (t.produced_on ? 'إنتاج ' + t.produced_on : '-');
-  $('f-checks').textContent = t.checks_left == null ? String(t.check_no) : `${t.check_no} من ${t.check_no + t.checks_left}`;
+  $('f-product').textContent = t.product_name || (t.produced_on ? tx('إنتاج ', 'Made ') + t.produced_on : '-');
+  $('f-checks').textContent = t.checks_left == null ? String(t.check_no) : `${t.check_no} ${tx('من', 'of')} ${t.check_no + t.checks_left}`;
   show('test-note', t.is_test);
   // صورة المنتج للدفعة، وإذا ما فيه، شعار التاجر
   const pic = t.image_url || d.brand.logo_url;
@@ -127,14 +147,15 @@ function ok(d) {
   shareData = { name: t.product_name || '', brand: d.brand.name };
   show('ok');
   $('ok').classList.add('pop');
+  if (d.shop) setupShop(d.shop);
   if (d.loyalty) setupLoyalty(d.loyalty, d.brand);
   if (d.rating) setupRating(d.rating);
   if (d.contest) {
     if (d.contest.entered) return show('entered');
-    $('c-title').textContent = d.contest.title || 'شارك في المسابقة';
+    $('c-title').textContent = d.contest.title || tx('شارك في المسابقة', 'Enter the contest');
     if (d.contest.ends_at) {
-      const end = new Date(d.contest.ends_at * 1000).toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { timeZone: 'Asia/Riyadh', day: 'numeric', month: 'long' });
-      $('c-sub').textContent = `مشاركة وحدة لكل علامة، وتنتهي المسابقة ${end}.`;
+      const end = new Date(d.contest.ends_at * 1000).toLocaleDateString(EN ? 'en-GB' : 'ar-SA-u-ca-gregory-nu-latn', { timeZone: 'Asia/Riyadh', day: 'numeric', month: 'long' });
+      $('c-sub').textContent = tx(`مشاركة وحدة لكل علامة، وتنتهي المسابقة ${end}.`, `One entry per tag. The contest ends ${end}.`);
     }
     if (d.contest.terms_url) $('terms').href = d.contest.terms_url;
     else $('terms').removeAttribute('href');
@@ -146,48 +167,106 @@ function ok(d) {
 
 const monthName = (ym) => {
   const [y, m] = ym.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString(EN ? 'en-GB' : 'ar-SA-u-ca-gregory-nu-latn', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 };
+
+// ---------- متاجر أصالة: اطلبه مرة ثانية ----------
+const money = (n) => Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 }) + tx(' ر.س', ' SAR');
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const img = (src, alt = '') => { const i = el('img'); i.src = src; i.alt = alt; i.loading = 'lazy'; return i; };
+function setupShop(s) {
+  const base = '/stores/' + (EN ? '?lang=en&' : '?');
+  $('shop-all').href = base + 'm=' + encodeURIComponent(s.slug);
+  if (EN) $('shop-all').textContent = 'All products';
+  const p = s.product;
+  if (p) {
+    const a = $('shop-main');
+    a.href = base + 'p=' + p.id;
+    const info = el('div');
+    info.append(el('small', 'muted', tx('نفس المنتج اللي معك', 'The same product you have')), el('b', '', p.title), el('span', 'price', money(p.price)));
+    a.replaceChildren(...(p.image_url ? [img(p.image_url)] : []), info, el('span', 'go', tx('اطلبه ↗', 'Order ↗')));
+    show('shop-main');
+  } else $('shop-title').textContent = tx(`من متجر ${lastData.brand.name} 🛍️`, `From ${lastData.brand.name} 🛍️`);
+  if (s.coupon) {
+    const c = $('shop-coupon');
+    const btn = el('button', 'btn btn-sm', tx('انسخ', 'Copy'));
+    btn.type = 'button';
+    btn.addEventListener('click', async () => {
+      await navigator.clipboard?.writeText(s.coupon.code).catch(() => {});
+      btn.textContent = tx('تم النسخ ✅', 'Copied ✅');
+      if (p) fetch('/api/public/store/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'coupon', id: p.id }) }).catch(() => {});
+    });
+    const code = el('b', 'ltr', s.coupon.code);
+    c.replaceChildren(el('span', '', '🎟️'), el('span', '', s.coupon.note || tx('كود خصم لعملاء أصالة', 'Discount code for Asalah customers')), code, btn);
+    show('shop-coupon');
+  }
+  if (s.reels.length) {
+    $('shop-reels').replaceChildren(
+      ...s.reels.map((r) => {
+        const a = el('a', 'shop-reel');
+        a.href = base + 'v=reels&r=' + r.id;
+        if (r.poster_url) a.append(img(r.poster_url));
+        a.append(el('span', '', r.title));
+        return a;
+      })
+    );
+    show('shop-reels');
+  }
+  if (s.more.length) {
+    $('shop-more').replaceChildren(
+      ...s.more.map((x) => {
+        const a = el('a', 'shop-card');
+        a.href = base + 'p=' + x.id;
+        a.append(x.image_url ? img(x.image_url) : el('span', 'ph'), el('b', '', x.title), el('span', 'price', money(x.price)));
+        return a;
+      })
+    );
+    show('shop-more');
+  }
+  show('shop');
+}
 
 // ---------- مشاركة "اشتريت أصلي" ----------
 let shareData = null;
 $('share').addEventListener('click', async () => {
-  const what = shareData.name ? `${shareData.name} من ${shareData.brand}` : `منتج ${shareData.brand}`;
-  const text = `تأكدت إن ${what} أصلي ✅ عبر علامة أصالة. اشترِ الأصلي دايماً!`;
+  const what = shareData.name ? tx(`${shareData.name} من ${shareData.brand}`, `${shareData.name} by ${shareData.brand}`) : tx(`منتج ${shareData.brand}`, `a ${shareData.brand} product`);
+  const text = tx(`تأكدت إن ${what} أصلي ✅ عبر علامة أصالة. اشترِ الأصلي دايماً!`, `I verified ${what} is original ✅ with an Asalah tag. Always buy genuine!`);
   const link = location.origin + '/';
   if (navigator.share) {
-    try { await navigator.share({ title: 'اشتريت أصلي', text, url: link }); } catch { /* ألغى المشاركة */ }
+    try { await navigator.share({ title: tx('اشتريت أصلي', 'I bought original'), text, url: link }); } catch { /* ألغى المشاركة */ }
   } else window.open('https://wa.me/?text=' + encodeURIComponent(text + ' ' + link), '_blank', 'noopener');
 });
 
 // ---------- النقاط والكاش باك ----------
 // الرقم يُحفظ في الجهاز لكل تاجر، عشان المرة الجاية يضاف الرصيد بضغطة
 let loyalty = null, brandKey = '';
-const fmt = (n) => (loyalty.mode === 'cashback' ? (n / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ريال' : n.toLocaleString('en-US') + ' نقطة');
+const fmt = (n) => (loyalty.mode === 'cashback' ? (n / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) + tx(' ريال', ' SAR') : n.toLocaleString('en-US') + tx(' نقطة', ' points'));
 const savedPhone = () => local?.getItem('asalah_phone_' + brandKey) || '';
 
 function setupLoyalty(l, b) {
   loyalty = l;
   brandKey = b.name;
-  $('l-title').textContent = l.mode === 'cashback' ? 'كاش باك على مشترياتك' : 'اجمع نقاطك';
-  $('l-sub').textContent = `كل منتج أصلي يعطيك ${fmt(l.per_tag)}${l.reward ? '، وعند ' + fmt(l.min_redeem) + ' تحصل على: ' + l.reward : '، وتستبدل عند ' + fmt(l.min_redeem)}.`;
+  $('l-title').textContent = l.mode === 'cashback' ? tx('كاش باك على مشترياتك', 'Cashback on your purchases') : tx('اجمع نقاطك', 'Collect your points');
+  $('l-sub').textContent = EN
+    ? `Every original product gives you ${fmt(l.per_tag)}${l.reward ? ', and at ' + fmt(l.min_redeem) + ' you get: ' + l.reward : ', redeem at ' + fmt(l.min_redeem)}.`
+    : `كل منتج أصلي يعطيك ${fmt(l.per_tag)}${l.reward ? '، وعند ' + fmt(l.min_redeem) + ' تحصل على: ' + l.reward : '، وتستبدل عند ' + fmt(l.min_redeem)}.`;
   const phone = savedPhone();
   if (phone) $('claim-form').phone.value = phone;
   show('loyalty');
   // المكافأة تطلع للعميل أول ما يتأكد إن المنتج أصلي
   if (!l.claimed) {
-    $('reward-title').textContent = `🎉 حصلت على ${fmt(l.per_tag)}${l.mode === 'cashback' ? ' كاش باك' : ''}`;
-    $('reward-sub').textContent = phone ? 'جاري إضافتها لرصيدك…' : 'اكتب رقم جوالك تحت عشان تنحفظ في رصيدك';
+    $('reward-title').textContent = tx(`🎉 حصلت على ${fmt(l.per_tag)}${l.mode === 'cashback' ? ' كاش باك' : ''}`, `🎉 You earned ${fmt(l.per_tag)}${l.mode === 'cashback' ? ' cashback' : ''}`);
+    $('reward-sub').textContent = phone ? tx('جاري إضافتها لرصيدك…', 'Adding it to your balance…') : tx('اكتب رقم جوالك تحت عشان تنحفظ في رصيدك', 'Enter your mobile below to save it to your balance');
     show('reward');
-    $('l-title').textContent = `حصلت على ${fmt(l.per_tag)} 🎉`;
-    $('claim-btn').textContent = 'احفظها في رصيدي';
+    $('l-title').textContent = tx(`حصلت على ${fmt(l.per_tag)} 🎉`, `You earned ${fmt(l.per_tag)} 🎉`);
+    $('claim-btn').textContent = tx('احفظها في رصيدي', 'Save to my balance');
     // الرقم محفوظ من قبل: تنضاف تلقائياً
     if (phone) claim(phone);
   }
   if (l.claimed) {
     show('claim-form', false);
     if (phone) loadWallet(phone);
-    else { show('claim-form'); $('claim-btn').textContent = 'اعرض رصيدي'; }
+    else { show('claim-form'); $('claim-btn').textContent = tx('اعرض رصيدي', 'Show my balance'); }
   }
 }
 
@@ -196,11 +275,11 @@ function renderWallet(w, added) {
   show('claim-form', false);
   $('w-balance').textContent = fmt(w.balance);
   const pct = Math.min(100, Math.round((w.balance / w.min_redeem) * 100));
-  $('w-progress-label').textContent = w.can_redeem ? 'رصيدك يكفي للاستبدال' : `باقي ${fmt(w.min_redeem - w.balance)} للاستبدال`;
+  $('w-progress-label').textContent = w.can_redeem ? tx('رصيدك يكفي للاستبدال', 'You can redeem now') : tx(`باقي ${fmt(w.min_redeem - w.balance)} للاستبدال`, `${fmt(w.min_redeem - w.balance)} to go`);
   requestAnimationFrame(() => ($('w-bar').style.width = pct + '%'));
   show('redeem-btn', w.can_redeem);
   if (added) {
-    $('w-msg').textContent = `انضاف لك ${fmt(added)} 🎉`;
+    $('w-msg').textContent = tx(`انضاف لك ${fmt(added)} 🎉`, `${fmt(added)} added 🎉`);
     show('w-msg');
     $('wallet').classList.add('add-pop');
   }
@@ -211,7 +290,7 @@ function renderWallet(w, added) {
       code.className = 'ltr' + (c.status !== 'issued' ? ' used' : '');
       code.textContent = c.code;
       const st = document.createElement('span');
-      st.textContent = c.status === 'issued' ? 'جاهز للاستخدام' : c.status === 'used' ? 'مستخدم' : 'ملغي';
+      st.textContent = c.status === 'issued' ? tx('جاهز للاستخدام', 'Ready to use') : c.status === 'used' ? tx('مستخدم', 'Used') : tx('ملغي', 'Cancelled');
       li.append(code, st);
       return li;
     })
@@ -223,7 +302,7 @@ async function loadWallet(phone) {
     renderWallet((await post('/api/loyalty/wallet', { t: token, sid, phone })).wallet);
   } catch (err) {
     show('claim-form');
-    $('claim-btn').textContent = 'اعرض رصيدي';
+    $('claim-btn').textContent = tx('اعرض رصيدي', 'Show my balance');
     if (err.data?.code !== 'no_member') $('l-sub').textContent = err.message;
   }
 }
@@ -237,13 +316,13 @@ async function claim(phone, manual) {
       const r = await post('/api/loyalty/claim', { t: token, sid, phone });
       loyalty.claimed = true;
       renderWallet(r.wallet, r.added);
-      $('reward-sub').textContent = `انضافت لرصيدك. رصيدك الحين ${fmt(r.wallet.balance)}`;
+      $('reward-sub').textContent = tx(`انضافت لرصيدك. رصيدك الحين ${fmt(r.wallet.balance)}`, `Added. Your balance is now ${fmt(r.wallet.balance)}`);
     }
     local?.setItem('asalah_phone_' + brandKey, phone);
   } catch (err) {
     if (err.data?.code === 'already_claimed') { loyalty.claimed = true; await loadWallet(phone); }
     else if (manual) alert(err.message);
-    else $('reward-sub').textContent = 'اكتب رقم جوالك تحت عشان تنحفظ في رصيدك';
+    else $('reward-sub').textContent = tx('اكتب رقم جوالك تحت عشان تنحفظ في رصيدك', 'Enter your mobile below to save it to your balance');
   } finally {
     btn.disabled = false;
   }
@@ -256,13 +335,13 @@ $('claim-form').addEventListener('submit', (e) => {
 $('redeem-btn').addEventListener('click', async () => {
   const phone = savedPhone() || $('claim-form').phone.value.trim();
   const what = loyalty.reward || fmt(loyalty.min_redeem);
-  if (!confirm(`تبي تستبدل ${fmt(loyalty.min_redeem)} مقابل: ${what}؟`)) return;
+  if (!confirm(tx(`تبي تستبدل ${fmt(loyalty.min_redeem)} مقابل: ${what}؟`, `Redeem ${fmt(loyalty.min_redeem)} for: ${what}?`))) return;
   $('redeem-btn').disabled = true;
   try {
     const r = await post('/api/loyalty/redeem', { t: token, sid, phone });
     renderWallet(r.wallet);
     $('w-code-val').textContent = r.code;
-    $('w-code-reward').textContent = loyalty.reward || 'قيمة ' + fmt(loyalty.min_redeem);
+    $('w-code-reward').textContent = loyalty.reward || tx('قيمة ', 'Worth ') + fmt(loyalty.min_redeem);
     show('w-code');
     $('w-code').scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (err) {
@@ -278,7 +357,7 @@ $('w-other').addEventListener('click', () => {
   show('wallet', false);
   show('w-code', false);
   show('claim-form');
-  if (loyalty.claimed) $('claim-btn').textContent = 'اعرض رصيدي';
+  if (loyalty.claimed) $('claim-btn').textContent = tx('اعرض رصيدي', 'Show my balance');
 });
 
 // ---------- التقييم ----------
@@ -317,7 +396,7 @@ $('rate-form').addEventListener('submit', async (e) => {
 
 function bad(result, message) {
   show('loading', false);
-  $('bad-title').textContent = result === 'not_activated' ? 'علامة غير مفعّلة' : 'قد يكون المنتج مقلّداً';
+  $('bad-title').textContent = result === 'not_activated' ? tx('علامة غير مفعّلة', 'Tag not activated') : tx('قد يكون المنتج مقلّداً', 'This product may be counterfeit');
   $('bad-msg').textContent = message;
   show('bad');
   show('report');

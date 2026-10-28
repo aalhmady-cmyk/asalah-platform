@@ -1,5 +1,7 @@
 // أصالة المنتجات الأصلية: نقطة الدخول.
 import { runAlerts } from './lib/alerts.js';
+import { notifyMerchants } from './lib/notify.js';
+import { runStoreSync } from './lib/sync.js';
 import { serveImage } from './lib/images.js';
 import { prepare } from './lib/schema.js';
 import { HttpError, json } from './lib/util.js';
@@ -66,6 +68,12 @@ export default {
     return out;
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(prepare(env).then(runAlerts));
+    ctx.waitUntil(
+      prepare(env).then(async (e) => {
+        await runAlerts(e);
+        await notifyMerchants(e).catch((err) => console.error('ASALAH_NOTIFY', err?.stack || err));
+        await runStoreSync(e).catch((err) => console.error('ASALAH_SYNC', err?.stack || err));
+      })
+    );
   },
 };

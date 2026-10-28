@@ -5,6 +5,7 @@ import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
 import { entriesWithFlags, FLAGS, hotspots, listDraws, monthlyReport, runDraw } from '../lib/insights.js';
 import { lookupTag, overviewFor, setTagStatus } from '../lib/ops.js';
 import { handleMerchantStore } from './store.js';
+import { deliver, whatsappEnabled } from '../lib/notify.js';
 import { audit, csvResponse, fail, int, json, now, rateLimit, readJson, saPhone, str, url } from '../lib/util.js';
 
 function sellerFields(b) {
@@ -40,7 +41,7 @@ export async function handleMerchant(req, env, path) {
   if (path === '/api/m/batches' && m === 'GET') {
     const r = await db
       .prepare(
-        `SELECT b.code,b.size,b.status,b.product_name,b.produced_on,b.activated_at,b.image_key,b.expires_on,b.details,
+        `SELECT b.code,b.size,b.status,b.product_name,b.produced_on,b.activated_at,b.image_key,b.expires_on,b.details,b.store_product_id,
                 (SELECT COUNT(*) FROM tags t WHERE t.batch_id=b.id AND t.first_checked_at IS NOT NULL) AS sold,
                 (SELECT COUNT(*) FROM tags t WHERE t.batch_id=b.id AND t.status<>'active') AS blocked
          FROM batches b WHERE b.merchant_id=? AND b.is_test=0 ORDER BY b.id DESC`
@@ -277,10 +278,14 @@ export async function handleMerchant(req, env, path) {
       f.expires_on = v;
     }
     if ('details' in b) f.details = str(b.details, 'تفاصيل المنتج', { max: 500, optional: true });
+    if ('store_product_id' in b) {
+      f.store_product_id = int(b.store_product_id, 'منتج المتجر', { min: 1, optional: true });
+      if (f.store_product_id && !(await db.prepare('SELECT 1 FROM store_products WHERE id=? AND merchant_id=?').bind(f.store_product_id, mid).first())) fail(404, 'ما لقينا المنتج');
+    }
     const keys = Object.keys(f);
     if (!keys.length) fail(400, 'ما فيه تغييرات');
     const row = await db
-      .prepare(`UPDATE batches SET ${keys.map((k) => k + '=?').join(',')} WHERE code=? AND merchant_id=? RETURNING code,expires_on,details`)
+      .prepare(`UPDATE batches SET ${keys.map((k) => k + '=?').join(',')} WHERE code=? AND merchant_id=? RETURNING code,expires_on,details,store_product_id`)
       .bind(...keys.map((k) => f[k]), match[1], mid)
       .first();
     if (!row) fail(404, 'ما لقينا الدفعة');
@@ -302,6 +307,31 @@ export async function handleMerchant(req, env, path) {
   if (path === '/api/m/reports' && m === 'GET') {
     const r = await db.prepare('SELECT id,reason,city,point_of_sale,note,created_at FROM reports WHERE merchant_id=? ORDER BY id DESC LIMIT 200').bind(mid).all();
     return json({ ok: true, reports: r.results });
+  }
+
+  // ---------- إشعارات واتساب ----------
+  if (path === '/api/m/notify' && m === 'GET') {
+    const [row, recent] = await Promise.all([
+      db.prepare('SELECT alert_phone,notify_whatsapp FROM merchants WHERE id=?').bind(mid).first(),
+      db.prepare('SELECT message,status,error,created_at FROM notifications WHERE merchant_id=? ORDER BY id DESC LIMIT 10').bind(mid).all(),
+    ]);
+    return json({ ok: true, enabled: whatsappEnabled(env), alert_phone: row.alert_phone, notify_whatsapp: !!row.notify_whatsapp, recent: recent.results });
+  }
+  if (path === '/api/m/notify' && m === 'PATCH') {
+    const b = await readJson(req);
+    const phone = saPhone(b.alert_phone, { optional: true });
+    await db.prepare('UPDATE merchants SET alert_phone=?,notify_whatsapp=? WHERE id=?').bind(phone, b.notify_whatsapp ? 1 : 0, mid).run();
+    await audit(db, user, 'notify_updated', { alert_phone: phone, notify_whatsapp: !!b.notify_whatsapp });
+    return json({ ok: true, alert_phone: phone });
+  }
+  if (path === '/api/m/notify/test' && m === 'POST') {
+    if (!whatsappEnabled(env)) fail(503, 'إشعارات واتساب ما تفعّلت في المنصة للحين', 'whatsapp_disabled');
+    await rateLimit(db, 'watest:' + mid, 5, 3600);
+    const row = await db.prepare('SELECT alert_phone FROM merchants WHERE id=?').bind(mid).first();
+    if (!row.alert_phone) fail(400, 'احفظ رقم جوالك أول');
+    const st = await deliver(env, mid, row.alert_phone, '✅ رسالة تجربة من أصالة: التنبيهات بتوصلك على هذا الرقم.');
+    if (st !== 'sent') fail(502, 'ما وصلت الرسالة. تأكد من الرقم، أو تواصل مع أصالة');
+    return json({ ok: true, message: 'أرسلنا رسالة تجربة لجوالك' });
   }
 
   // طلب دفعة جديدة يوصل للمدير العام كتنبيه في اللوحة الأم

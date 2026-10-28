@@ -59,11 +59,24 @@ export async function loadStore() {
       <div class="kpi"><span class="label">ضغطات "اشتر الآن"</span><span class="value">${num(S.stats.clicks + S.stats.reel_clicks)}</span><span class="note">تحوّلت لمتجرك في سلة</span></div>
       <div class="kpi"><span class="label">مشاهدات الريلز</span><span class="value">${num(S.stats.reel_views)}</span></div>
     </div>
-    ${S.store_url ? '' : html`<form class="card st-salla" id="st-salla" style="margin-top:24px">
-      <h2>رابط متجرك في سلة</h2>
-      <p class="small muted" style="margin:0">نستخدمه كرابط شراء احتياطي، ويظهر في صفحة متجرك.</p>
-      <div class="st-inline"><input name="store_url" type="url" required class="ltr" placeholder="https://your-store.salla.sa" aria-label="رابط متجرك في سلة"><button class="btn btn-primary" type="submit">حفظ</button></div>
-    </form>`}
+    <div class="row" style="margin-top:24px">
+      <form class="card" id="st-sync">
+        <div class="card-head"><h2>🔄 اسحب كل منتجات متجرك</h2></div>
+        <p class="small muted" style="margin:0">نقرأ منتجاتك من متجرك في سلة ونضيفها هنا مرة وحدة، مع الصور والأسعار. وتقدر تخلي الأسعار تتحدث لحالها.</p>
+        <div class="st-inline"><input name="store_url" type="url" required class="ltr" value="${S.store_url || ''}" placeholder="https://your-store.salla.sa" aria-label="رابط متجرك"><button class="btn btn-primary" type="submit">ابحث عن منتجاتي</button></div>
+        <label class="check"><input type="checkbox" name="auto" data-st="auto" ${S.auto_sync ? 'checked' : ''}> حدّث الأسعار تلقائياً من سلة (كل 12 ساعة)</label>
+        <div id="st-sync-body"></div>
+      </form>
+      <form class="card" id="st-coupon">
+        <div class="card-head"><h2>🎟️ كوبون متاجر أصالة</h2>${S.coupon.code ? html`<span class="small muted">انسخ ${num(S.coupon.copies)} مرة</span>` : ''}</div>
+        <p class="small muted" style="margin:0">سوّ كود خصم في سلة خاص بعملاء أصالة، واكتبه هنا. يظهر للعميل مع زر "اشتر الآن"، وتعرف من سلة كم طلب جاك منا.</p>
+        <div class="form-grid">
+          <label class="field">الكود<input name="store_coupon" maxlength="30" class="ltr" value="${S.coupon.code || ''}" placeholder="ASALAH10" style="text-transform:uppercase"></label>
+          <label class="field">وش يعطي؟<input name="store_coupon_note" maxlength="80" value="${S.coupon.note || ''}" placeholder="خصم 10٪ على كل الطلب"></label>
+        </div>
+        <div><button class="btn btn-primary" type="submit">حفظ الكوبون</button></div>
+      </form>
+    </div>
     <div class="card st-compose" style="margin-top:24px" id="st-compose"></div>
     <div class="card" style="margin-top:24px">
       <div class="card-head"><h2>منتجاتك (${num(S.products.length)})</h2></div>
@@ -225,6 +238,55 @@ async function saveDraft(form) {
   await loadStore();
 }
 
+// ---------- سحب كل المنتجات ----------
+let found = [];
+async function discover(storeUrl) {
+  const el = $('st-sync-body');
+  render(el, html`<div class="st-thinking"><span class="st-dots" aria-hidden="true"><i></i><i></i><i></i></span>نقرأ متجرك…</div>`);
+  try {
+    if (storeUrl !== S.store_url) await api('/api/m/store', { method: 'PATCH', body: { store_url: storeUrl } });
+    S.store_url = storeUrl;
+    const d = await api('/api/m/store/discover', { method: 'POST', body: { url: storeUrl } });
+    found = d.links;
+    if (!found.length) return render(el, html`<p class="tip good" style="margin:0">لقينا ${num(d.found)} منتج، وكلها مضافة عندك من قبل 👌</p>`);
+    render(el, html`<p class="tip info" style="margin:0">لقينا ${num(d.found)} منتج، منها ${num(found.length)} جديدة.</p>
+      <div class="actions"><button class="btn btn-gold" type="button" data-st="import-all">أضف الـ ${num(found.length)} منتج</button></div>`);
+  } catch (e) {
+    render(el, html`<p class="tip warn" style="margin:0">${e.message}</p>`);
+  }
+}
+
+async function importAll() {
+  const el = $('st-sync-body');
+  busy = true;
+  let done = 0, failed = 0;
+  const step = () => render(el, html`<div class="st-progress"><div class="bar"><i style="width:${Math.round(((done + failed) / found.length) * 100)}%"></i></div><span>نضيف المنتجات… ${done + failed} من ${found.length}${failed ? ` (تعذر ${failed})` : ''}</span></div>`);
+  step();
+  for (const link of found) {
+    try {
+      const p = (await api('/api/m/store/import', { method: 'POST', body: { url: link } })).product;
+      if (!p.price) throw new Error('بدون سعر');
+      let img = {};
+      if (p.image) {
+        try {
+          const r = await fetch('/api/m/store/fetch-image?u=' + encodeURIComponent(p.image), { credentials: 'same-origin' });
+          if (r.ok) img = await uploadImage(await shrink(await r.blob()));
+        } catch {}
+      }
+      const ai = S.ai ? await aiDraft({ link: { title: p.title, description: p.description } }) : {};
+      await api('/api/m/store/products', { method: 'POST', body: { title: ai.title || p.title, description: ai.description || p.description, category: ai.category || 'other', price: p.price, buy_url: p.buy_url, image_key: img.image_key ?? null, status: 'active', imported: true } });
+      done++;
+    } catch {
+      failed++;
+    }
+    step();
+  }
+  busy = false;
+  toast(`انضاف ${done} منتج لمتجرك 🎉`);
+  found = [];
+  await loadStore();
+}
+
 // ---------- القوائم ----------
 function renderProducts() {
   const el = $('st-products');
@@ -236,6 +298,7 @@ function renderProducts() {
         <b>${p.title}</b>
         <div class="st-price">${sar(p.price)}${p.old_price ? html` <s>${sar(p.old_price)}</s>` : ''}</div>
         <div class="small muted">${S.categories[p.category]} · 👁 ${num(p.views)} · 🛒 ${num(p.clicks)}</div>
+        ${p.sync_error ? html`<div class="small" style="color:var(--red-ink)" title="${p.sync_error}">⚠️ ما قدرنا نحدّث السعر من سلة</div>` : ''}
         <div class="actions">
           <button class="btn btn-sm" type="button" data-st="edit" data-id="${p.id}">تعديل</button>
           <button class="btn btn-sm" type="button" data-st="toggle" data-id="${p.id}">${p.status === 'hidden' ? 'إظهار' : 'إخفاء'}</button>
@@ -377,7 +440,11 @@ document.addEventListener('click', async (e) => {
     if (act === 'request') {
       b.disabled = true;
       toast((await api('/api/m/store/request', { method: 'POST' })).message);
-    } else if (act === 'way') wayBody(b.dataset.way);
+    } else if (act === 'auto') {
+      await api('/api/m/store', { method: 'PATCH', body: { store_auto_sync: b.checked } });
+      toast(b.checked ? 'بنحدّث أسعارك تلقائياً من سلة' : 'وقفنا التحديث التلقائي');
+    } else if (act === 'import-all') await importAll();
+    else if (act === 'way') wayBody(b.dataset.way);
     else if (act === 'cancel') { draft = null; renderCompose(); }
     else if (act === 'img') {
       const file = await pickFile('image/*');
@@ -451,7 +518,12 @@ document.addEventListener('submit', async (e) => {
       await api('/api/m/store', { method: 'PATCH', body: { store_url: form.store_url.value } });
       toast('تم حفظ رابط متجرك');
       await loadStore();
-    } else if (form.id === 'st-link') await fromLink(form.url.value);
+    } else if (form.id === 'st-coupon') {
+      await api('/api/m/store', { method: 'PATCH', body: { store_coupon: form.store_coupon.value.trim() || null, store_coupon_note: form.store_coupon_note.value.trim() || null } });
+      toast('تم حفظ الكوبون');
+      await loadStore();
+    } else if (form.id === 'st-sync') await discover(form.store_url.value);
+    else if (form.id === 'st-link') await fromLink(form.url.value);
     else if (form.id === 'st-text') await fromText(form.text.value);
     else if (form.id === 'st-form') await saveDraft(form);
   } catch (err) {
