@@ -4,6 +4,7 @@ import { ask, assistantEnabled, merchantContext, tips } from '../lib/assistant.j
 import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
 import { entriesWithFlags, FLAGS, hotspots, listDraws, monthlyReport, runDraw } from '../lib/insights.js';
 import { lookupTag, overviewFor, setTagStatus } from '../lib/ops.js';
+import { handleMerchantStore } from './store.js';
 import { audit, csvResponse, fail, int, json, now, rateLimit, readJson, saPhone, str, url } from '../lib/util.js';
 
 function sellerFields(b) {
@@ -23,12 +24,13 @@ export async function handleMerchant(req, env, path) {
   const user = await requireUser(db, req, 'merchant');
   const mid = user.merchant_id;
   const m = req.method;
+  if (path === '/api/m/store' || path.startsWith('/api/m/store/')) return handleMerchantStore(req, env, path, user);
 
   if (path === '/api/m/overview' && m === 'GET') {
     const [ov, merchant, alerts] = await Promise.all([
       overviewFor(db, mid),
-      db.prepare('SELECT id,name,slug,logo_url,logo_key,brand_color,store_url,low_stock_threshold,max_checks,contest_enabled,contest_title,contest_ends_at,contest_terms_url,public_listed,about FROM merchants WHERE id=?').bind(mid).first(),
-      db.prepare("SELECT id,kind,message,created_at,read_at FROM alerts WHERE merchant_id=? AND kind<>'tag_request' ORDER BY id DESC LIMIT 10").bind(mid).all(),
+      db.prepare('SELECT id,name,slug,logo_url,logo_key,brand_color,store_url,store_enabled,low_stock_threshold,max_checks,contest_enabled,contest_title,contest_ends_at,contest_terms_url,public_listed,about FROM merchants WHERE id=?').bind(mid).first(),
+      db.prepare("SELECT id,kind,message,created_at,read_at FROM alerts WHERE merchant_id=? AND kind NOT IN ('tag_request','store_request') ORDER BY id DESC LIMIT 10").bind(mid).all(),
     ]);
     const entries = await db.prepare('SELECT COUNT(*) AS n FROM entries WHERE merchant_id=?').bind(mid).first();
     merchant.logo_url = imageUrl(merchant.logo_key) || merchant.logo_url;

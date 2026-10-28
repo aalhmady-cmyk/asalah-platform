@@ -7,18 +7,22 @@ const TYPES = {
   'image/png': { ext: 'png', magic: (b) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 },
   'image/webp': { ext: 'webp', magic: (b) => b[0] === 0x52 && b[1] === 0x49 && b[8] === 0x57 && b[9] === 0x45 },
 };
-const KEY_RE = /^(logos|products)\/[0-9]+\/[a-f0-9]{24}\.(jpg|png|webp)$/;
+const KEY_RE = /^(logos|products|posters)\/[0-9]+\/[a-f0-9]{24}\.(jpg|png|webp)$/;
 
 export const imageUrl = (key) => (key ? '/img/' + key : null);
 
-// يحفظ الصورة ويرجع مفتاحها. kind = logos أو products
+// يحفظ الصورة ويرجع مفتاحها. kind = logos أو products أو posters
 export async function saveImage(env, req, kind, merchantId) {
   const type = (req.headers.get('Content-Type') || '').split(';')[0].trim();
-  const t = TYPES[type];
-  if (!t) fail(415, 'الصورة لازم تكون JPG أو PNG أو WEBP');
+  if (!TYPES[type]) fail(415, 'الصورة لازم تكون JPG أو PNG أو WEBP');
   const len = Number(req.headers.get('Content-Length') || 0);
   if (len > MAX_BYTES) fail(413, 'حجم الصورة أكبر من 1 ميجا');
-  const buf = new Uint8Array(await req.arrayBuffer());
+  return saveImageBytes(env, new Uint8Array(await req.arrayBuffer()), type, kind, merchantId);
+}
+
+export async function saveImageBytes(env, buf, type, kind, merchantId) {
+  const t = TYPES[type];
+  if (!t) fail(415, 'الصورة لازم تكون JPG أو PNG أو WEBP');
   if (!buf.length) fail(400, 'الصورة فاضية');
   if (buf.length > MAX_BYTES) fail(413, 'حجم الصورة أكبر من 1 ميجا');
   if (!t.magic(buf)) fail(415, 'الملف مو صورة صالحة');
@@ -26,6 +30,9 @@ export async function saveImage(env, req, kind, merchantId) {
   await env.DB.prepare('INSERT INTO images(key,content_type,data,created_at) VALUES(?,?,?,?)').bind(key, type, buf, now()).run();
   return key;
 }
+
+// المفتاح لازم يكون صورة منتج تخص نفس التاجر
+export const ownsImage = (key, merchantId) => typeof key === 'string' && KEY_RE.test(key) && key.startsWith(`products/${merchantId}/`);
 
 export async function deleteImage(env, key) {
   if (key && KEY_RE.test(key)) await env.DB.prepare('DELETE FROM images WHERE key=?').bind(key).run();

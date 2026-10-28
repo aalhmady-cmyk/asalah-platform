@@ -6,6 +6,8 @@ import { HttpError, json } from './lib/util.js';
 import { handleAdmin } from './routes/admin.js';
 import { changePassword, login, logout, me, setup } from './routes/auth.js';
 import { handleMerchant } from './routes/merchant.js';
+import { handlePublicStore } from './routes/store.js';
+import { serveMedia } from './lib/store.js';
 import { brandPage, brands, enter, guideChat, guideInfo, joinRequest, shopAiRoute, stats, loyaltyClaim, loyaltyRedeem, loyaltyWallet, rate, report, verify } from './routes/public.js';
 
 const SECURITY_HEADERS = {
@@ -20,6 +22,8 @@ async function route(req, env) {
   if (!env.DB) return json({ ok: false, message: 'قاعدة البيانات غير مرتبطة باسم DB' }, 503);
   env = await prepare(env);
   if (path.startsWith('/img/') && (m === 'GET' || m === 'HEAD')) return serveImage(env, path);
+  if (path.startsWith('/media/') && (m === 'GET' || m === 'HEAD')) return serveMedia(req, env, path);
+  if (path === '/api/public/store' || path.startsWith('/api/public/store/')) return handlePublicStore(req, env, path);
   if (path === '/api/verify' && m === 'POST') return verify(req, env);
   if (path === '/api/loyalty/claim' && m === 'POST') return loyaltyClaim(req, env);
   if (path === '/api/loyalty/wallet' && m === 'POST') return loyaltyWallet(req, env);

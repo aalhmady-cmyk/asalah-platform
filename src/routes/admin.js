@@ -27,6 +27,7 @@ function merchantFields(b, partial) {
   if (has('low_stock_threshold')) f.low_stock_threshold = int(b.low_stock_threshold ?? 5000, 'حد تنبيه المخزون', { max: 1000000 });
   if (has('max_checks')) f.max_checks = int(b.max_checks ?? 5, 'حد الفحوصات', { max: 100 });
   if (has('public_listed')) f.public_listed = b.public_listed ? 1 : 0;
+  if (partial && 'store_enabled' in b) f.store_enabled = b.store_enabled ? 1 : 0;
   if (partial && 'status' in b) {
     if (!['active', 'suspended'].includes(b.status)) fail(400, 'الحالة غير معروفة');
     f.status = b.status;
@@ -91,6 +92,8 @@ export async function handleAdmin(req, env, path) {
   if ((match = path.match(/^\/api\/admin\/merchants\/(\d+)$/)) && m === 'PATCH') {
     const id = Number(match[1]);
     const f = merchantFields(await readJson(req), true);
+    // أول تفعيل للمتجر يسجّل تاريخ الاشتراك
+    if (f.store_enabled) f.store_since = (await db.prepare('SELECT store_since FROM merchants WHERE id=?').bind(id).first())?.store_since || now();
     const keys = Object.keys(f);
     if (!keys.length) fail(400, 'ما فيه تغييرات');
     const row = await db.prepare(`UPDATE merchants SET ${keys.map((k) => k + '=?').join(',')} WHERE id=? RETURNING *`).bind(...keys.map((k) => f[k]), id).first();

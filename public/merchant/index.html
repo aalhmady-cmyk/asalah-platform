@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/merchant/store.css">
 </head>
 <body>
 <div class="shell">
@@ -17,6 +18,7 @@
     </div>
     <nav id="nav" aria-label="أقسام اللوحة">
       <button type="button" data-tab="home">الرئيسية</button>
+      <button type="button" data-tab="store">متجري 🛍️</button>
       <button type="button" data-tab="assistant">المساعد الذكي ✨</button>
       <button type="button" data-tab="tags">العلامات</button>
       <button type="button" data-tab="loyalty">النقاط والكاش باك 🪙</button>
@@ -45,6 +47,8 @@
         <div class="card"><h2>آخر عمليات التحقق</h2><div class="table-wrap" id="recent"></div></div>
       </div>
     </section>
+
+    <section id="store" hidden></section>
 
     <section id="tags" hidden>
       <div class="page-head"><div><h1>العلامات</h1><p>دفعاتك، والبحث عن أي علامة، وإيقافها أو تفعيلها</p></div></div>

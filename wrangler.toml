@@ -15,13 +15,18 @@ fallthrough = true
 directory = "./public"
 binding = "ASSETS"
 not_found_handling = "404-page"
-run_worker_first = ["/api/*", "/img/*"]
+run_worker_first = ["/api/*", "/img/*", "/media/*"]
 
 # قاعدة البيانات تنشأ تلقائياً في حسابك أول مرة تنشر (بدون نسخ أي معرّف)
 [[d1_databases]]
 binding = "DB"
 database_name = "asalah"
 migrations_dir = "migrations"
+
+# فيديوهات الريلز. الـ bucket ينشأ تلقائياً أول مرة تنشر (لازم R2 يكون مفعّل في الحساب)
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "asalah-media"
 
 # فحص المخزون والتنبيهات كل ساعة
 [triggers]

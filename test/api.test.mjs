@@ -417,4 +417,62 @@ test('متاجر أصالة: الصفحة والذكاء بدون مفتاح', a
   const page = await fetch(BASE + '/stores/');
   assert.equal(page.status, 200);
   assert.ok((await page.text()).includes('متاجر أصالة'));
+  assert.equal((await fetch(BASE + '/stores/demo/')).status, 200);
+});
+
+test('متجر التاجر: الاشتراك والمنتجات والريلز والعرض العام', async () => {
+  // قبل التفعيل: يشوف حالته بس، والإضافة مرفوضة
+  let r = await call('/api/m/store', { cookie: S.merchant });
+  assert.equal(r.data.enabled, false);
+  assert.equal((await post('/api/m/store/products', { title: 'x', price: 1, buy_url: 'https://a.salla.sa/p' }, S.merchant)).status, 403);
+  assert.equal((await post('/api/m/store/request', {}, S.merchant)).status, 200);
+  const ov = await call('/api/admin/overview', { cookie: S.admin });
+  assert.ok(ov.data.alerts.some((a) => a.kind === 'store_request'));
+  assert.equal((await patch(`/api/admin/merchants/${S.mid}`, { store_enabled: true }, S.admin)).status, 200);
+
+  r = await post('/api/m/store/products', { title: 'شاي أخضر فاخر 250 جرام', price: '49.5', old_price: 65, category: 'coffee', buy_url: 'https://green.salla.sa/p/123', description: 'شاي أصلي' }, S.merchant);
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  const pid = r.data.product.id;
+  assert.equal(r.data.product.price, 49.5);
+  assert.equal((await post('/api/m/store/products', { title: 'بدون رابط', price: 10 }, S.merchant)).status, 400);
+  assert.equal((await post('/api/m/store/products', { title: 'رابط http', price: 10, buy_url: 'http://x.sa' }, S.merchant)).status, 400);
+
+  // يظهر للعامة، والبحث يلقاه
+  let pub = await call('/api/public/store');
+  assert.equal(pub.data.products.length, 1);
+  assert.equal(pub.data.merchants[0].slug, 'green-kif');
+  assert.equal((await call('/api/public/store/products?q=' + encodeURIComponent('شاي'))).data.products.length, 1);
+  assert.equal((await call('/api/public/store/products?cat=perfume')).data.products.length, 0);
+  const one = await call('/api/public/store/products/' + pid);
+  assert.equal(one.data.product.buy_url, 'https://green.salla.sa/p/123');
+  assert.equal((await post('/api/public/store/track', { type: 'click', id: pid })).status, 200);
+
+  // الريل: بيانات، ثم الفيديو
+  const bad = await post('/api/m/store/reels', { title: 'قصير', duration: 5 }, S.merchant);
+  assert.equal(bad.status, 400);
+  r = await post('/api/m/store/reels', { title: 'طريقة التحضير', duration: 20, product_id: pid }, S.merchant);
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  const mp4 = new Uint8Array(4096);
+  mp4.set([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]);
+  const up = await fetch(`${BASE}/api/m/store/reels/${r.data.id}/video`, { method: 'PUT', headers: { Cookie: S.merchant, Origin: BASE, 'Content-Type': 'video/mp4' }, body: mp4 });
+  assert.equal(up.status, 200, await up.clone().text());
+  const reel = (await up.json()).reel;
+  const reels = await call('/api/public/store/reels');
+  assert.equal(reels.data.reels.length, 1);
+  assert.equal(reels.data.reels[0].product_title, 'شاي أخضر فاخر 250 جرام');
+  const vid = await fetch(BASE + reel.video_url, { headers: { Range: 'bytes=0-99' } });
+  assert.equal(vid.status, 206);
+  assert.equal(vid.headers.get('Content-Range'), 'bytes 0-99/4096');
+  assert.equal((await vid.arrayBuffer()).byteLength, 100);
+
+  // الإيقاف من المدير يخفي المتجر كامل
+  assert.equal((await patch(`/api/admin/merchants/${S.mid}`, { store_enabled: false }, S.admin)).status, 200);
+  pub = await call('/api/public/store');
+  assert.equal(pub.data.products.length, 0);
+  assert.equal(pub.data.reels.length, 0);
+  assert.equal((await call('/api/public/store/products/' + pid)).status, 404);
+  assert.equal((await patch(`/api/admin/merchants/${S.mid}`, { store_enabled: true }, S.admin)).status, 200);
+  assert.equal((await call(`/api/m/store/reels/${reel.id}`, { method: 'DELETE', cookie: S.merchant })).status, 200);
+  assert.equal((await fetch(BASE + reel.video_url)).status, 404);
+  assert.equal((await post('/api/public/store/chat', { messages: [{ role: 'user', content: 'شاي' }] })).status, 503);
 });

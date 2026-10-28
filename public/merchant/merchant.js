@@ -1,4 +1,5 @@
 import { api, hotspotsTable, initial, pickImage, bars, BATCH_STATUS, hbars, html, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
+import { loadStore } from '/merchant/store.js';
 
 const $ = (id) => document.getElementById(id);
 const me = await api('/api/auth/me');
@@ -397,7 +398,7 @@ onSubmit($('password-form'), async (f) => {
   setTimeout(() => (location.href = '/login/'), 1200);
 });
 
-const loaders = { home: loadHome, assistant: async () => { if (!merchant) merchant = (await api('/api/m/overview')).merchant; return loadAssistant(); }, tags: loadTags, loyalty: loadLoyalty, contest: async () => { await loadContest(); await loadContestData(); }, reports: loadReports, monthly: async () => {}, sellers: loadSellers, account: loadAccount };
+const loaders = { home: loadHome, store: loadStore, assistant: async () => { if (!merchant) merchant = (await api('/api/m/overview')).merchant; return loadAssistant(); }, tags: loadTags, loyalty: loadLoyalty, contest: async () => { await loadContest(); await loadContestData(); }, reports: loadReports, monthly: async () => {}, sellers: loadSellers, account: loadAccount };
 // هوية التاجر في القائمة الجانبية حتى لو فتح اللوحة على غير الرئيسية
 api('/api/m/overview').then((d) => { merchant = merchant || d.merchant; brandHeader(d.merchant); }).catch(() => {});
 tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => loaders[id]().catch((e) => toast(e.message, true)));
