@@ -9,3 +9,5 @@
   Cache-Control: no-store
 /merchant/*
   Cache-Control: no-store
+/report/*
+  Cache-Control: no-store

@@ -6,7 +6,7 @@ import { HttpError, json } from './lib/util.js';
 import { handleAdmin } from './routes/admin.js';
 import { changePassword, login, logout, me, setup } from './routes/auth.js';
 import { handleMerchant } from './routes/merchant.js';
-import { enter, report, verify } from './routes/public.js';
+import { brandPage, brands, enter, report, verify } from './routes/public.js';
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
@@ -21,6 +21,9 @@ async function route(req, env) {
   env = await prepare(env);
   if (path.startsWith('/img/') && (m === 'GET' || m === 'HEAD')) return serveImage(env, path);
   if (path === '/api/verify' && m === 'POST') return verify(req, env);
+  if (path === '/api/public/brands' && m === 'GET') return brands(env);
+  const bm = path.match(/^\/api\/public\/brands\/([a-z0-9-]{2,40})$/);
+  if (bm && m === 'GET') return brandPage(env, bm[1]);
   if (path === '/api/enter' && m === 'POST') return enter(req, env);
   if (path === '/api/report' && m === 'POST') return report(req, env);
   if (path === '/api/auth/login' && m === 'POST') return login(req, env);

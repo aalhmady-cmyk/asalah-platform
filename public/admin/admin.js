@@ -1,4 +1,4 @@
-import { api, bars, BATCH_STATUS, hbars, html, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
+import { api, bars, BATCH_STATUS, hbars, hotspotsTable, html, pickImage, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
 let merchants = [];
@@ -24,6 +24,7 @@ function openDialog(id, merchant) {
     $('merchant-status-field').hidden = !merchant;
     f.slug.readOnly = Boolean(merchant);
     if (merchant) for (const k of ['name', 'slug', 'brand_color', 'logo_url', 'store_url', 'whatsapp', 'low_stock_threshold', 'max_checks', 'status']) if (merchant[k] != null) f[k].value = merchant[k];
+    f.public_listed.checked = Boolean(merchant?.public_listed);
   }
   if (id === 'dlg-batch' || id === 'dlg-user') {
     const opts = merchants.map((m) => html`<option value="${m.id}">${m.name}</option>`);
@@ -37,7 +38,7 @@ const optional = (v) => (v === '' ? null : v);
 onSubmit($('merchant-form'), async (f, form) => {
   const body = {
     name: f.name, brand_color: f.brand_color, logo_url: optional(f.logo_url), store_url: optional(f.store_url), whatsapp: optional(f.whatsapp),
-    low_stock_threshold: Number(f.low_stock_threshold), max_checks: Number(f.max_checks),
+    low_stock_threshold: Number(f.low_stock_threshold), max_checks: Number(f.max_checks), public_listed: f.public_listed === 'on',
   };
   if (f.id) await api(`/api/admin/merchants/${f.id}`, { method: 'PATCH', body: { ...body, status: f.status } });
   else await api('/api/admin/merchants', { method: 'POST', body: { ...body, slug: f.slug } });
@@ -78,10 +79,21 @@ function merchantRows(list, withEdit) {
       <td>${num(m.scans_7d)}</td>
       <td>${m.contest_enabled ? 'مفعّلة' : 'موقوفة'}</td>
       <td>${status}</td>
-      <td>${withEdit ? html`<button class="btn" type="button" data-edit-merchant="${m.id}">تعديل</button>` : html`<button class="btn" type="button" data-batch-for="${m.id}">دفعة جديدة</button>`}</td>
+      <td>${withEdit ? html`<div class="actions"><button class="btn btn-sm" type="button" data-edit-merchant="${m.id}">تعديل</button><button class="btn btn-sm" type="button" data-logo-for="${m.id}">${m.logo_key ? 'تغيير الشعار' : 'رفع الشعار'}</button><a class="btn btn-sm" href="/report/?merchant=${m.id}" target="_blank" rel="noopener">التقرير</a></div>` : html`<button class="btn" type="button" data-batch-for="${m.id}">دفعة جديدة</button>`}</td>
     </tr>`;
   })}</tbody></table>`;
 }
+// رفع الشعار وصورة المنتج من اللوحة الأم
+document.addEventListener('click', async (e) => {
+  const lg = e.target.closest('[data-logo-for]'), bi = e.target.closest('[data-batch-image]');
+  if (!lg && !bi) return;
+  try {
+    const img = await pickImage(lg ? 600 : 1200);
+    if (!img) return;
+    if (lg) { await api(`/api/admin/merchants/${lg.dataset.logoFor}/logo`, { method: 'POST', body: img }); toast('تم رفع الشعار'); loadMerchants(); }
+    else { await api(`/api/admin/batches/${bi.dataset.batchImage}/image`, { method: 'POST', body: img }); toast('تم رفع صورة المنتج'); loadBatches(); }
+  } catch (err) { toast(err.message, true); }
+});
 document.addEventListener('click', (e) => {
   const edit = e.target.closest('[data-edit-merchant]');
   if (edit) openDialog('dlg-merchant', merchants.find((m) => m.id === Number(edit.dataset.editMerchant)));
@@ -126,6 +138,8 @@ async function loadBatches() {
     <td>${b.merchant_name}</td><td>${num(b.size)}</td><td>${b.product_name || '-'}</td>
     <td>${pill(BATCH_STATUS, b.status)}</td><td>${when(b.created_at)}</td>
     <td><div class="actions">
+      ${b.image_url ? html`<img src="${b.image_url}" alt="" class="thumb" style="width:36px;height:36px">` : ''}
+      <button class="btn btn-sm" type="button" data-batch-image="${b.id}">${b.image_url ? 'تغيير الصورة' : 'صورة المنتج'}</button>
       <button class="btn" type="button" data-factory="${b.id}" data-code="${b.code}" data-size="${b.size}">ملف المصنع</button>
       ${b.status === 'active' ? html`<button class="btn btn-danger" type="button" data-batch-status="blocked" data-id="${b.id}">إيقاف</button>` : html`<button class="btn btn-primary" type="button" data-batch-status="active" data-id="${b.id}">تفعيل</button>`}
     </div></td>
@@ -204,7 +218,8 @@ onSubmit($('status-form'), async (f) => {
 
 // ---------- البلاغات والحسابات والسجل ----------
 async function loadReports() {
-  const [ov, rep] = await Promise.all([api('/api/admin/overview'), api('/api/admin/reports')]);
+  const [ov, rep, hot] = await Promise.all([api('/api/admin/overview'), api('/api/admin/reports'), api('/api/admin/hotspots?days=' + $('hot-days').value)]);
+  render($('hotspots'), hotspotsTable(hot.hotspots));
   render($('unknown-table'), !ov.unknown.length ? html`<div class="empty">ما فيه أكواد مزيّفة</div>` : html`<table><thead><tr><th>بداية الكود</th><th>التاجر المنتحَل</th><th>المحاولات</th><th>المكان</th><th>آخر مرة</th></tr></thead><tbody>${ov.unknown.map((u) => html`<tr><td class="mono">${u.preview}…</td><td>${u.merchant_name || '-'}</td><td>${num(u.count)}</td><td>${u.city || '-'}</td><td>${when(u.last_at)}</td></tr>`)}</tbody></table>`);
   render($('reports-table'), !rep.reports.length ? html`<div class="empty">ما فيه بلاغات</div>` : html`<table><thead><tr><th>التاجر</th><th>المدينة</th><th>المحل</th><th>ملاحظة</th><th>الوقت</th></tr></thead><tbody>${rep.reports.map((r) => html`<tr><td>${r.merchant_name || '-'}</td><td>${r.city}</td><td>${r.point_of_sale}</td><td>${r.note || '-'}</td><td>${when(r.created_at)}</td></tr>`)}</tbody></table>`);
 }
@@ -245,6 +260,7 @@ async function loadAudit() {
   render($('audit-table'), html`<table style="min-width:720px"><thead><tr><th>الوقت</th><th>الحساب</th><th>العملية</th><th>التفاصيل</th></tr></thead><tbody>${audit.map((a) => html`<tr><td>${when(a.created_at)}</td><td class="ltr">${a.email || '-'}</td><td>${ACTIONS[a.action] || a.action}</td><td class="mono small" style="white-space:normal;word-break:break-all">${a.detail || ''}</td></tr>`)}</tbody></table>`);
 }
 
+$('hot-days').addEventListener('change', () => loadReports().catch((e) => toast(e.message, true)));
 const loaders = { home: loadHome, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, reports: loadReports, users: loadUsers, audit: loadAudit };
 let current = 'home';
 const refresh = () => loaders[current]().catch((e) => toast(e.message, true));

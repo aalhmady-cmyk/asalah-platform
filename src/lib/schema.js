@@ -4,6 +4,7 @@ import m0001 from '../../migrations/0001_init.sql';
 import m0002 from '../../migrations/0002_images.sql';
 import m0003 from '../../migrations/0003_settings.sql';
 import m0004 from '../../migrations/0004_image_store.sql';
+import m0005 from '../../migrations/0005_draws_sellers.sql';
 import { randomHex } from './util.js';
 
 const MIGRATIONS = [
@@ -11,6 +12,7 @@ const MIGRATIONS = [
   ['0002_images.sql', m0002],
   ['0003_settings.sql', m0003],
   ['0004_image_store.sql', m0004],
+  ['0005_draws_sellers.sql', m0005],
 ];
 
 // يقسم الملف لجمل: نشيل التعليقات ونقسم على ; في آخر السطر

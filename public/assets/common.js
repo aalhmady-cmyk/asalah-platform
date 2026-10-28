@@ -180,3 +180,11 @@ export function pickImage(maxSide = 1200) {
     input.click();
   });
 }
+
+// بؤر التقليد: كل مدينة بعدد الحالات المشبوهة ونسبتها من كل المسحات
+export function hotspotsTable(rows) {
+  if (!rows.length) return html`<div class="empty">ما فيه تقليد ملحوظ في هذي الفترة 👍</div>`;
+  return html`<div class="table-wrap"><table style="min-width:640px"><thead><tr><th>المدينة</th><th>حالات مشبوهة</th><th>نسبة الخطر</th><th>أكواد مزيّفة</th><th>موقوفة أو مقفلة</th><th>جهاز آخر</th><th>بلاغات</th><th>محلات مذكورة</th></tr></thead><tbody>${rows.map(
+    (r) => html`<tr><td><b>${r.city}</b></td><td><b>${num(r.suspicious)}</b></td><td><div style="display:flex;align-items:center;gap:8px"><div class="risk"><i style="width:${r.risk}%"></i></div><span class="small">${r.risk}%</span></div></td><td>${num(r.unknown)}</td><td>${num(r.blocked)}</td><td>${num(r.other_device)}</td><td>${num(r.reports)}</td><td class="small">${r.places.join('، ') || '-'}</td></tr>`
+  )}</tbody></table></div>`;
+}

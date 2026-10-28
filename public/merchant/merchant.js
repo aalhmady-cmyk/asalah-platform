@@ -1,4 +1,4 @@
-import { api, initial, pickImage, bars, BATCH_STATUS, hbars, html, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
+import { api, hotspotsTable, initial, pickImage, bars, BATCH_STATUS, hbars, html, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
 const me = await api('/api/auth/me');
@@ -141,9 +141,142 @@ onSubmit($('contest-form'), async (f) => {
 });
 
 async function loadReports() {
-  const { reports } = await api('/api/m/reports');
+  const days = $('hot-days').value;
+  const [{ reports }, { hotspots }] = await Promise.all([api('/api/m/reports'), api('/api/m/hotspots?days=' + days)]);
+  render($('hotspots'), hotspotsTable(hotspots));
   render($('reports-table'), !reports.length ? html`<div class="empty">ما فيه بلاغات</div>` : html`<table style="min-width:560px"><thead><tr><th>المدينة</th><th>المحل</th><th>السبب</th><th>ملاحظة</th><th>الوقت</th></tr></thead><tbody>${reports.map((r) => html`<tr><td>${r.city}</td><td><b>${r.point_of_sale}</b></td><td>${pill(RESULT, r.reason)}</td><td>${r.note || '-'}</td><td>${when(r.created_at)}</td></tr>`)}</tbody></table>`);
 }
+$('hot-days').addEventListener('change', () => loadReports().catch((e) => toast(e.message, true)));
+
+// ---------- المسابقة: المشاركات والاستبعاد والسحب ----------
+async function loadContestData() {
+  const [{ entries, flags, suspicious }, { excluded }, { draws }] = await Promise.all([api('/api/m/entries'), api('/api/m/excluded'), api('/api/m/draws')]);
+  const phones = new Set(entries.map((e) => e.phone)).size;
+  $('entries-summary').textContent = `${num(entries.length)} مشاركة من ${num(phones)} رقم${suspicious ? ` · ${num(suspicious)} مشبوهة` : ''}`;
+  render($('entries'), !entries.length ? html`<div class="empty">ما فيه مشاركات للحين</div>` : html`<table style="min-width:760px"><thead><tr><th>الاسم</th><th>الجوال</th><th>المدينة</th><th>المحل</th><th>العلامة</th><th>الوقت</th><th>ملاحظات</th><th><span class="sr-only">إجراء</span></th></tr></thead><tbody>${entries.slice(0, 300).map((e) => html`<tr>
+    <td><b>${e.customer_name}</b></td><td class="mono">${e.phone}</td><td>${e.city}</td><td>${e.point_of_sale}</td><td class="mono">${e.code}-${e.serial}</td><td class="muted">${when(e.created_at)}</td>
+    <td>${e.flags.map((f) => html`<span class="flag">${flags[f]}</span>`)}${e.entries_for_phone > 1 ? html`<span class="small muted">${e.entries_for_phone} مشاركات للرقم</span>` : ''}</td>
+    <td>${e.flags.includes('excluded') ? '' : html`<button class="btn btn-sm" type="button" data-exclude="${e.phone}">استبعاد</button>`}</td></tr>`)}</tbody></table>`);
+  render($('excluded'), !excluded.length ? html`<div class="empty">ما فيه أرقام مستبعدة</div>` : html`<table><tbody>${excluded.map((x) => html`<tr><td class="mono">${x.phone}</td><td>${x.reason || '-'}</td><td><button class="btn btn-sm" type="button" data-unexclude="${x.phone}">إرجاع</button></td></tr>`)}</tbody></table>`);
+  render($('draws'), !draws.length ? html`<div class="empty">ما سويت أي سحب للحين</div>` : html`${draws.map((d) => html`<div style="border-top:1px solid var(--line-soft);padding-top:12px;display:flex;flex-direction:column;gap:8px">
+    <div class="card-head"><b>${d.title}</b><span class="small muted">${when(d.created_at)} · من ${num(d.pool_size)} مشارك · <a href="/api/m/draws/${d.id}/winners.csv">تنزيل الفائزين</a></span></div>
+    <div class="winners">${d.winners.map((w) => html`<div class="winner"><b class="rank">${w.rank}</b><div><b>${w.customer_name}</b> <span class="mono small">${w.phone}</span><div class="small muted">${w.city} · ${w.point_of_sale}</div></div></div>`)}</div></div>`)}`);
+}
+$('entries').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-exclude]');
+  if (!b || !confirm(`استبعاد الرقم ${b.dataset.exclude} من السحب؟`)) return;
+  try { await api('/api/m/excluded', { method: 'POST', body: { phone: b.dataset.exclude } }); toast('تم الاستبعاد'); loadContestData(); } catch (err) { toast(err.message, true); }
+});
+$('excluded').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-unexclude]');
+  if (!b) return;
+  try { await api('/api/m/excluded', { method: 'DELETE', body: { phone: b.dataset.unexclude } }); loadContestData(); } catch (err) { toast(err.message, true); }
+});
+onSubmit($('exclude-form'), async (f, form) => {
+  await api('/api/m/excluded', { method: 'POST', body: f });
+  form.reset();
+  toast('تم الاستبعاد');
+  loadContestData();
+});
+const dayStart = (d) => (d ? Math.floor(Date.parse(d + 'T00:00:00+03:00') / 1000) : null);
+const dayEnd = (d) => (d ? Math.floor(Date.parse(d + 'T23:59:59+03:00') / 1000) : null);
+onSubmit($('draw-form'), async (f) => {
+  if (!confirm(`بنسحب ${f.winners} فائز الحين، والنتيجة تنحفظ وما تتغيّر. نكمل؟`)) return;
+  const box = $('draw-result');
+  render(box, html`<div class="draw-rolling">🎲 جاري السحب…</div>`);
+  const [d] = await Promise.all([
+    api('/api/m/draws', { method: 'POST', body: { title: f.title, winners: Number(f.winners), from: dayStart(f.from), to: dayEnd(f.to), skip_flagged: f.skip_flagged === 'on', skip_previous: f.skip_previous === 'on' } }),
+    new Promise((r) => setTimeout(r, 1200)),
+  ]).catch((e) => { box.textContent = ''; throw e; });
+  render(box, html`<div class="alert info"><div>🎉 تم السحب من بين ${num(d.draw.pool_size)} مشارك</div></div><div class="winners">${d.draw.winners.map((w) => html`<div class="winner"><b class="rank">${w.rank}</b><div><b>${w.customer_name}</b> <span class="mono small">${w.phone}</span><div class="small muted">${w.city} · ${w.point_of_sale}</div></div></div>`)}</div>`);
+  loadContestData();
+});
+
+// ---------- التقرير الشهري ----------
+$('month-form').month.value = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 7);
+onSubmit($('month-form'), async (f) => { window.open('/report/?month=' + encodeURIComponent(f.month), '_blank'); });
+
+// ---------- نقاط البيع ----------
+let sellers = [];
+async function loadSellers() {
+  if (!merchant) merchant = (await api('/api/m/overview')).merchant;
+  const pf = $('public-form');
+  pf.public_listed.checked = Boolean(merchant.public_listed);
+  pf.about.value = merchant.about || '';
+  $('public-link').href = '/brand/?s=' + merchant.slug;
+  $('public-link').hidden = !merchant.public_listed;
+  sellers = (await api('/api/m/sellers')).sellers;
+  render($('sellers-table'), !sellers.length ? html`<div class="empty">ما أضفت نقاط بيع للحين</div>` : html`<table style="min-width:560px"><thead><tr><th>المحل</th><th>المدينة</th><th>العنوان</th><th>الخريطة</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>${sellers.map((x) => html`<tr>
+    <td><b>${x.name}</b>${x.online ? html` <span class="pill ok">متجر إلكتروني</span>` : ''}</td><td>${x.city}</td><td>${x.address || '-'}</td><td>${x.map_url ? html`<a href="${x.map_url}" target="_blank" rel="noopener">فتح</a>` : '-'}</td>
+    <td><div class="actions"><button class="btn btn-sm" type="button" data-edit-seller="${x.id}">تعديل</button><button class="btn btn-sm btn-danger" type="button" data-del-seller="${x.id}">حذف</button></div></td></tr>`)}</tbody></table>`);
+}
+onSubmit($('public-form'), async (f) => {
+  const d = await api('/api/m/settings', { method: 'PATCH', body: { public_listed: f.public_listed === 'on', about: f.about || null } });
+  Object.assign(merchant, d.settings);
+  $('public-link').hidden = !merchant.public_listed;
+  toast(merchant.public_listed ? 'علامتك صارت تظهر في موقع أصالة' : 'تم الحفظ');
+});
+onSubmit($('seller-form'), async (f, form) => {
+  const body = { name: f.name, city: f.city, address: f.address || null, map_url: f.map_url || null, phone: f.phone || null, online: f.online === 'on' };
+  if (f.seller_id) await api('/api/m/sellers/' + f.seller_id, { method: 'PATCH', body });
+  else await api('/api/m/sellers', { method: 'POST', body });
+  form.reset();
+  form.seller_id.value = '';
+  $('seller-form-title').textContent = 'إضافة نقطة بيع';
+  toast('تم الحفظ');
+  loadSellers();
+});
+$('seller-reset').addEventListener('click', () => { $('seller-form').seller_id.value = ''; $('seller-form-title').textContent = 'إضافة نقطة بيع'; });
+$('sellers-table').addEventListener('click', async (e) => {
+  const ed = e.target.closest('[data-edit-seller]'), del = e.target.closest('[data-del-seller]');
+  if (ed) {
+    const x = sellers.find((s) => s.id === Number(ed.dataset.editSeller));
+    const f = $('seller-form');
+    f.seller_id.value = x.id;
+    for (const k of ['name', 'city', 'address', 'map_url', 'phone']) f[k].value = x[k] ?? '';
+    f.online.checked = Boolean(x.online);
+    $('seller-form-title').textContent = 'تعديل نقطة بيع';
+    f.scrollIntoView({ behavior: 'smooth' });
+  }
+  if (del && confirm('حذف نقطة البيع؟')) {
+    try { await api('/api/m/sellers/' + del.dataset.delSeller, { method: 'DELETE' }); loadSellers(); } catch (err) { toast(err.message, true); }
+  }
+});
+
+// ---------- المساعد الذكي ----------
+const chat = [];
+const SUGGEST = ['كم علامة انمسحت هالشهر؟', 'متى أطلب دفعة جديدة؟', 'وين فيه تقليد على منتجي؟', 'وش تنصحني أسوي هالأسبوع؟'];
+let chatReady = false;
+async function loadAssistant() {
+  const d = await api('/api/m/assistant');
+  render($('tips'), html`${d.tips.map((t) => html`<div class="tip ${t.level}">${t.text}</div>`)}`);
+  $('chat-form').hidden = !d.chat;
+  $('chat-off').hidden = d.chat;
+  render($('chat-suggest'), d.chat ? html`${SUGGEST.map((q) => html`<button type="button" data-q="${q}">${q}</button>`)}` : html``);
+  if (!chatReady) {
+    chatReady = true;
+    renderChat();
+  }
+}
+function renderChat(typing) {
+  const hello = { role: 'assistant', content: `هلا ${merchant?.name ?? ''} 👋 أنا مساعد أصالة. اسألني عن مخزونك ومسحاتك ومبيعاتك والتقليد والمسابقة.` };
+  render($('chat-log'), html`${[hello, ...chat].map((m) => html`<div class="msg ${m.role === 'user' ? 'me' : 'bot'}">${m.content}</div>`)}${typing ? html`<div class="msg bot typing">يكتب…</div>` : ''}`);
+  $('chat-log').scrollTop = $('chat-log').scrollHeight;
+}
+async function sendQuestion(q) {
+  chat.push({ role: 'user', content: q });
+  renderChat(true);
+  try {
+    const d = await api('/api/m/assistant', { method: 'POST', body: { question: q, history: chat.slice(0, -1) } });
+    chat.push({ role: 'assistant', content: d.answer });
+  } catch (e) {
+    chat.pop();
+    toast(e.message, true);
+  }
+  renderChat();
+}
+$('chat-suggest').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) sendQuestion(b.dataset.q); });
+onSubmit($('chat-form'), async (f, form) => { form.reset(); await sendQuestion(f.q); });
 async function loadAccount() {
   if (!merchant) merchant = (await api('/api/m/overview')).merchant;
   render($('logo-box'), html`<div style="display:flex;align-items:center;gap:16px">
@@ -176,5 +309,7 @@ onSubmit($('password-form'), async (f) => {
   setTimeout(() => (location.href = '/login/'), 1200);
 });
 
-const loaders = { home: loadHome, tags: loadTags, contest: loadContest, reports: loadReports, account: loadAccount };
+const loaders = { home: loadHome, assistant: async () => { if (!merchant) merchant = (await api('/api/m/overview')).merchant; return loadAssistant(); }, tags: loadTags, contest: async () => { await loadContest(); await loadContestData(); }, reports: loadReports, monthly: async () => {}, sellers: loadSellers, account: loadAccount };
+// هوية التاجر في القائمة الجانبية حتى لو فتح اللوحة على غير الرئيسية
+api('/api/m/overview').then((d) => { merchant = merchant || d.merchant; brandHeader(d.merchant); }).catch(() => {});
 tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => loaders[id]().catch((e) => toast(e.message, true)));

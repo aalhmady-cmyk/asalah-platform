@@ -234,3 +234,95 @@ test('صورة المنتج وشعار التاجر بعد التحقق', async 
   assert.equal((await fetch(BASE + img.data.image_url)).status, 404);
   assert.equal((await call('/api/m/batches', { cookie: S.merchant })).data.batches[0].image_url, null);
 });
+
+test('المشاركات المشبوهة والاستبعاد والسحب', async () => {
+  // جهاز واحد يسجّل 3 علامات بثلاث أرقام مختلفة = مشبوه
+  const phones = ['0551110001', '0551110002', '0551110003'];
+  for (let i = 0; i < 3; i++) {
+    const t = tokenOf(S.urls[5 + i]);
+    assert.equal((await post('/api/verify', { t, sid: sid('f') })).data.result, 'original');
+    const r = await post('/api/enter', { t, sid: sid('f'), name: 'عميل ' + i, phone: phones[i], city: 'الدمام', point_of_sale: 'سوبرماركت', consent: true });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+  }
+  let e = await call('/api/m/entries', { cookie: S.merchant });
+  assert.equal(e.status, 200);
+  assert.equal(e.data.entries.length, 4);
+  assert.equal(e.data.suspicious, 3);
+  assert.ok(e.data.entries.find((x) => x.phone === '966551110001').flags.includes('device_many_phones'));
+  assert.deepEqual(e.data.entries.find((x) => x.phone === '966551234567').flags, []);
+
+  // مع استبعاد المشبوهين يبقى مشارك واحد
+  let d = await post('/api/m/draws', { title: 'سحب 1', winners: 2 }, S.merchant);
+  assert.equal(d.status, 400);
+  d = await post('/api/m/draws', { title: 'سحب 1', winners: 1 }, S.merchant);
+  assert.equal(d.status, 201, JSON.stringify(d.data));
+  assert.equal(d.data.draw.pool_size, 1);
+  assert.equal(d.data.draw.winners[0].phone, '966551234567');
+  // الفائز السابق ما يدخل مرة ثانية، فما يبقى أحد
+  assert.equal((await post('/api/m/draws', { title: 'سحب 2', winners: 1 }, S.merchant)).status, 400);
+  // بدون استبعاد المشبوهين والفائزين السابقين: كل رقم فرصة وحدة
+  d = await post('/api/m/draws', { title: 'سحب 3', winners: 4, skip_flagged: false, skip_previous: false }, S.merchant);
+  assert.equal(d.data.draw.pool_size, 4);
+  assert.equal(new Set(d.data.draw.winners.map((w) => w.phone)).size, 4);
+
+  // الرقم المستبعد ما يدخل أي سحب
+  assert.equal((await post('/api/m/excluded', { phone: '0551234567', reason: 'موظف' }, S.merchant)).status, 200);
+  d = await post('/api/m/draws', { title: 'سحب 4', winners: 3, skip_flagged: false, skip_previous: false }, S.merchant);
+  assert.equal(d.data.draw.pool_size, 3);
+  assert.ok(!d.data.draw.winners.some((w) => w.phone === '966551234567'));
+  const list = await call('/api/m/draws', { cookie: S.merchant });
+  assert.equal(list.data.draws.length, 3);
+  const csv = await call(`/api/m/draws/${list.data.draws[0].id}/winners.csv`, { cookie: S.merchant });
+  assert.equal(csv.status, 200);
+  assert.ok(csv.data.includes('9665511100'));
+});
+
+test('بؤر التقليد والتقرير الشهري', async () => {
+  await post('/api/report', { t: tokenOf(S.urls[2]), city: 'جدة', point_of_sale: 'محل الأمانة', reason: 'blocked' });
+  const h = await call('/api/m/hotspots?days=30', { cookie: S.merchant });
+  assert.equal(h.status, 200);
+  assert.ok(Array.isArray(h.data.hotspots));
+  const all = await call('/api/admin/hotspots', { cookie: S.admin });
+  assert.ok(all.data.hotspots.length >= 1);
+  const month = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 7);
+  const r = await call('/api/m/report?month=' + month, { cookie: S.merchant });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.report.sold, 6);
+  assert.equal(r.data.report.entries, 4);
+  assert.ok(r.data.report.scans > 0);
+  assert.equal((await call('/api/m/report?month=2026-13', { cookie: S.merchant })).status, 400);
+  assert.equal((await call(`/api/admin/report?merchant=${S.mid}&month=${month}`, { cookie: S.admin })).data.report.sold, 6);
+  assert.equal((await call('/api/admin/report?merchant=1&month=' + month, { cookie: S.merchant })).status, 403);
+});
+
+test('نقاط البيع والموقع العام', async () => {
+  assert.equal((await call('/api/public/brands')).data.brands.length, 0);
+  assert.equal((await call('/api/public/brands/green-kif')).status, 404);
+  let r = await post('/api/m/sellers', { name: 'بقالة النور', city: 'الرياض', map_url: 'https://maps.google.com/?q=1' }, S.merchant);
+  assert.equal(r.status, 201);
+  await post('/api/m/sellers', { name: 'المتجر', city: 'أونلاين', online: true }, S.merchant);
+  assert.equal((await post('/api/m/sellers', { name: 'x', city: 'y', map_url: 'javascript:alert(1)' }, S.merchant)).status, 400);
+  assert.equal((await patch('/api/m/settings', { public_listed: true, about: 'شاي طبيعي' }, S.merchant)).status, 200);
+  const list = await call('/api/public/brands');
+  assert.equal(list.data.brands.length, 1);
+  assert.equal(list.data.brands[0].sellers, 2);
+  const page = await call('/api/public/brands/green-kif');
+  assert.equal(page.data.brand.about, 'شاي طبيعي');
+  assert.equal(page.data.sellers.length, 2);
+  assert.equal(page.data.products[0].name, 'شاي أخضر');
+  // تاجر ثاني ما يقدر يعدّل نقطة بيع غيره
+  const id = r.data.id;
+  assert.equal((await call('/api/m/sellers/' + id, { method: 'DELETE', cookie: S.merchant })).status, 200);
+  assert.equal((await call('/api/m/sellers/' + id, { method: 'DELETE', cookie: S.merchant })).status, 404);
+});
+
+test('المساعد الذكي: الملاحظات تشتغل بدون مفتاح', async () => {
+  const r = await call('/api/m/assistant', { cookie: S.merchant });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.chat, false);
+  assert.ok(r.data.tips.length >= 1);
+  assert.ok(r.data.tips.some((t) => t.text.includes('مشبوهة')));
+  const a = await post('/api/m/assistant', { question: 'كم بعت؟' }, S.merchant);
+  assert.equal(a.status, 503);
+  assert.equal((await call('/api/m/assistant', { cookie: S.admin })).status, 403);
+});

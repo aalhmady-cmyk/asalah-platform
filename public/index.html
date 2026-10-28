@@ -3,18 +3,108 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0F2A21">
 <title>أصالة المنتجات الأصلية</title>
-<meta name="description" content="علامات NFC تحمي منتجك من التقليد، وتخلي عميلك يتأكد إنه أصلي بلمسة جوال.">
+<meta name="description" content="علامات NFC تحمي منتجك من التقليد، وتخلي عميلك يتأكد إنه أصلي بلمسة جوال. اعرف العلامات التجارية المحمية ووين تلقى منتجاتها الأصلية.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/login/login.css">
+<link rel="stylesheet" href="/assets/site.css">
 </head>
-<body>
-<main style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;padding:24px;text-align:center;background:var(--forest);color:#fff">
-  <svg width="72" height="72" viewBox="0 0 40 40" aria-hidden="true"><rect x="2" y="2" width="36" height="36" rx="10" fill="none" stroke="#D9B45A" stroke-width="2"/><path d="M12 21l5 5 11-12" fill="none" stroke="#D9B45A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  <h1 style="font-size:40px">أصالة المنتجات الأصلية</h1>
-  <p style="margin:0;max-width:520px;font-size:18px;color:var(--forest-ink)">علامات NFC تحمي منتجك من التقليد، وتخلي عميلك يتأكد إنه أصلي بلمسة جوال.</p>
-  <a class="btn btn-gold" href="/login/">دخول التجار والإدارة</a>
+<body class="site">
+<header class="site-nav">
+  <a class="site-logo" href="/"><svg width="34" height="34" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="11" fill="#D9B45A"/><path d="M12 21l5 5 11-12" fill="none" stroke="#0F2A21" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg><b>أصالة</b></a>
+  <nav><a href="#how">كيف تشتغل</a><a href="#brands">العلامات المحمية</a><a class="btn btn-gold btn-sm" href="/login/">دخول التجار</a></nav>
+</header>
+
+<section class="scene site-hero">
+  <div class="scene-glow"></div>
+  <div class="hero-grid">
+    <div class="hero-copy">
+      <div class="scene-badge"><span class="dot"></span> تحقق فوري عبر NFC</div>
+      <h1>المنتج الأصلي <span>يثبت نفسه</span> بلمسة جوال</h1>
+      <p>نلصق على منتجك علامة ذكية ما تتكرر. العميل يقرّب جواله منها، ويعرف خلال ثانية إن المنتج أصلي، وأنت تعرف وين ينباع منتجك ووين يتقلّد.</p>
+      <div class="hero-cta"><a class="btn btn-gold big" href="#brands">العلامات المحمية</a><a class="btn ghost big" href="#merchants">أنا صاحب علامة تجارية</a></div>
+    </div>
+        <svg class="scene-art" viewBox="0 0 360 360">
+      <defs>
+        <linearGradient id="box" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16805E"/><stop offset="1" stop-color="#0B5A42"/></linearGradient>
+        <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#143A2E"/><stop offset="1" stop-color="#0B2219"/></linearGradient>
+        <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9B45A" stop-opacity="0"/><stop offset=".5" stop-color="#F3D68C" stop-opacity=".9"/><stop offset="1" stop-color="#D9B45A" stop-opacity="0"/></linearGradient>
+        <clipPath id="screen-clip"><rect x="196" y="58" width="96" height="176" rx="14"/></clipPath>
+      </defs>
+      <!-- المنتج -->
+      <g class="product">
+        <ellipse cx="128" cy="318" rx="86" ry="12" fill="#000" opacity=".25"/>
+        <path d="M62 150 L128 128 L194 150 L194 306 L128 320 L62 306 Z" fill="url(#box)"/>
+        <path d="M128 128 L194 150 L194 306 L128 320 Z" fill="#000" opacity=".14"/>
+        <path d="M62 150 L128 128 L194 150 L128 170 Z" fill="#1E9670"/>
+        <rect x="80" y="236" width="70" height="6" rx="3" fill="#fff" opacity=".35"/>
+        <rect x="80" y="250" width="46" height="6" rx="3" fill="#fff" opacity=".22"/>
+        <!-- علامة NFC على المنتج -->
+        <g class="tag">
+          <circle cx="112" cy="200" r="22" fill="#D9B45A"/>
+          <circle cx="112" cy="200" r="16" fill="none" stroke="#0F2A21" stroke-width="2" opacity=".5"/>
+          <path d="M104 201l6 6 11-13" fill="none" stroke="#0F2A21" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+        <g class="waves" fill="none" stroke="#F3D68C" stroke-width="3" stroke-linecap="round">
+          <path class="w1" d="M142 182 a30 30 0 0 1 0 36"/>
+          <path class="w2" d="M156 170 a48 48 0 0 1 0 60"/>
+          <path class="w3" d="M170 158 a66 66 0 0 1 0 84"/>
+        </g>
+      </g>
+      <!-- الجوال -->
+      <g class="phone">
+        <rect x="188" y="46" width="112" height="200" rx="22" fill="#0A1A14" stroke="#D9B45A" stroke-opacity=".55" stroke-width="2"/>
+        <rect x="196" y="58" width="96" height="176" rx="14" fill="url(#screen)"/>
+        <rect x="228" y="64" width="32" height="5" rx="2.5" fill="#000" opacity=".6"/>
+        <g clip-path="url(#screen-clip)">
+          <rect class="beam" x="196" y="40" width="96" height="44" fill="url(#beam)"/>
+          <g class="scanning">
+            <circle cx="244" cy="140" r="26" fill="none" stroke="#2D5C4B" stroke-width="5"/>
+            <path class="spin" d="M244 114 a26 26 0 0 1 26 26" fill="none" stroke="#D9B45A" stroke-width="5" stroke-linecap="round"/>
+            <rect x="214" y="186" width="60" height="6" rx="3" fill="#2D5C4B"/>
+            <rect x="224" y="198" width="40" height="6" rx="3" fill="#2D5C4B"/>
+          </g>
+          <g class="ok">
+            <circle cx="244" cy="136" r="30" fill="#D9B45A"/>
+            <path d="M230 137l10 10 19-21" fill="none" stroke="#0F2A21" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="212" y="184" width="64" height="8" rx="4" fill="#F3D68C"/>
+            <rect x="224" y="198" width="40" height="6" rx="3" fill="#5E8A79"/>
+          </g>
+        </g>
+      </g>
+    </svg>
+
+  </div>
+</section>
+
+<main>
+  <section class="sec" id="how">
+    <h2>كيف تشتغل؟</h2>
+    <div class="steps">
+      <div class="step"><span>1</span><h3>علامة لكل منتج</h3><p>كل علامة لها توقيع رقمي ما ينسخ ولا يتخمّن، وتنربط بأول جوال يمسحها.</p></div>
+      <div class="step"><span>2</span><h3>العميل يمسح</h3><p>يقرّب جواله من العلامة، وتطلع له النتيجة: أصلي، أو تحذير لو كانت مقلّدة أو موقوفة.</p></div>
+      <div class="step"><span>3</span><h3>التاجر يشوف كل شي</h3><p>لوحة فيها المبيعات التقديرية، المدن، بؤر التقليد، المسابقة، والتقرير الشهري.</p></div>
+    </div>
+  </section>
+
+  <section class="sec" id="brands">
+    <div class="sec-head"><h2>علامات تجارية محمية بأصالة</h2><label class="search"><input id="brand-q" placeholder="ابحث عن علامة…" aria-label="ابحث عن علامة تجارية"></label></div>
+    <div class="brands" id="brand-list"><div class="empty">جاري التحميل…</div></div>
+  </section>
+
+  <section class="sec merchants" id="merchants">
+    <div>
+      <h2>تبي تحمي منتجك؟</h2>
+      <p>نصدر لك علامات NFC بعدد منتجاتك، ونعطيك لوحة تحكم كاملة: مخزون العلامات وتنبيه قبل ما تخلص، إيقاف أي علامة، مسابقة للعملاء مع السحب، بؤر التقليد، ومساعد ذكي يقرأ أرقامك.</p>
+    </div>
+    <a class="btn btn-gold big" href="/login/">دخول التجار</a>
+  </section>
 </main>
+
+<footer class="site-foot">© أصالة المنتجات الأصلية · <a href="/login/">دخول التجار والإدارة</a></footer>
+<script type="module" src="/assets/home.js"></script>
 </body>
 </html>

@@ -195,3 +195,35 @@ export async function report(req, env) {
     .run();
   return json({ ok: true, message: 'وصلنا بلاغك، شكراً لمساعدتك في وقف التقليد' });
 }
+
+// ---------- الموقع العام ----------
+// التجار اللي اختاروا الظهور، ونقاط البيع المعتمدة لكل تاجر
+const publicBrand = (m) => ({ slug: m.slug, name: m.name, logo_url: imageUrl(m.logo_key) || m.logo_url, brand_color: m.brand_color, store_url: m.store_url, about: m.about });
+
+export async function brands(env) {
+  const r = await env.DB.prepare(
+    `SELECT m.slug,m.name,m.logo_url,m.logo_key,m.brand_color,m.store_url,m.about,(SELECT COUNT(*) FROM sellers s WHERE s.merchant_id=m.id) AS sellers
+     FROM merchants m WHERE m.public_listed=1 AND m.status='active' ORDER BY m.name`
+  ).all();
+  return json({ ok: true, brands: r.results.map((m) => ({ ...publicBrand(m), sellers: m.sellers })) }, 200, { 'Cache-Control': 'public, max-age=300' });
+}
+
+export async function brandPage(env, slug) {
+  const db = env.DB;
+  const m = await db.prepare("SELECT id,slug,name,logo_url,logo_key,brand_color,store_url,about,whatsapp FROM merchants WHERE slug=? AND public_listed=1 AND status='active'").bind(slug).first();
+  if (!m) fail(404, 'ما لقينا هذي العلامة التجارية');
+  const [sellers, products] = await db.batch([
+    db.prepare('SELECT name,city,address,map_url,phone,online FROM sellers WHERE merchant_id=? ORDER BY online,city,name').bind(m.id),
+    db.prepare("SELECT product_name,image_key,MAX(id) AS latest FROM batches WHERE merchant_id=? AND status='active' AND is_test=0 AND product_name IS NOT NULL GROUP BY product_name ORDER BY latest DESC LIMIT 12").bind(m.id),
+  ]);
+  return json(
+    {
+      ok: true,
+      brand: { ...publicBrand(m), whatsapp: m.whatsapp },
+      products: products.results.map((p) => ({ name: p.product_name, image_url: imageUrl(p.image_key) })),
+      sellers: sellers.results,
+    },
+    200,
+    { 'Cache-Control': 'public, max-age=300' }
+  );
+}

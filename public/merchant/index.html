@@ -17,9 +17,12 @@
     </div>
     <nav id="nav" aria-label="أقسام اللوحة">
       <button type="button" data-tab="home">الرئيسية</button>
+      <button type="button" data-tab="assistant">المساعد الذكي ✨</button>
       <button type="button" data-tab="tags">العلامات</button>
       <button type="button" data-tab="contest">المسابقة</button>
-      <button type="button" data-tab="reports">البلاغات</button>
+      <button type="button" data-tab="reports">التقليد والبلاغات</button>
+      <button type="button" data-tab="monthly">التقارير</button>
+      <button type="button" data-tab="sellers">نقاط البيع</button>
       <button type="button" data-tab="account">الحساب</button>
     </nav>
     <div class="foot"><span id="me"></span><button type="button" id="logout">تسجيل الخروج</button></div>
@@ -80,14 +83,98 @@
           <label class="field">رابط الشروط (https)<input name="contest_terms_url" type="url" class="ltr"></label>
           <label class="field">رابط متجرك (https)<input name="store_url" type="url" class="ltr"></label>
         </div>
-        <p class="small muted" style="margin:0">تأكد من ترخيص وزارة التجارة للمسابقة قبل تشغيلها. السحب يجي في المرحلة الثالثة.</p>
+        <p class="small muted" style="margin:0">تأكد من ترخيص وزارة التجارة للمسابقة قبل تشغيلها.</p>
         <div><button class="btn btn-primary" type="submit">حفظ</button></div>
       </form>
+      <div class="row" style="margin-top:24px">
+        <form class="card" id="draw-form">
+          <h2>السحب على الفائزين 🎁</h2>
+          <p class="small muted" style="margin:0">كل رقم جوال له فرصة وحدة مهما كان عدد مشاركاته. الأرقام المستبعدة ما تدخل السحب.</p>
+          <div class="form-grid">
+            <label class="field">اسم السحب<input name="title" required placeholder="سحب الأسبوع الأول"></label>
+            <label class="field">عدد الفائزين<input name="winners" type="number" min="1" max="100" value="3" required class="ltr"></label>
+            <label class="field">من تاريخ (اختياري)<input name="from" type="date" class="ltr"></label>
+            <label class="field">إلى تاريخ (اختياري)<input name="to" type="date" class="ltr"></label>
+          </div>
+          <label class="check"><input type="checkbox" name="skip_flagged" checked> استبعد المشاركات المشبوهة</label>
+          <label class="check"><input type="checkbox" name="skip_previous" checked> استبعد اللي فازوا في سحوبات سابقة</label>
+          <div><button class="btn btn-gold" type="submit">ابدأ السحب</button></div>
+          <div id="draw-result"></div>
+        </form>
+        <div class="card">
+          <h2>استبعاد أرقام</h2>
+          <p class="small muted" style="margin:0">مثل أرقام الموظفين، أو أي رقم ما تبيه يدخل السحب.</p>
+          <form id="exclude-form" class="form-grid">
+            <label class="field">رقم الجوال<input name="phone" required placeholder="05xxxxxxxx" class="ltr"></label>
+            <label class="field">السبب (اختياري)<input name="reason" placeholder="موظف"></label>
+            <div style="align-self:end"><button class="btn" type="submit">استبعاد</button></div>
+          </form>
+          <div class="table-wrap" id="excluded"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:24px"><div class="card-head"><h2>السحوبات السابقة</h2></div><div id="draws"></div></div>
+      <div class="card" style="margin-top:24px">
+        <div class="card-head"><h2>المشاركات</h2><span id="entries-summary" class="small muted"></span></div>
+        <div class="table-wrap" id="entries"></div>
+      </div>
     </section>
 
     <section id="reports" hidden>
-      <div class="page-head"><div><h1>بلاغات التقليد</h1><p>اللي أرسلها العملاء لما طلعت لهم علامة مقلّدة أو موقوفة</p></div></div>
-      <div class="card" style="margin-top:24px"><div class="table-wrap" id="reports-table"></div></div>
+      <div class="page-head"><div><h1>التقليد والبلاغات</h1><p>وين يظهر التقليد، واللي أرسله العملاء لما طلعت لهم علامة مقلّدة أو موقوفة</p></div>
+        <label class="field" style="min-width:160px">المدة<select id="hot-days"><option value="7">آخر 7 أيام</option><option value="30" selected>آخر 30 يوم</option><option value="90">آخر 90 يوم</option></select></label></div>
+      <div class="card" style="margin-top:24px"><div class="card-head"><h2>بؤر التقليد حسب المدينة</h2><span class="small muted">أكواد مزيّفة، علامات موقوفة، أجهزة أخرى، وبلاغات</span></div><div id="hotspots"></div></div>
+      <div class="card" style="margin-top:24px"><h2>البلاغات</h2><div class="table-wrap" id="reports-table"></div></div>
+    </section>
+
+    <section id="monthly" hidden>
+      <div class="page-head"><div><h1>التقرير الشهري</h1><p>ملخص الشهر: المسحات والمبيعات التقديرية والتقليد والمسابقة. تقدر تطبعه أو تحفظه PDF.</p></div></div>
+      <form class="card" id="month-form" style="margin-top:24px;max-width:520px">
+        <label class="field">الشهر<input name="month" type="month" required class="ltr"></label>
+        <div><button class="btn btn-primary" type="submit">افتح التقرير</button></div>
+      </form>
+    </section>
+
+    <section id="sellers" hidden>
+      <div class="page-head"><div><h1>نقاط البيع المعتمدة</h1><p>المحلات والمتاجر اللي تبيع منتجك الأصلي. تظهر للعملاء في صفحتك على موقع أصالة.</p></div><a class="btn" id="public-link" target="_blank" rel="noopener" hidden>صفحتك العامة ↗</a></div>
+      <form class="card" id="public-form" style="margin-top:24px">
+        <h2>صفحتك في موقع أصالة</h2>
+        <label class="check"><input type="checkbox" name="public_listed"> أظهر علامتي التجارية في الموقع العام</label>
+        <label class="field">نبذة عن علامتك (اختياري)<textarea name="about" maxlength="600" rows="3" placeholder="مثال: شاي أخضر طبيعي 100٪ من مزارعنا…"></textarea></label>
+        <div><button class="btn btn-primary" type="submit">حفظ</button></div>
+      </form>
+      <div class="row" style="margin-top:24px">
+        <form class="card" id="seller-form">
+          <h2 id="seller-form-title">إضافة نقطة بيع</h2>
+          <input type="hidden" name="seller_id">
+          <div class="form-grid">
+            <label class="field">اسم المحل<input name="name" required></label>
+            <label class="field">المدينة<input name="city" required></label>
+            <label class="field">العنوان أو الحي (اختياري)<input name="address"></label>
+            <label class="field">رابط قوقل ماب (اختياري)<input name="map_url" type="url" class="ltr" placeholder="https://maps.google.com/..."></label>
+            <label class="field">جوال المحل (اختياري)<input name="phone" class="ltr"></label>
+          </div>
+          <label class="check"><input type="checkbox" name="online"> متجر إلكتروني (بدون فرع)</label>
+          <div class="actions"><button class="btn btn-primary" type="submit">حفظ</button><button class="btn" type="reset" id="seller-reset">إلغاء</button></div>
+        </form>
+        <div class="card wide"><h2>نقاط البيع</h2><div class="table-wrap" id="sellers-table"></div></div>
+      </div>
+    </section>
+
+    <section id="assistant" hidden>
+      <div class="page-head"><div><h1>المساعد الذكي ✨</h1><p>يقرأ أرقامك ويقولك وش المهم الحين، وتقدر تسأله أي سؤال عن علاماتك ومبيعاتك.</p></div></div>
+      <div class="row" style="margin-top:24px">
+        <div class="card"><h2>ملاحظات اليوم</h2><div id="tips" class="tips"></div></div>
+        <div class="card wide chat-card">
+          <h2>اسأل المساعد</h2>
+          <div id="chat-log" class="chat-log" aria-live="polite"></div>
+          <div id="chat-suggest" class="chat-suggest"></div>
+          <form id="chat-form" class="chat-form">
+            <input name="q" autocomplete="off" placeholder="مثال: كم علامة بعت هالشهر؟ وين فيه تقليد؟" required>
+            <button class="btn btn-primary" type="submit">إرسال</button>
+          </form>
+          <p id="chat-off" class="small muted" hidden style="margin:0">الأسئلة الحرة تحتاج تفعيل من إدارة أصالة. الملاحظات اللي جنبك شغّالة دائماً.</p>
+        </div>
+      </div>
     </section>
 
     <section id="account" hidden>

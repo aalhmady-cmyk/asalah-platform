@@ -83,7 +83,9 @@
     </section>
 
     <section id="reports" hidden>
-      <div class="page-head"><div><h1>التقليد والبلاغات</h1><p>الأكواد اللي انمسحت وهي مو موجودة عندنا، وبلاغات العملاء</p></div></div>
+      <div class="page-head"><div><h1>التقليد والبلاغات</h1><p>بؤر التقليد في كل المنصة، والأكواد اللي انمسحت وهي مو موجودة عندنا، وبلاغات العملاء</p></div>
+        <label class="field" style="min-width:160px">المدة<select id="hot-days"><option value="7">آخر 7 أيام</option><option value="30" selected>آخر 30 يوم</option><option value="90">آخر 90 يوم</option></select></label></div>
+      <div class="card" style="margin-top:24px"><h2>بؤر التقليد حسب المدينة</h2><div id="hotspots"></div></div>
       <div class="row" style="margin-top:24px">
         <div class="card"><h2>آخر الأكواد المزيّفة</h2><div class="table-wrap" id="unknown-table"></div></div>
         <div class="card"><h2>بلاغات العملاء</h2><div class="table-wrap" id="reports-table"></div></div>
@@ -115,6 +117,7 @@
       <label class="field">واتساب<input name="whatsapp" class="ltr" placeholder="9665XXXXXXXX"></label>
       <label class="field">حد تنبيه المخزون<input name="low_stock_threshold" type="number" min="0" value="5000" class="ltr"></label>
       <label class="field">حد الفحوصات لكل علامة<input name="max_checks" type="number" min="0" max="100" value="5" class="ltr"></label>
+      <label class="check" style="align-self:end"><input type="checkbox" name="public_listed"> يظهر في الموقع العام</label>
       <label class="field" id="merchant-status-field" hidden>الحالة<select name="status"><option value="active">نشط</option><option value="suspended">موقوف</option></select></label>
     </div>
     <div class="actions"><button class="btn btn-primary" type="submit">حفظ</button><button class="btn" type="button" data-close>إلغاء</button></div>

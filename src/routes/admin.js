@@ -1,6 +1,7 @@
 // اللوحة الأم: المدير العام يدير التجار والحسابات والدفعات وكل العلامات.
 import { hashPassword, requireUser, validPassword } from '../lib/auth.js';
 import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
+import { hotspots, monthlyReport } from '../lib/insights.js';
 import { lookupTag, overviewFor, setTagStatus } from '../lib/ops.js';
 import { publicId, stockFor, tokenFor } from '../lib/tags.js';
 import { audit, csvResponse, fail, int, json, now, randomHex, readJson, str, url } from '../lib/util.js';
@@ -25,6 +26,7 @@ function merchantFields(b, partial) {
   if (has('whatsapp')) f.whatsapp = str(b.whatsapp, 'الواتساب', { max: 20, optional: true });
   if (has('low_stock_threshold')) f.low_stock_threshold = int(b.low_stock_threshold ?? 5000, 'حد تنبيه المخزون', { max: 1000000 });
   if (has('max_checks')) f.max_checks = int(b.max_checks ?? 5, 'حد الفحوصات', { max: 100 });
+  if (has('public_listed')) f.public_listed = b.public_listed ? 1 : 0;
   if (partial && 'status' in b) {
     if (!['active', 'suspended'].includes(b.status)) fail(400, 'الحالة غير معروفة');
     f.status = b.status;
@@ -61,6 +63,18 @@ export async function handleAdmin(req, env, path) {
     return json({ ok: true, overview: ov, totals, merchants, alerts: alerts.results, unknown: unknown.results });
   }
 
+  // ---------- التقليد والتقارير ----------
+  if (path === '/api/admin/hotspots' && m === 'GET') {
+    const q = new URL(req.url).searchParams;
+    const days = int(q.get('days') || 30, 'المدة', { min: 1, max: 365 });
+    const mid = q.get('merchant') ? int(q.get('merchant'), 'التاجر') : null;
+    return json({ ok: true, days, hotspots: await hotspots(db, mid, days) });
+  }
+  if (path === '/api/admin/report' && m === 'GET') {
+    const q = new URL(req.url).searchParams;
+    return json({ ok: true, report: await monthlyReport(db, int(q.get('merchant'), 'التاجر'), q.get('month')) });
+  }
+
   // ---------- التجار ----------
   if (path === '/api/admin/merchants' && m === 'GET') return json({ ok: true, merchants: await listMerchants(db) });
   if (path === '/api/admin/merchants' && m === 'POST') {
@@ -68,8 +82,8 @@ export async function handleAdmin(req, env, path) {
     const dup = await db.prepare('SELECT id FROM merchants WHERE slug=?').bind(f.slug).first();
     if (dup) fail(409, 'الاسم المختصر مستخدم لتاجر ثاني');
     const row = await db
-      .prepare('INSERT INTO merchants(slug,name,logo_url,brand_color,store_url,whatsapp,low_stock_threshold,max_checks,created_at) VALUES(?,?,?,?,?,?,?,?,?) RETURNING *')
-      .bind(f.slug, f.name, f.logo_url, f.brand_color, f.store_url, f.whatsapp, f.low_stock_threshold, f.max_checks, now())
+      .prepare('INSERT INTO merchants(slug,name,logo_url,brand_color,store_url,whatsapp,low_stock_threshold,max_checks,public_listed,created_at) VALUES(?,?,?,?,?,?,?,?,?,?) RETURNING *')
+      .bind(f.slug, f.name, f.logo_url, f.brand_color, f.store_url, f.whatsapp, f.low_stock_threshold, f.max_checks, f.public_listed, now())
       .first();
     await audit(db, user, 'merchant_created', { slug: f.slug }, row.id);
     return json({ ok: true, merchant: row }, 201);

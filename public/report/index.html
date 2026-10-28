@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>التقرير الشهري - أصالة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/report/report.css">
+</head>
+<body>
+<div class="toolbar no-print">
+  <button class="btn" type="button" id="back">رجوع</button>
+  <label class="field" style="flex-direction:row;align-items:center">الشهر <input id="month" type="month" class="ltr"></label>
+  <button class="btn btn-primary" type="button" id="print">طباعة / حفظ PDF</button>
+</div>
+<main class="sheet" id="sheet"><div class="empty">جاري تجهيز التقرير…</div></main>
+<script type="module" src="/report/report.js"></script>
+</body>
+</html>
