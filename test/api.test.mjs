@@ -394,3 +394,14 @@ test('التقييم وتاريخ الانتهاء', async () => {
   v = await post('/api/verify', { t, sid: sid('1') });
   assert.equal(v.data.tag.expired, false);
 });
+
+test('أرقام المنصة وطلب الانضمام', async () => {
+  const s = await call('/api/public/stats');
+  assert.equal(s.status, 200);
+  assert.ok(s.data.original > 0);
+  assert.ok(s.data.caught > 0);
+  assert.equal((await post('/api/public/join', { name: 'سعد', brand: 'عطور', phone: '123' })).status, 400);
+  assert.equal((await post('/api/public/join', { name: 'سعد', brand: 'عطور الورد', phone: '0501234567', qty: 'أقل من 1000' })).status, 200);
+  const ov = await call('/api/admin/overview', { cookie: S.admin });
+  assert.ok(ov.data.alerts.some((a) => a.kind === 'join_request' && a.message.includes('عطور الورد')));
+});

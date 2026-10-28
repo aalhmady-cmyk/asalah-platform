@@ -6,7 +6,7 @@ import { HttpError, json } from './lib/util.js';
 import { handleAdmin } from './routes/admin.js';
 import { changePassword, login, logout, me, setup } from './routes/auth.js';
 import { handleMerchant } from './routes/merchant.js';
-import { brandPage, brands, enter, loyaltyClaim, loyaltyRedeem, loyaltyWallet, rate, report, verify } from './routes/public.js';
+import { brandPage, brands, enter, joinRequest, stats, loyaltyClaim, loyaltyRedeem, loyaltyWallet, rate, report, verify } from './routes/public.js';
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
@@ -26,6 +26,8 @@ async function route(req, env) {
   if (path === '/api/loyalty/redeem' && m === 'POST') return loyaltyRedeem(req, env);
   if (path === '/api/rate' && m === 'POST') return rate(req, env);
   if (path === '/api/public/brands' && m === 'GET') return brands(env);
+  if (path === '/api/public/stats' && m === 'GET') return stats(env);
+  if (path === '/api/public/join' && m === 'POST') return joinRequest(req, env);
   const bm = path.match(/^\/api\/public\/brands\/([a-z0-9-]{2,40})$/);
   if (bm && m === 'GET') return brandPage(env, bm[1]);
   if (path === '/api/enter' && m === 'POST') return enter(req, env);

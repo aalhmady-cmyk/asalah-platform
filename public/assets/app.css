@@ -73,7 +73,7 @@ h2 { font-size: 18px; }
 .kpi .note { font-size: 13px; color: var(--muted); }
 .good { color: var(--green-ink) !important; }
 .bad { color: var(--red) !important; }
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; position: relative; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: right; }
 th { padding: 10px 12px; font-weight: 500; color: var(--muted); border-bottom: 1px solid var(--line); white-space: nowrap; }
 td { padding: 12px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }

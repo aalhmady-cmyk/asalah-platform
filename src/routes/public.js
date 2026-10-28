@@ -364,3 +364,31 @@ export async function brandPage(env, slug) {
     { 'Cache-Control': 'public, max-age=300' }
   );
 }
+
+// أرقام المنصة للصفحة الرئيسية
+export async function stats(env) {
+  const db = env.DB;
+  const [scans, merchants] = await db.batch([
+    db.prepare("SELECT SUM(result='original') AS original,SUM(result IN ('unknown','blocked','locked')) AS caught,COUNT(DISTINCT city) AS cities FROM scans"),
+    db.prepare("SELECT COUNT(*) AS n FROM merchants WHERE status='active'"),
+  ]);
+  const s = scans.results[0];
+  return json({ ok: true, original: s.original ?? 0, caught: s.caught ?? 0, cities: s.cities ?? 0, brands: merchants.results[0].n }, 200, { 'Cache-Control': 'public, max-age=600' });
+}
+
+// طلب انضمام تاجر جديد: يوصل للمدير العام كتنبيه في اللوحة الأم
+export async function joinRequest(req, env) {
+  const db = env.DB;
+  await rateLimit(db, 'join:' + (await ipHash(req)), 3, 3600);
+  const b = await readJson(req);
+  const f = {
+    name: str(b.name, 'اسمك', { min: 2, max: 100 }),
+    brand: str(b.brand, 'اسم العلامة التجارية', { min: 2, max: 100 }),
+    phone: saPhone(b.phone),
+    product: str(b.product, 'نوع المنتج', { max: 150, optional: true }),
+    qty: str(b.qty, 'الكمية', { max: 40, optional: true }),
+  };
+  const msg = `طلب انضمام: ${f.brand} · ${f.name} · ${f.phone}${f.product ? ' · ' + f.product : ''}${f.qty ? ' · ' + f.qty + ' منتج شهرياً' : ''}`;
+  await db.prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(NULL,'join_request',?,?)").bind(msg, now()).run();
+  return json({ ok: true, message: 'وصلنا طلبك، بنتواصل معك قريب' });
+}
