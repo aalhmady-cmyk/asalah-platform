@@ -2,6 +2,12 @@ name = "asalah-platform"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
 
+# ملفات SQL تنضم للكود عشان النظام يجهّز قاعدته بنفسه بعد النشر
+[[rules]]
+type = "Text"
+globs = ["**/*.sql"]
+fallthrough = true
+
 # الصفحات الثابتة (اللوحات وصفحة التحقق). مسارات /api و /img تمر على الـ Worker أولاً.
 [assets]
 directory = "./public"
@@ -9,16 +15,11 @@ binding = "ASSETS"
 not_found_handling = "404-page"
 run_worker_first = ["/api/*", "/img/*"]
 
+# قاعدة البيانات تنشأ تلقائياً في حسابك أول مرة تنشر (بدون نسخ أي معرّف)
 [[d1_databases]]
 binding = "DB"
 database_name = "asalah"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
 migrations_dir = "migrations"
-
-# صور المنتجات وشعارات التجار
-[[r2_buckets]]
-binding = "IMAGES"
-bucket_name = "asalah-images"
 
 # فحص المخزون والتنبيهات كل ساعة
 [triggers]
@@ -27,6 +28,7 @@ crons = ["0 * * * *"]
 [vars]
 PLATFORM_NAME = "أصالة المنتجات الأصلية"
 
-# أسرار تضاف بـ: wrangler secret put <الاسم>
-#   TAG_SECRET   : 32 حرف أو أكثر. يوقّع روابط العلامات، ولا يتغيّر بعد أول دفعة.
-#   SETUP_TOKEN  : 32 حرف أو أكثر. لإنشاء أول حساب مدير عام فقط.
+# أسرار اختيارية (wrangler secret put <الاسم>):
+#   TAG_SECRET   : يوقّع روابط العلامات. لو ما انضاف، يتولّد تلقائياً ويُحفظ في القاعدة.
+#                  لا تضيفه ولا تغيّره بعد أول دفعة، لأنه يبطل كل العلامات المطبوعة.
+#   SETUP_TOKEN  : لو انضاف، صفحة إنشاء أول مدير تطلبه.

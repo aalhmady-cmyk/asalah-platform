@@ -1,6 +1,7 @@
 // أصالة المنتجات الأصلية: نقطة الدخول.
 import { runAlerts } from './lib/alerts.js';
 import { serveImage } from './lib/images.js';
+import { prepare } from './lib/schema.js';
 import { HttpError, json } from './lib/util.js';
 import { handleAdmin } from './routes/admin.js';
 import { changePassword, login, logout, me, setup } from './routes/auth.js';
@@ -17,6 +18,7 @@ async function route(req, env) {
   const path = new URL(req.url).pathname;
   const m = req.method;
   if (!env.DB) return json({ ok: false, message: 'قاعدة البيانات غير مرتبطة باسم DB' }, 503);
+  env = await prepare(env);
   if (path.startsWith('/img/') && (m === 'GET' || m === 'HEAD')) return serveImage(env, path);
   if (path === '/api/verify' && m === 'POST') return verify(req, env);
   if (path === '/api/enter' && m === 'POST') return enter(req, env);
@@ -48,6 +50,6 @@ export default {
     return out;
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(runAlerts(env));
+    ctx.waitUntil(prepare(env).then(runAlerts));
   },
 };

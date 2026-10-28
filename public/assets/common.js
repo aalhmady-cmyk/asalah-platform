@@ -167,7 +167,12 @@ export function pickImage(maxSide = 1200) {
         ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('تعذر قراءة الصورة'))), 'image/jpeg', 0.85);
+        // نخفّض الجودة لين تصير أقل من 900 كيلو (حد الخادم 1 ميجا)
+        const toJpeg = (q) => new Promise((r) => canvas.toBlob(r, 'image/jpeg', q));
+        let blob;
+        for (const q of [0.85, 0.7, 0.55, 0.4]) if ((blob = await toJpeg(q)) && blob.size < 900 * 1024) break;
+        if (!blob) throw new Error();
+        resolve(blob);
       } catch {
         reject(new Error('تعذر قراءة الصورة، جرّب صورة ثانية'));
       }

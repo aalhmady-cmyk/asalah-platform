@@ -51,16 +51,15 @@ export async function changePassword(req, env) {
   return json({ ok: true, message: 'تم تغيير كلمة المرور، سجّل الدخول من جديد' }, 200, { 'Set-Cookie': await destroySession(db, req) });
 }
 
-// يشتغل مرة وحدة: لما ما فيه أي مدير عام، وبمفتاح SETUP_TOKEN
+// يشتغل مرة وحدة: لما ما فيه أي مدير عام. ولو انضاف SETUP_TOKEN لازم يطابقه
 export async function setup(req, env) {
   sameOrigin(req);
   const db = env.DB;
   await rateLimit(db, 'setup:' + (await ipHash(req)), 5, 3600);
-  if (typeof env.SETUP_TOKEN !== 'string' || env.SETUP_TOKEN.length < 32) fail(503, 'أضف SETUP_TOKEN بطول 32 حرفاً على الأقل');
   const existing = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role='admin'").first();
   if (existing.n > 0) fail(409, 'تم إعداد النظام مسبقاً');
   const b = await readJson(req);
-  if (!safeEqual(String(b.token ?? ''), env.SETUP_TOKEN)) fail(401, 'مفتاح الإعداد غير صحيح');
+  if (env.SETUP_TOKEN && !safeEqual(String(b.token ?? ''), env.SETUP_TOKEN)) fail(401, 'مفتاح الإعداد غير صحيح');
   const email = str(b.email, 'البريد', { max: 200 }).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail(400, 'البريد غير صحيح');
   const { hash, salt } = await hashPassword(validPassword(b.password));

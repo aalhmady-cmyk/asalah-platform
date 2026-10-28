@@ -25,8 +25,8 @@
 
     <form id="setup" hidden style="display:flex;flex-direction:column;gap:14px">
       <h1 style="font-size:22px">إعداد أول مدير عام</h1>
-      <p class="muted small" style="margin:0">هذي الصفحة تشتغل مرة وحدة فقط، بمفتاح الإعداد SETUP_TOKEN.</p>
-      <label class="field">مفتاح الإعداد<input name="token" type="password" required class="ltr"></label>
+      <p class="muted small" style="margin:0">هذي الصفحة تشتغل مرة وحدة فقط: أول حساب ينشأ هنا يصير المدير العام، وبعدها تقفل.</p>
+      <label class="field">مفتاح الإعداد (إذا أضفت SETUP_TOKEN)<input name="token" type="password" class="ltr"></label>
       <label class="field">الاسم<input name="name" required></label>
       <label class="field">البريد الإلكتروني<input name="email" type="email" required class="ltr"></label>
       <label class="field">كلمة المرور (10 أحرف أو أكثر)<input name="password" type="password" minlength="10" autocomplete="new-password" required class="ltr"></label>

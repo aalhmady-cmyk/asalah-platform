@@ -1,6 +1,6 @@
 // اختبار تكامل: يشغّل الـ Worker محلياً بقاعدة بيانات فاضية ويجرب المسارات الأساسية.
 // التشغيل: npm test
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -30,7 +30,6 @@ const sid = (c) => c.repeat(64);
 const tokenOf = (u) => new URL(u).searchParams.get('t');
 
 before(async () => {
-  execFileSync('npx', ['wrangler', 'd1', 'migrations', 'apply', 'DB', '--local', '--persist-to', persist], { stdio: 'ignore' });
   proc = spawn('npx', ['wrangler', 'dev', '--port', String(PORT), '--ip', '127.0.0.1', '--persist-to', persist, '--test-scheduled', '--show-interactive-dev-session=false'], {
     stdio: 'ignore',
     detached: true, // نقتل المجموعة كاملة بعد الاختبار، npx ما يمرر الإشارة لـ wrangler
