@@ -385,7 +385,7 @@ function drawRows() {
       <span role="cell"><input type="checkbox" data-sel="${p.id}" ${raw(PF.sel.has(p.id) ? 'checked' : '')} aria-label="تحديد ${p.title}"></span>
       <span role="cell" class="st-td-p"><span class="st-td-img">${p.image_url ? html`<img src="${p.image_url}" alt="" loading="lazy">` : raw('🛍️')}</span><span><b>${p.title}</b><small class="muted">${S.categories[p.category]}${p.sync_error ? ' · ⚠️ ما تحدّث السعر' : ''}</small></span></span>
       <span role="cell" class="st-td-price"><b>${sar(p.price)}</b>${p.old_price ? html`<s>${sar(p.old_price)}</s>` : ''}</span>
-      <span role="cell" class="small muted">👁 ${num(p.views)} · 🛒 ${num(p.clicks)}</span>
+      <span role="cell" class="small muted">👁 ${num(p.views)} · 🛒 ${num(p.clicks)}${p.comments || p.rating_n ? html`<br><button class="st-link" type="button" data-st="p-comments" data-id="${p.id}">⭐ ${p.rating_n ? (p.rating_sum / p.rating_n).toFixed(1) : '–'} · 💬 ${num(p.comments)}</button>` : ''}</span>
       <span role="cell" class="st-q" title="${qy.tips.join('، ') || 'البطاقة كاملة'}"><i style="--q:${qy.score}%"></i><small>${qy.tips[0] || 'ممتازة ✓'}</small></span>
       <span role="cell"><label class="st-switch" aria-label="معروض في المتاجر"><input type="checkbox" data-live="${p.id}" ${raw(p.status === 'active' ? 'checked' : '')}><i></i></label></span>
       <span role="cell" class="st-td-acts"><button class="btn btn-sm" type="button" data-st="edit" data-id="${p.id}">تعديل</button>${S.ai ? html`<button class="btn btn-sm" type="button" data-st="ai-fix" data-id="${p.id}" title="الذكاء يحسّن الاسم والوصف">✨</button>` : ''}<button class="btn btn-sm btn-danger" type="button" data-st="del" data-id="${p.id}" aria-label="حذف">🗑</button></span>
@@ -575,19 +575,19 @@ async function newReel() {
 }
 
 // تعليقات الريل: التاجر يقراها ويحذف المسيء
-async function reelComments(id) {
+async function reelComments(id, kind = 'reels') {
   const dlg = Object.assign(document.createElement('dialog'), { className: 'st-reel-dlg st-cm-dlg' });
   document.body.append(dlg);
   const draw = async () => {
-    const { comments } = await api(`/api/m/store/reels/${id}/comments`);
-    render(dlg, html`<div class="card-head"><h2>تعليقات الريل 💬</h2><button class="btn btn-sm" type="button" data-x>إغلاق</button></div>
+    const { comments } = await api(`/api/m/store/${kind}/${id}/comments`);
+    render(dlg, html`<div class="card-head"><h2>${kind === 'reels' ? 'تعليقات الريل' : 'تقييمات وتعليقات المنتج'} 💬</h2><button class="btn btn-sm" type="button" data-x>إغلاق</button></div>
       ${comments.length ? html`<div class="st-cm-list">${comments.map((c) => html`<div class="st-cm"><div><b>${c.name}</b> ${c.rating ? '⭐'.repeat(c.rating) : ''}<div class="small muted">${new Date(c.created_at * 1000).toLocaleString('ar-SA-u-nu-latn')}</div>${c.body ? html`<p>${c.body}</p>` : ''}</div>
         <button class="btn btn-sm btn-danger" type="button" data-del="${c.id}">حذف</button></div>`)}</div>` : html`<div class="empty">ما فيه تعليقات</div>`}`);
   };
   dlg.addEventListener('click', async (e) => {
     if (e.target.closest('[data-x]')) { dlg.close(); dlg.remove(); return loadStore(); }
     const d = e.target.closest('[data-del]');
-    if (d && confirm('تحذف التعليق؟')) { await api(`/api/m/store/reels/${id}/comments/${d.dataset.del}`, { method: 'DELETE' }); await draw(); }
+    if (d && confirm('تحذف التعليق؟')) { await api(`/api/m/store/${kind}/${id}/comments/${d.dataset.del}`, { method: 'DELETE' }); await draw(); }
   });
   await draw();
   dlg.showModal();
@@ -679,6 +679,7 @@ document.addEventListener('click', async (e) => {
       await loadStore();
     } else if (act === 'reel-new') await newReel();
     else if (act === 'reel-comments') await reelComments(id);
+    else if (act === 'p-comments') await reelComments(id, 'products');
     else if (act === 'reel-toggle') {
       const r = S.reels.find((x) => x.id === id);
       await api('/api/m/store/reels/' + id, { method: 'PATCH', body: { status: r.status === 'hidden' ? 'active' : 'hidden' } });

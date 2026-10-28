@@ -142,3 +142,4 @@
 .st-coach { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 12px; border-radius: var(--radius); background: var(--amber-tint); border: 1px solid var(--amber-line); color: var(--amber-ink); font-size: 14px; }
 .st-coach > span { font-size: 22px; }
 .st-coach > div { flex: 1; }
+.st-link { border: 0; background: none; padding: 0; color: var(--green); font: inherit; font-weight: 700; cursor: pointer; }

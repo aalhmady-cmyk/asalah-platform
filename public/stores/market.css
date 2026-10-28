@@ -408,9 +408,24 @@ body[data-view="reels"] .mk-view { max-width: none; padding: 0; }
 .mk-fab small { font-size: 14px; }
 @media (max-width: 760px) { .mk-fab { bottom: calc(var(--bar) + 14px + env(safe-area-inset-bottom)); inset-inline-end: 14px; height: 50px; min-width: 50px; } }
 body[data-view="chat"] .mk-fab, body[data-view="reels"] .mk-fab { display: none; }
-@media (max-width: 760px) { .mk-fab { padding: 0; justify-content: center; } .mk-fab small { display: none; } .mk-sheet:not([hidden]) ~ .mk-fab { bottom: calc(96px + env(safe-area-inset-bottom)); } }
+@media (max-width: 760px) { .mk-fab { padding: 0; justify-content: center; } .mk-fab small { display: none; } .mk-sheet:not([hidden]) ~ .mk-fab { top: calc(66px + env(safe-area-inset-top)); bottom: auto; inset-inline-end: auto; inset-inline-start: 14px; } }
 .mk-toast { z-index: 80; }
 .mk-to-asalah { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(217,180,90,.55); color: var(--gold-2); text-decoration: none; font-weight: 700; font-size: 14px; white-space: nowrap; }
 .mk-to-asalah:hover { background: rgba(217,180,90,.12); }
 @media (min-width: 761px) { .mk-to-asalah { order: 4; } .mk-tabs .mk-home-link { display: none; } }
 @media (max-width: 760px) { .mk-to-asalah { padding: 6px 12px; } }
+
+/* تقييمات المنتجات والدخول بحساب Google */
+.mk-rate-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; text-align: start; }
+.mk-rate-line .mk-stars i svg { fill: #ddd; }
+.mk-rate-line .mk-stars i.on svg { fill: #F5A623; }
+.mk-p-b .mk-rate-line { margin: 2px 0 10px; font-size: 14px; }
+.mk-rate-line .mk-link { padding: 0; font-size: 14px; }
+.mk-card-r { font-size: 12px; font-weight: 700; color: #B7791F; } .mk-card-r small { color: var(--muted); font-weight: 500; }
+.mk-cm-login { align-items: center; text-align: center; gap: 10px; }
+.mk-cm-login p { margin: 0; font-size: 14px; color: var(--muted); line-height: 1.6; }
+.mk-google { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 46px; padding: 0 20px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: #1f1f1f; font-weight: 700; text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.mk-google svg { width: 20px; height: 20px; }
+.mk-cm-me { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
+.mk-cm-me img { width: 22px; height: 22px; border-radius: 50%; }
+.mk-cm-row.me { grid-template-columns: 1fr auto; }

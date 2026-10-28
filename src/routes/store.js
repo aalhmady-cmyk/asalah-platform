@@ -3,6 +3,7 @@ import { assistantEnabled } from '../lib/assistant.js';
 import { deleteImage, imageUrl, ownsImage, saveImage, saveImageBytes } from '../lib/images.js';
 import { draftProduct, reelTitles, storeChat } from '../lib/shop.js';
 import { CATEGORIES, ORIGINAL_MAX_BYTES, REEL_MAX, REEL_MIN, VIDEO_MAX_BYTES, discoverProducts, importLink, productFields, proxyImage, videoType } from '../lib/store.js';
+import { currentCustomer, googleEnabled } from '../lib/customers.js';
 import { audit, fail, int, ipHash, json, now, randomHex, rateLimit, readJson, sha256, str, url } from '../lib/util.js';
 
 const MAX_PRODUCTS = 500;
@@ -152,6 +153,7 @@ export async function handleMerchantStore(req, env, path, user) {
     if (m === 'DELETE') {
       await db.batch([
         db.prepare('UPDATE reels SET product_id=NULL WHERE product_id=?').bind(cur.id),
+        db.prepare('DELETE FROM product_comments WHERE product_id=?').bind(cur.id),
         db.prepare('DELETE FROM store_products WHERE id=?').bind(cur.id),
       ]);
       await deleteImage(env, cur.image_key);
@@ -236,21 +238,23 @@ export async function handleMerchantStore(req, env, path, user) {
     await audit(db, user, 'reel_published', { id: reel.id, title: reel.title, bytes: stored });
     return json({ ok: true, reel: reelOut(row) });
   }
-  // التاجر يشوف تعليقات ريلزه ويحذف المسيء منها
-  if ((match = path.match(/^\/api\/m\/store\/reels\/(\d+)\/comments(?:\/(\d+))?$/))) {
-    const reel = await db.prepare('SELECT id FROM reels WHERE id=? AND merchant_id=?').bind(Number(match[1]), mid).first();
-    if (!reel) fail(404, 'ما لقينا الريل');
-    if (!match[2] && m === 'GET') return json({ ok: true, comments: await reelComments(db, reel.id) });
-    if (match[2] && m === 'DELETE') {
-      const c = await db.prepare('SELECT * FROM reel_comments WHERE id=? AND reel_id=?').bind(Number(match[2]), reel.id).first();
+  // التاجر يشوف تعليقات ريلزه ومنتجاته ويحذف المسيء منها
+  if ((match = path.match(/^\/api\/m\/store\/(reels|products)\/(\d+)\/comments(?:\/(\d+))?$/))) {
+    const K = COMMENT_KINDS[match[1]];
+    const item = await db.prepare(`SELECT id FROM ${K.target} WHERE id=? AND merchant_id=?`).bind(Number(match[2]), mid).first();
+    if (!item) fail(404, 'ما لقيناه');
+    if (!match[3] && m === 'GET') {
+      const r = await db.prepare(`SELECT id,name,body,rating,created_at FROM ${K.table} WHERE ${K.fk}=? ORDER BY id DESC LIMIT 200`).bind(item.id).all();
+      return json({ ok: true, comments: r.results });
+    }
+    if (match[3] && m === 'DELETE') {
+      const c = await db.prepare(`SELECT * FROM ${K.table} WHERE id=? AND ${K.fk}=?`).bind(Number(match[3]), item.id).first();
       if (!c) fail(404, 'ما لقينا التعليق');
       await db.batch([
-        db.prepare('DELETE FROM reel_comments WHERE id=?').bind(c.id),
-        db
-          .prepare('UPDATE reels SET comments=MAX(0,comments-?),rating_sum=rating_sum-?,rating_n=MAX(0,rating_n-?) WHERE id=?')
-          .bind(c.body ? 1 : 0, c.rating || 0, c.rating ? 1 : 0, reel.id),
+        db.prepare(`DELETE FROM ${K.table} WHERE id=?`).bind(c.id),
+        db.prepare(`UPDATE ${K.target} SET comments=MAX(0,comments-?),rating_sum=rating_sum-?,rating_n=MAX(0,rating_n-?) WHERE id=?`).bind(c.body ? 1 : 0, c.rating || 0, c.rating ? 1 : 0, item.id),
       ]);
-      await audit(db, user, 'reel_comment_deleted', { reel: reel.id, name: c.name });
+      await audit(db, user, 'comment_deleted', { kind: match[1], id: item.id, name: c.name });
       return json({ ok: true });
     }
     fail(405, 'غير مسموح');
@@ -286,11 +290,12 @@ export async function handleMerchantStore(req, env, path, user) {
 
 // ================= الواجهة العامة =================
 const LIVE = "m.store_enabled=1 AND m.status='active'";
-const PRODUCT_COLS = 'p.id,p.title,p.description,p.category,p.price,p.old_price,p.buy_url,p.image_key,p.created_at,p.merchant_id,m.name AS merchant_name,m.slug AS merchant_slug,m.logo_key AS merchant_logo,m.store_coupon,m.store_coupon_note';
+const PRODUCT_COLS = 'p.id,p.comments,p.rating_sum,p.rating_n,p.title,p.description,p.category,p.price,p.old_price,p.buy_url,p.image_key,p.created_at,p.merchant_id,m.name AS merchant_name,m.slug AS merchant_slug,m.logo_key AS merchant_logo,m.store_coupon,m.store_coupon_note';
 
 function publicProduct(p) {
-  const { merchant_logo, store_coupon, store_coupon_note, ...rest } = productOut(p);
-  return { ...rest, merchant_logo: imageUrl(merchant_logo), coupon: store_coupon ? { code: store_coupon, note: store_coupon_note } : null };
+  const { merchant_logo, store_coupon, store_coupon_note, rating_sum, rating_n, ...rest } = productOut(p);
+  const rating = rating_n ? { avg: Math.round((rating_sum / rating_n) * 10) / 10, n: rating_n } : null;
+  return { ...rest, rating, merchant_logo: imageUrl(merchant_logo), coupon: store_coupon ? { code: store_coupon, note: store_coupon_note } : null };
 }
 
 const PRODUCT_SORT = {
@@ -323,6 +328,47 @@ async function listProducts(db, { cat, merchant, q, ids, sort, max, limit = 60, 
 async function reelComments(db, reelId) {
   const r = await db.prepare('SELECT id,name,body,rating,created_at FROM reel_comments WHERE reel_id=? ORDER BY id DESC LIMIT 100').bind(reelId).all();
   return r.results;
+}
+
+// تعليقات وتقييم الريلز والمنتجات. لو دخول Google مفعّل، التعليق لازم يكون من حساب مسجّل
+const COMMENT_KINDS = {
+  reels: { table: 'reel_comments', fk: 'reel_id', target: 'reels', alias: 'r', live: "r.status='active'", voter: 'ip_hash' },
+  products: { table: 'product_comments', fk: 'product_id', target: 'store_products', alias: 'p', live: "p.status='active'", voter: 'voter' },
+};
+async function publicComments(req, env, kind, id) {
+  const db = env.DB;
+  const K = COMMENT_KINDS[kind];
+  const item = await db
+    .prepare(`SELECT ${K.alias}.id,${K.alias}.rating_sum,${K.alias}.rating_n,${K.alias}.comments FROM ${K.target} ${K.alias} JOIN merchants m ON m.id=${K.alias}.merchant_id WHERE ${K.alias}.id=? AND ${K.live} AND ${LIVE}`)
+    .bind(id)
+    .first();
+  if (!item) fail(404, kind === 'reels' ? 'الريل غير متاح' : 'المنتج غير متاح');
+  const login = googleEnabled(env);
+  const me = await currentCustomer(db, req);
+  if (req.method === 'GET') {
+    const rating = item.rating_n ? { avg: Math.round((item.rating_sum / item.rating_n) * 10) / 10, n: item.rating_n } : null;
+    const r = await db.prepare(`SELECT id,name,body,rating,created_at FROM ${K.table} WHERE ${K.fk}=? ORDER BY id DESC LIMIT 100`).bind(id).all();
+    return json({ ok: true, comments: r.results, rating, count: item.comments, login, me: me ? { name: me.name, picture: me.picture } : null });
+  }
+  if (req.method !== 'POST') fail(405, 'غير مسموح');
+  if (login && !me) fail(401, 'سجّل دخولك بحساب Google عشان تعلّق', 'login_required');
+  const ip = await ipHash(req);
+  await rateLimit(db, 'rc:' + (me ? 'c' + me.id : ip), 8, 600);
+  const b = await readJson(req);
+  const name = me ? me.name : str(b.name, 'اسمك', { min: 1, max: 30 });
+  const body = str(b.body, 'التعليق', { min: 1, max: 300, optional: true });
+  const rating = b.rating == null || b.rating === '' ? null : int(b.rating, 'التقييم', { min: 1, max: 5 });
+  if (!body && !rating) fail(400, 'اكتب تعليق أو اختر تقييم');
+  if (body && /https?:\/\/|www\.|\.com\b/i.test(body)) fail(400, 'الروابط ممنوعة في التعليقات');
+  // تقييم واحد لكل حساب (أو لكل جهاز لو الدخول مو مفعّل)، لأن شبكات الجوال تشارك نفس الـ IP
+  const who = me ? 'c' + me.id : typeof b.device === 'string' && /^[a-z0-9]{16,40}$/.test(b.device) ? await sha256('dev:' + b.device) : ip;
+  if (rating && (await db.prepare(`SELECT 1 FROM ${K.table} WHERE ${K.fk}=? AND ${K.voter}=? AND rating IS NOT NULL`).bind(id, who).first())) fail(409, kind === 'reels' ? 'قيّمت هذا الريل من قبل' : 'قيّمت هذا المنتج من قبل');
+  const t = now();
+  const [ins] = await db.batch([
+    db.prepare(`INSERT INTO ${K.table}(${K.fk},name,body,rating,${K.voter},customer_id,created_at) VALUES(?,?,?,?,?,?,?) RETURNING id`).bind(id, name, body, rating, who, me?.id ?? null, t),
+    db.prepare(`UPDATE ${K.target} SET comments=comments+?,rating_sum=rating_sum+?,rating_n=rating_n+? WHERE id=?`).bind(body ? 1 : 0, rating || 0, rating ? 1 : 0, id),
+  ]);
+  return json({ ok: true, comment: { id: ins.results[0].id, name, body, rating, created_at: t } }, 201);
 }
 
 async function listReels(db, { merchant, product, sort, limit = 20, offset = 0 }) {
@@ -426,35 +472,7 @@ export async function handlePublicStore(req, env, path) {
     }
     return json({ ok: true, reels: await listReels(db, { merchant: slug, sort: sp.get('sort'), offset, limit: 20 }) });
   }
-  if ((match = path.match(/^\/api\/public\/store\/reels\/(\d+)\/comments$/))) {
-    const reel = await db.prepare(`SELECT r.id,r.rating_sum,r.rating_n,r.comments FROM reels r JOIN merchants m ON m.id=r.merchant_id WHERE r.id=? AND r.status='active' AND ${LIVE}`).bind(Number(match[1])).first();
-    if (!reel) fail(404, 'الريل غير متاح');
-    if (m === 'GET') {
-      const rating = reel.rating_n ? { avg: Math.round((reel.rating_sum / reel.rating_n) * 10) / 10, n: reel.rating_n } : null;
-      return json({ ok: true, comments: await reelComments(db, reel.id), rating, count: reel.comments });
-    }
-    if (m === 'POST') {
-      const ip = await ipHash(req);
-      await rateLimit(db, 'rc:' + ip, 8, 600);
-      const b = await readJson(req);
-      const name = str(b.name, 'اسمك', { min: 1, max: 30 });
-      const body = str(b.body, 'التعليق', { min: 1, max: 300, optional: true });
-      const rating = b.rating == null || b.rating === '' ? null : int(b.rating, 'التقييم', { min: 1, max: 5 });
-      if (!body && !rating) fail(400, 'اكتب تعليق أو اختر تقييم');
-      if (body && /https?:\/\/|www\.|\.com\b/i.test(body)) fail(400, 'الروابط ممنوعة في التعليقات');
-      // تقييم واحد لكل جهاز على نفس الريل
-      // رقم الجهاز (من المتصفح) أدق من الـ IP، لأن شبكات الجوال تشارك نفس الـ IP بين ناس كثير
-      const who = typeof b.device === 'string' && /^[a-z0-9]{16,40}$/.test(b.device) ? await sha256('dev:' + b.device) : ip;
-      if (rating && (await db.prepare('SELECT 1 FROM reel_comments WHERE reel_id=? AND ip_hash=? AND rating IS NOT NULL').bind(reel.id, who).first())) fail(409, 'قيّمت هذا الريل من قبل');
-      const t = now();
-      const [ins] = await db.batch([
-        db.prepare('INSERT INTO reel_comments(reel_id,name,body,rating,ip_hash,created_at) VALUES(?,?,?,?,?,?) RETURNING id').bind(reel.id, name, body, rating, who, t),
-        db.prepare('UPDATE reels SET comments=comments+?,rating_sum=rating_sum+?,rating_n=rating_n+? WHERE id=?').bind(body ? 1 : 0, rating || 0, rating ? 1 : 0, reel.id),
-      ]);
-      return json({ ok: true, comment: { id: ins.results[0].id, name, body, rating, created_at: t } }, 201);
-    }
-    fail(405, 'غير مسموح');
-  }
+  if ((match = path.match(/^\/api\/public\/store\/(reels|products)\/(\d+)\/comments$/))) return publicComments(req, env, match[1], Number(match[2]));
   // عدّاد المشاهدات والضغطات (تقريبي، بحد طلبات لكل جهاز)
   if (path === '/api/public/store/track' && m === 'POST') {
     const b = await readJson(req);

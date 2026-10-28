@@ -599,3 +599,28 @@ test('التصفح: الترتيب والميزانية والحالات وسل�
   assert.equal(g.data.list.title, 'مقاضي البيت');
   assert.equal(g.data.list.items[0].product.buy_url.startsWith('https://'), true);
 });
+
+test('تقييم وتعليقات المنتجات، وحساب العميل', async () => {
+  const st = await call('/api/m/store', { cookie: S.merchant });
+  const pid = st.data.products[0].id;
+  const me = await call('/api/c/me');
+  assert.equal(me.data.login, false);
+  assert.equal(me.data.customer, null);
+  assert.equal((await call('/api/c/google/start')).status, 503);
+  const pc = `/api/public/store/products/${pid}/comments`;
+  assert.equal((await post(pc, { name: 'سعد', body: 'منتج ممتاز', rating: 4, device: 'aaaaaaaaaaaaaaaa1' })).status, 201);
+  assert.equal((await post(pc, { name: 'سعد', rating: 5, device: 'aaaaaaaaaaaaaaaa1' })).status, 409);
+  assert.equal((await post(pc, { name: 'منى', rating: 2, device: 'bbbbbbbbbbbbbbbb2' })).status, 201);
+  const g = await call(pc);
+  assert.equal(g.data.count, 1);
+  assert.deepEqual(g.data.rating, { avg: 3, n: 2 });
+  assert.equal(g.data.login, false);
+  const one = await call('/api/public/store/products/' + pid);
+  assert.deepEqual(one.data.product.rating, { avg: 3, n: 2 });
+  assert.equal(one.data.product.comments, 1);
+  const mine = await call(`/api/m/store/products/${pid}/comments`, { cookie: S.merchant });
+  assert.equal(mine.data.comments.length, 2);
+  assert.equal((await call(`/api/m/store/products/${pid}/comments/${mine.data.comments[0].id}`, { method: 'DELETE', cookie: S.merchant })).status, 200);
+  assert.equal((await call(pc)).data.rating.n, 1);
+  assert.equal((await call('/api/public/store/products/99999/comments')).status, 404);
+});

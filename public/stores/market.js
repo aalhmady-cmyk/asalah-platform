@@ -30,7 +30,7 @@ const T = {
     coupon: 'كوبون أصالة', copy: 'انسخ', copied: 'نسخنا الكود ✅ الصقه وقت الدفع', shared: 'نسخنا الرابط ✅', shareText: (p, m) => `${p} من ${m}، أصلي وموثّق في متاجر أصالة 🛡️`,
     noReels: 'ما فيه ريلز للحين', noReelsP: 'التجار بيبدون ينزلون ريلز منتجاتهم قريب.', browse: 'تصفّح المنتجات', newest: 'الأحدث', popular: 'الأكثر مشاهدة', savedTab: 'المحفوظة',
     postsT: 'المنشورات', askThis: 'اسأل المساعد عن هذا المنتج', askAbout2: (p, m) => `عندي سؤال عن «${p}» من ${m}`, fabT: 'محتار؟ اسألني',
-    comments: 'التعليقات', shareShort: 'شارك', ratingsN: (n) => `${n} تقييم`, noComments: 'ما فيه تعليقات للحين. كن أول واحد 👋', rateIt: 'قيّم', yourName: 'اسمك', addComment: 'اكتب تعليقك…', needComment: 'اكتب تعليق أو اختر النجوم', thanksComment: 'شكراً على رأيك 🌟', ago: (n, u) => `قبل ${n} ${{ m: 'د', h: 'س', d: 'يوم' }[u]}`,
+    comments: 'التعليقات', loginToComment: 'سجّل دخولك بحساب Google عشان تقيّم وتعلّق. نعرض اسمك بس، وما ننشر إيميلك.', googleBtn: 'الدخول بحساب Google', asName: (n) => `باسم ${n}`, reviews: 'التقييمات والتعليقات', reviewsN: (n) => `${n} تعليق`, rateFirst: 'كن أول من يقيّم ⭐', loginOk: 'سجّلت دخولك ✅', loginFail: 'ما تم الدخول، حاول مرة ثانية', shareShort: 'شارك', ratingsN: (n) => `${n} تقييم`, noComments: 'ما فيه تعليقات للحين. كن أول واحد 👋', rateIt: 'قيّم', yourName: 'اسمك', addComment: 'اكتب تعليقك…', needComment: 'اكتب تعليق أو اختر النجوم', thanksComment: 'شكراً على رأيك 🌟', ago: (n, u) => `قبل ${n} ${{ m: 'د', h: 'س', d: 'يوم' }[u]}`,
     sound_on: 'تشغيل الصوت', sound_off: 'كتم الصوت', like: 'أعجبني', saveReel: 'حفظ الريل',
     savedTitle: 'المفضلة', savedEmpty: 'ما حفظت شي للحين', savedEmptyP: 'اضغط ♡ على أي منتج أو ريل وتلقاه هنا.', savedProducts: 'منتجات', savedReels: 'ريلز',
     hello: 'هلا 👋 أنا مساعد متاجر أصالة. قول لي وش تبي (نوع المنتج، المناسبة، الميزانية) وأطلع لك الأصلي من المتاجر الموثّقة.',
@@ -56,7 +56,7 @@ const T = {
     coupon: 'Asalah coupon', copy: 'Copy', copied: 'Code copied ✅ paste it at checkout', shared: 'Link copied ✅', shareText: (p, m) => `${p} by ${m}, verified original on Asalah Stores 🛡️`,
     noReels: 'No reels yet', noReelsP: 'Brands will start posting reels of their products soon.', browse: 'Browse products', newest: 'Newest', popular: 'Most viewed', savedTab: 'Saved',
     postsT: 'Posts', askThis: 'Ask the assistant about this product', askAbout2: (p, m) => `I have a question about “${p}” from ${m}`, fabT: 'Not sure? Ask me',
-    comments: 'Comments', shareShort: 'Share', ratingsN: (n) => `${n} ratings`, noComments: 'No comments yet. Be the first 👋', rateIt: 'Rate', yourName: 'Your name', addComment: 'Add a comment…', needComment: 'Write a comment or pick stars', thanksComment: 'Thanks for your feedback 🌟', ago: (n, u) => `${n}${u} ago`,
+    comments: 'Comments', loginToComment: 'Sign in with Google to rate and comment. We only show your name, never your email.', googleBtn: 'Sign in with Google', asName: (n) => `as ${n}`, reviews: 'Ratings & comments', reviewsN: (n) => `${n} comments`, rateFirst: 'Be the first to rate ⭐', loginOk: 'Signed in ✅', loginFail: 'Sign-in failed, please try again', shareShort: 'Share', ratingsN: (n) => `${n} ratings`, noComments: 'No comments yet. Be the first 👋', rateIt: 'Rate', yourName: 'Your name', addComment: 'Add a comment…', needComment: 'Write a comment or pick stars', thanksComment: 'Thanks for your feedback 🌟', ago: (n, u) => `${n}${u} ago`,
     sound_on: 'Unmute', sound_off: 'Mute', like: 'Like', saveReel: 'Save reel',
     savedTitle: 'Saved', savedEmpty: 'Nothing saved yet', savedEmptyP: 'Tap ♡ on any product or reel to find it here.', savedProducts: 'Products', savedReels: 'Reels',
     hello: 'Hi 👋 I’m the Asalah Stores assistant. Tell me what you need (product type, occasion, budget) and I’ll find genuine options from verified stores.',
@@ -154,6 +154,15 @@ async function route() {
   }
   if (p.get('p')) openProduct(Number(p.get('p')), true);
   else closeSheet(true);
+  // راجع من الدخول بحساب Google: نفتح التعليقات اللي كان فيها
+  if (p.get('login') || p.get('cm')) {
+    if (p.get('login')) toast(p.get('login') === 'ok' ? t('loginOk') : t('loginFail'));
+    const [kind, cid] = String(p.get('cm') || '').split(':');
+    p.delete('login');
+    p.delete('cm');
+    history.replaceState(null, '', '/stores/' + (p.toString() ? '?' + p : ''));
+    if ((kind === 'reels' || kind === 'products') && Number(cid)) openComments(Number(cid), kind);
+  }
 }
 
 // ---------- البطاقات ----------
@@ -170,6 +179,7 @@ function card(p) {
       <span class="mk-card-m">${p.merchant_name}</span>
       <b class="mk-card-t">${p.title}</b>
       <div class="mk-price">${sar(p.price)}${p.old_price ? html` <s>${sar(p.old_price)}</s>` : ''}</div>
+      ${p.rating ? html`<span class="mk-card-r">★ ${p.rating.avg} <small>(${p.rating.n})</small></span>` : ''}
     </div>
   </article>`;
 }
@@ -308,6 +318,7 @@ function drawProduct(p, d) {
       <button type="button" class="mk-p-m" data-merchant="${p.merchant_slug}">${p.merchant_name} ›</button>
       <h1>${p.title}</h1>
       <div class="mk-p-price">${sar(p.price)}${p.old_price ? html` <s>${sar(p.old_price)}</s> <span class="mk-off inline">${t('save_pct', off(p))}</span>` : ''}</div>
+      <button type="button" class="mk-rate-line" data-comments="${p.id}" data-kind="products">${p.rating ? html`<span class="mk-stars">${stars(p.rating.avg)}<b>${p.rating.avg}</b><small>(${p.rating.n})</small></span>` : html`<span class="mk-muted">${t('rateFirst')}</span>`}<span class="mk-link">${t('reviews')} ›</span></button>
       <div class="mk-trust">${badge()}<span>${t('trust', p.merchant_name)}</span></div>
       ${p.coupon ? html`<div class="mk-coupon"><span class="mk-coupon-ic" aria-hidden="true">🎟️</span><div><small>${t('coupon')}${p.coupon.note ? ' · ' + p.coupon.note : ''}</small><b class="ltr">${p.coupon.code}</b></div><button type="button" class="mk-btn ghost-d" data-coupon="${p.id}">${t('copy')}</button></div>` : ''}
       ${p.description ? html`<p class="mk-p-desc">${p.description}</p>` : ''}
@@ -353,6 +364,7 @@ const IC = {
   sound: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h3.5L12 5v14l-4.5-4H4V9Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.8 2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3-4.6-4.4 6.3-.9L12 2.8Z"/></svg>',
 };
+const GOOGLE = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
 const stars = (avg) => raw([1, 2, 3, 4, 5].map((i) => `<i class="${avg >= i - 0.25 ? 'on' : ''}">${IC.star}</i>`).join(''));
 
 let sound = false;
@@ -460,14 +472,14 @@ function setSound(on) {
 }
 
 // ---------- تعليقات وتقييم الريل ----------
-async function openComments(id) {
+async function openComments(id, kind = 'reels') {
   closeComments();
   const box = Object.assign(document.createElement('div'), { className: 'mk-cm', id: 'cm' });
   box.innerHTML = '<div class="mk-cm-bg" data-cm-close></div><section class="mk-cm-in" role="dialog" aria-modal="true"><div class="mk-cm-load">…</div></section>';
   document.body.append(box);
   requestAnimationFrame(() => box.classList.add('open'));
   let d;
-  try { d = await get(`/api/public/store/reels/${id}/comments`); } catch (e) { return toast(e.message); }
+  try { d = await get(`/api/public/store/${kind}/${id}/comments`); } catch (e) { closeComments(); return toast(e.message); }
   let pick = 0;
   const draw = () => {
     render(box.querySelector('.mk-cm-in'), html`
@@ -476,11 +488,14 @@ async function openComments(id) {
       <div class="mk-cm-list">${d.comments.length ? d.comments.map((c) => html`<div class="mk-cm-c"><span class="mk-cm-av" aria-hidden="true">${(c.name || '?').trim()[0]}</span><div>
           <div class="mk-cm-n"><b>${c.name}</b>${c.rating ? html`<span class="mk-stars sm">${stars(c.rating)}</span>` : ''}<small>${ago(c.created_at)}</small></div>
           ${c.body ? html`<p>${c.body}</p>` : ''}</div></div>`) : html`<div class="mk-empty small">${t('noComments')}</div>`}</div>
-      <form class="mk-cm-f" id="cm-form">
-        <div class="mk-cm-rate" role="radiogroup" aria-label="${t('rateIt')}"><span>${t('rateIt')}</span>${[1, 2, 3, 4, 5].map((i) => html`<button type="button" class="${pick >= i ? 'on' : ''}" data-rate="${i}" role="radio" aria-checked="${pick === i}" aria-label="${i}">${raw(IC.star)}</button>`)}</div>
-        <div class="mk-cm-row"><input name="name" maxlength="30" required placeholder="${t('yourName')}" value="${load('asalah_name', '')}" aria-label="${t('yourName')}">
+      ${d.login && !d.me
+        ? html`<div class="mk-cm-f mk-cm-login"><p>${t('loginToComment')}</p><a class="mk-google" href="/api/c/google/start?next=${encodeURIComponent(location.pathname + (location.search || '?') + (location.search ? '&' : '') + 'cm=' + kind + ':' + id)}">${raw(GOOGLE)}<span>${t('googleBtn')}</span></a></div>`
+        : html`<form class="mk-cm-f" id="cm-form">
+        <div class="mk-cm-rate" role="radiogroup" aria-label="${t('rateIt')}"><span>${t('rateIt')}</span>${[1, 2, 3, 4, 5].map((i) => html`<button type="button" class="${pick >= i ? 'on' : ''}" data-rate="${i}" role="radio" aria-checked="${pick === i}" aria-label="${i}">${raw(IC.star)}</button>`)}
+          ${d.me ? html`<span class="mk-cm-me">${d.me.picture ? html`<img src="${d.me.picture}" alt="" referrerpolicy="no-referrer">` : ''}${t('asName', d.me.name)}</span>` : ''}</div>
+        <div class="mk-cm-row ${d.me ? 'me' : ''}">${d.me ? '' : html`<input name="name" maxlength="30" required placeholder="${t('yourName')}" value="${load('asalah_name', '')}" aria-label="${t('yourName')}">`}
         <input name="body" maxlength="300" placeholder="${t('addComment')}" aria-label="${t('addComment')}" autocomplete="off"><button type="submit" class="mk-btn gold" aria-label="${t('send')}">➤</button></div>
-      </form>`);
+      </form>`}`);
   };
   draw();
   box.addEventListener('click', (e) => {
@@ -495,20 +510,19 @@ async function openComments(id) {
     e.preventDefault();
     e.stopPropagation();
     const f = e.target;
-    const name = f.name.value.trim(), body = f.body.value.trim();
+    const name = d.me ? d.me.name : f.name.value.trim(), body = f.body.value.trim();
     if (!name) return f.name.focus();
     if (!body && !pick) return toast(t('needComment'));
     keep('asalah_name', name);
     f.querySelector('[type=submit]').disabled = true;
     try {
-      const r = await fetch(`/api/public/store/reels/${id}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, body: body || null, rating: pick || null, device: deviceId() }) });
+      const r = await fetch(`/api/public/store/${kind}/${id}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, body: body || null, rating: pick || null, device: deviceId() }) });
       const x = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(lang === 'en' ? t('err') : x.message || t('err'));
-      d = await get(`/api/public/store/reels/${id}/comments`);
+      d = await get(`/api/public/store/${kind}/${id}/comments`);
       pick = 0;
       draw();
-      const cc = document.querySelector(`.mk-reel[data-rid="${id}"] [data-ccount]`);
-      if (cc) cc.textContent = compact(d.count);
+      document.querySelectorAll(kind === 'reels' ? `.mk-reel[data-rid="${id}"] [data-ccount]` : `[data-pcount="${id}"]`).forEach((cc) => (cc.textContent = compact(d.count)));
       toast(t('thanksComment'));
     } catch (err) {
       toast(err.message);
@@ -534,7 +548,7 @@ function ago(ts) {
 }
 document.addEventListener('click', (e) => {
   const c = e.target.closest('[data-comments]');
-  if (c) return openComments(Number(c.dataset.comments));
+  if (c) return openComments(Number(c.dataset.comments), c.dataset.kind || 'reels');
   if (e.target.closest('[data-sound]')) return setSound(!sound);
 });
 function heartBurst(section) {
@@ -1042,11 +1056,12 @@ function openPosts(startId, ids) {
       <div class="mk-post-img" data-dbl-fav="${p.id}">${p.image_url ? html`<div class="mk-p-blur" style="background-image:url('${p.image_url}')" aria-hidden="true"></div><img src="${p.image_url}" alt="${p.title}" loading="lazy">` : raw('<span class="mk-full-emoji" aria-hidden="true">🛍️</span>')}${off(p) ? html`<span class="mk-off">-${off(p)}%</span>` : ''}</div>
       <div class="mk-post-acts">
         <button type="button" class="mk-pa fav ${on ? 'on' : ''}" data-post-fav="${p.id}" aria-pressed="${on}" aria-label="${t('save_aria')}">${raw(on ? IC.heart : PIC.heartO)}</button>
-        <button type="button" class="mk-pa" data-post-ask="${p.id}" aria-label="${t('askThis')}">${raw(PIC.ask)}</button>
+        <button type="button" class="mk-pa" data-comments="${p.id}" data-kind="products" aria-label="${t('comments')}">${raw(PIC.ask)}</button>
         <button type="button" class="mk-pa" data-share="${p.id}" aria-label="${t('share')}">${raw(PIC.send)}</button>
         <button type="button" class="mk-pa end" data-fam-add="${p.id}" aria-label="${t('famAdd')}">${raw(PIC.fam)}</button>
       </div>
       <div class="mk-post-cap">
+        <button type="button" class="mk-rate-line" data-comments="${p.id}" data-kind="products">${p.rating ? html`<span class="mk-stars">${stars(p.rating.avg)}<b>${p.rating.avg}</b><small>(${p.rating.n})</small></span>` : html`<span class="mk-muted">${t('rateFirst')}</span>`}${p.comments ? html`<span class="mk-muted">· <span data-pcount="${p.id}">${compact(p.comments)}</span> ${t('comments')}</span>` : ''}</button>
         <div class="mk-price">${sar(p.price)}${p.old_price ? html` <s>${sar(p.old_price)}</s>` : ''}</div>
         <p><b>${p.merchant_name}</b> ${p.title}</p>
         ${p.description ? html`<p class="mk-post-desc">${p.description}</p>` : ''}
