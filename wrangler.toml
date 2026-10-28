@@ -34,6 +34,8 @@ crons = ["0 * * * *"]
 
 [vars]
 PLATFORM_NAME = "أصالة المنتجات الأصلية"
+# معرّف عميل Google لتسجيل دخول الزبائن (عام وليس سراً). السر GOOGLE_CLIENT_SECRET يُضاف من لوحة Cloudflare
+GOOGLE_CLIENT_ID = "1018874096740-l7h8lnmlbudsognhshdo5bjc0ofo0upf.apps.googleusercontent.com"
 
 # أسرار اختيارية (wrangler secret put <الاسم>):
 #   TAG_SECRET   : يوقّع روابط العلامات. لو ما انضاف، يتولّد تلقائياً ويُحفظ في القاعدة.
