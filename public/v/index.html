@@ -16,9 +16,20 @@
     <div class="vbrand"><span id="b-logo" class="vlogo" aria-hidden="true"></span><b id="b-name">أصالة</b></div>
   </header>
 
-  <section id="loading" class="vcard center" aria-live="polite">
-    <div class="spinner" aria-hidden="true"></div>
-    <p>جاري التحقق من العلامة…</p>
+  <!-- شاشة المسح: العلامة في النص وموجات وخط مسح، والخطوات تنعلّم وحدة وحدة -->
+  <section id="loading" class="vcard scan-card" aria-live="polite">
+    <div class="scan-stage" aria-hidden="true">
+      <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
+      <svg class="scan-orbit" viewBox="0 0 200 200"><circle cx="100" cy="100" r="86" fill="none" stroke="rgba(217,180,90,.18)" stroke-width="3"/><path d="M100 14 a86 86 0 0 1 86 86" fill="none" stroke="#D9B45A" stroke-width="4" stroke-linecap="round"/></svg>
+      <svg class="scan-tag" viewBox="0 0 120 120"><circle cx="60" cy="60" r="56" fill="#D9B45A"/><circle cx="60" cy="60" r="44" fill="none" stroke="#0F2A21" stroke-opacity=".35" stroke-width="2.5" stroke-dasharray="4 6"/><g fill="none" stroke="#0F2A21" stroke-width="5" stroke-linecap="round"><path d="M52 44 a22 22 0 0 1 0 32" opacity=".45"/><path d="M62 36 a34 34 0 0 1 0 48" opacity=".7"/><path d="M42 52 a10 10 0 0 1 0 16"/></g></svg>
+      <span class="scan-line"></span>
+    </div>
+    <h2 class="scan-title">جاري التحقق من المنتج</h2>
+    <ol class="scan-steps">
+      <li data-step="0"><i></i>قراءة العلامة</li>
+      <li data-step="1"><i></i>التحقق من التوقيع الرقمي</li>
+      <li data-step="2"><i></i>مطابقة سجل المنتج</li>
+    </ol>
   </section>
 
   <section id="ok" class="vcard result-ok center" hidden aria-live="polite">

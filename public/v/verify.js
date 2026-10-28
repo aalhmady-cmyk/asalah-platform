@@ -51,13 +51,33 @@ function applyBrand(b) {
   }
 }
 
+// شاشة المسح: الخطوات تتعلّم وحدة وحدة، والنتيجة ما تطلع قبل ما تخلص (أقل من ثانيتين)
+const STEP_MS = 550;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function scanSteps() {
+  const items = [...document.querySelectorAll('.scan-steps li')];
+  let i = 0;
+  items[0].classList.add('active');
+  return new Promise((resolve) => {
+    const tick = () => {
+      items[i].classList.replace('active', 'done');
+      i++;
+      if (i < items.length) { items[i].classList.add('active'); setTimeout(tick, STEP_MS); }
+      else setTimeout(resolve, 250);
+    };
+    setTimeout(tick, reduced ? 50 : STEP_MS);
+  });
+}
+
 let lastResult = 'unknown';
 async function run() {
-  if (!token) return bad('unknown', 'ما لقينا رمز العلامة في الرابط. امسح العلامة مرة ثانية.');
+  const steps = scanSteps();
+  if (!token) { await steps; return bad('unknown', 'ما لقينا رمز العلامة في الرابط. امسح العلامة مرة ثانية.'); }
   let d;
   try {
-    d = await post('/api/verify', { t: token, sid });
+    [d] = await Promise.all([post('/api/verify', { t: token, sid }), steps]);
   } catch (e) {
+    await steps;
     show('loading', false);
     show('bad');
     $('bad-title').textContent = e.status === 429 ? 'محاولات كثيرة' : 'تعذر التحقق';

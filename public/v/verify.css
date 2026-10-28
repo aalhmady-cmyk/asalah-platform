@@ -33,3 +33,31 @@
 .product img { width: 100%; height: 100%; object-fit: cover; border-radius: 24px; border: 3px solid var(--gold); background: #fff; }
 .product.is-logo img { object-fit: contain; padding: 14px; }
 .product svg { position: absolute; bottom: -12px; inset-inline-start: -12px; }
+
+/* شاشة المسح */
+.scan-card { background: radial-gradient(120% 90% at 50% 0%, #1C4436 0%, #0F2A21 60%); border-color: var(--forest); color: #fff; align-items: center; text-align: center; padding: 34px 22px 26px; gap: 18px; overflow: hidden; }
+.scan-stage { position: relative; width: 200px; height: 200px; display: grid; place-items: center; }
+.scan-orbit { position: absolute; inset: 0; animation: orbit 1.4s linear infinite; }
+.scan-tag { width: 104px; height: 104px; filter: drop-shadow(0 8px 24px rgba(217,180,90,.35)); animation: tagpulse 1.4s ease-in-out infinite; }
+.ring { position: absolute; width: 104px; height: 104px; border-radius: 50%; border: 2px solid rgba(243,214,140,.7); opacity: 0; animation: ring 2.1s ease-out infinite; }
+.ring.r2 { animation-delay: .7s; } .ring.r3 { animation-delay: 1.4s; }
+.scan-line { position: absolute; left: 18px; right: 18px; height: 3px; top: 30px; border-radius: 3px; background: linear-gradient(90deg, transparent, #F3D68C, transparent); box-shadow: 0 0 14px 2px rgba(243,214,140,.55); animation: scanline 1.6s ease-in-out infinite alternate; }
+.scan-title { font-size: 20px; }
+.scan-steps { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 280px; display: flex; flex-direction: column; gap: 10px; text-align: start; }
+.scan-steps li { display: flex; align-items: center; gap: 10px; color: var(--forest-muted); font-size: 15px; opacity: .55; transition: opacity .3s, color .3s; }
+.scan-steps i { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #2D5C4B; flex: none; position: relative; transition: background .3s, border-color .3s; }
+.scan-steps li.active { opacity: 1; color: #fff; }
+.scan-steps li.active i { border-color: var(--gold); border-top-color: transparent; animation: orbit .8s linear infinite; }
+.scan-steps li.done { opacity: 1; color: #fff; }
+.scan-steps li.done i { background: var(--gold); border-color: var(--gold); animation: none; }
+.scan-steps li.done i::after { content: ""; position: absolute; left: 6px; top: 3px; width: 5px; height: 10px; border: solid var(--forest); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+@keyframes orbit { to { transform: rotate(360deg); } }
+@keyframes tagpulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes ring { 0% { transform: scale(1); opacity: .8; } 100% { transform: scale(1.9); opacity: 0; } }
+@keyframes scanline { from { transform: translateY(0); } to { transform: translateY(140px); } }
+/* ختم الأصلي ينطبع بعد المسح */
+.result-ok.pop .product, .result-ok.pop #seal { animation: stamp .6s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes stamp { from { transform: scale(1.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .scan-orbit, .scan-tag, .ring, .scan-line, .scan-steps li.active i, .result-ok.pop .product, .result-ok.pop #seal { animation: none !important; }
+}
