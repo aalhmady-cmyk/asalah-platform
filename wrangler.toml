@@ -1,5 +1,7 @@
 name = "asalah-platform"
 main = "src/index.js"
+# يحافظ على المتغيرات المضافة من لوحة Cloudflare عند كل نشر من GitHub
+keep_vars = true
 compatibility_date = "2026-10-01"
 
 # ملفات SQL تنضم للكود عشان النظام يجهّز قاعدته بنفسه بعد النشر
