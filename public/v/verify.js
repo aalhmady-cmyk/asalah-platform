@@ -174,6 +174,16 @@ function setupLoyalty(l, b) {
   const phone = savedPhone();
   if (phone) $('claim-form').phone.value = phone;
   show('loyalty');
+  // المكافأة تطلع للعميل أول ما يتأكد إن المنتج أصلي
+  if (!l.claimed) {
+    $('reward-title').textContent = `🎉 حصلت على ${fmt(l.per_tag)}${l.mode === 'cashback' ? ' كاش باك' : ''}`;
+    $('reward-sub').textContent = phone ? 'جاري إضافتها لرصيدك…' : 'اكتب رقم جوالك تحت عشان تنحفظ في رصيدك';
+    show('reward');
+    $('l-title').textContent = `حصلت على ${fmt(l.per_tag)} 🎉`;
+    $('claim-btn').textContent = 'احفظها في رصيدي';
+    // الرقم محفوظ من قبل: تنضاف تلقائياً
+    if (phone) claim(phone);
+  }
   if (l.claimed) {
     show('claim-form', false);
     if (phone) loadWallet(phone);
@@ -218,9 +228,7 @@ async function loadWallet(phone) {
   }
 }
 
-$('claim-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const phone = e.target.phone.value.trim();
+async function claim(phone, manual) {
   const btn = $('claim-btn');
   btn.disabled = true;
   try {
@@ -229,14 +237,20 @@ $('claim-form').addEventListener('submit', async (e) => {
       const r = await post('/api/loyalty/claim', { t: token, sid, phone });
       loyalty.claimed = true;
       renderWallet(r.wallet, r.added);
+      $('reward-sub').textContent = `انضافت لرصيدك. رصيدك الحين ${fmt(r.wallet.balance)}`;
     }
     local?.setItem('asalah_phone_' + brandKey, phone);
   } catch (err) {
     if (err.data?.code === 'already_claimed') { loyalty.claimed = true; await loadWallet(phone); }
-    else alert(err.message);
+    else if (manual) alert(err.message);
+    else $('reward-sub').textContent = 'اكتب رقم جوالك تحت عشان تنحفظ في رصيدك';
   } finally {
     btn.disabled = false;
   }
+}
+$('claim-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  claim(e.target.phone.value.trim(), true);
 });
 
 $('redeem-btn').addEventListener('click', async () => {
