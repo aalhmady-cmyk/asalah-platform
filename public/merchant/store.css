@@ -63,3 +63,4 @@
 .st-progress .bar { height: 10px; border-radius: 999px; background: var(--line-soft); overflow: hidden; }
 .st-progress .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green), var(--gold)); transition: width .2s; }
 @media (max-width: 640px) { .st-ed-grid { grid-template-columns: 1fr; } }
+.st-progress .st-pct { font-size: 22px; color: var(--green); margin-inline-end: 6px; font-variant-numeric: tabular-nums; }

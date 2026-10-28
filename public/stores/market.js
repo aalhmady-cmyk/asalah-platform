@@ -22,7 +22,7 @@ const T = {
     brand: 'متاجر أصالة', tagline: 'كل منتج أصلي وموثّق', search: 'دوّر على منتج أو متجر…', home: 'الرئيسية', reels: 'ريلز', chat: 'المساعد', saved: 'المفضلة', asalah: 'أصالة', langBtn: 'EN',
     heroA: 'تسوّق', heroB: 'الأصلي', heroC: 'وبس', heroP: 'كل منتج هنا من علامته التجارية مباشرة، ومحمي بعلامة أصالة. تدفع في متجر التاجر الرسمي.',
     askBtn: '✨ اسأل المساعد', reelsBtn: '🎬 شوف الريلز', stores: 'المتاجر', products: (n) => `${n} منتج`, all: 'الكل', newIn: 'وصل جديد', noCat: 'ما فيه منتجات في هذي الفئة حالياً',
-    soon: 'المتاجر الأصلية في الطريق', soonP: 'قريب بتلقى هنا منتجات العلامات السعودية الموثّقة بعلامة أصالة.', demo: 'جرّب نسخة العرض', haveBrand: 'عندك علامة تجارية؟',
+    soon: 'المتاجر الأصلية في الطريق', soonP: 'قريب بتلقى هنا منتجات العلامات السعودية الموثّقة بعلامة أصالة.', demo: 'جرّب نسخة العرض', demoBtn: '🧪 النسخة التجريبية', demoT: 'شوف النسخة التجريبية', demoP: 'اكتشف وتصفح متاجر أصالة بمنتجات تجريبية لين تكتمل المتاجر', haveBrand: 'عندك علامة تجارية؟',
     results: (q) => `نتائج «${q}»`, noResults: 'ما لقينا شي بهالاسم', noResultsP: 'جرّب كلمة ثانية، أو خل المساعد يدوّر لك.', askAbout: (q) => `✨ اسأل المساعد عن «${q}»`,
     verified: '🛡️ أصلي موثّق', verifiedT: 'أصلي وموثّق من أصالة', trust: (m) => `الدفع والشحن من متجر ${m} الرسمي`, buy: (m) => `اشتر الآن من ${m} ↗`, buyNow: 'اشتر الآن ↗', from: (m) => `من متجر ${m}`, buyShort: 'اشتر', share: '↗ شارك',
     save: '♡ حفظ', unsave: '♥ محفوظ', save_aria: 'أضف للمفضلة', productReels: 'ريلز المنتج', youMayLike: 'ممكن يعجبك', save_pct: (n) => `وفّر ${n}٪`,
@@ -40,7 +40,7 @@ const T = {
     brand: 'Asalah Stores', tagline: 'Every product verified original', search: 'Search products or stores…', home: 'Home', reels: 'Reels', chat: 'Assistant', saved: 'Saved', asalah: 'Asalah', langBtn: 'ع',
     heroA: 'Shop', heroB: 'genuine', heroC: 'only', heroP: 'Every product comes straight from its brand and is protected by an Asalah tag. You pay in the brand’s official store.',
     askBtn: '✨ Ask the assistant', reelsBtn: '🎬 Watch reels', stores: 'Stores', products: (n) => `${n} products`, all: 'All', newIn: 'New arrivals', noCat: 'No products in this category yet',
-    soon: 'Genuine stores are on the way', soonP: 'Soon you will find verified Saudi brands here, protected by Asalah tags.', demo: 'Try the demo', haveBrand: 'Own a brand?',
+    soon: 'Genuine stores are on the way', soonP: 'Soon you will find verified Saudi brands here, protected by Asalah tags.', demo: 'Try the demo', demoBtn: '🧪 Demo version', demoT: 'See the demo version', demoP: 'Discover and browse Asalah Stores with sample products while real stores fill up', haveBrand: 'Own a brand?',
     results: (q) => `Results for “${q}”`, noResults: 'Nothing found', noResultsP: 'Try another word, or let the assistant look for you.', askAbout: (q) => `✨ Ask the assistant about “${q}”`,
     verified: '🛡️ Verified original', verifiedT: 'Verified original by Asalah', trust: (m) => `Payment and shipping by ${m}’s official store`, buy: (m) => `Buy now from ${m} ↗`, buyNow: 'Buy now ↗', from: (m) => `from ${m}`, buyShort: 'Buy', share: '↗ Share',
     save: '♡ Save', unsave: '♥ Saved', save_aria: 'Save to favourites', productReels: 'Product reels', youMayLike: 'You may also like', save_pct: (n) => `Save ${n}%`,
@@ -180,7 +180,7 @@ async function showHome(cat) {
       <div>
         <h1>${t('heroA')} <em>${t('heroB')}</em> ${t('heroC')}</h1>
         <p>${t('heroP')}</p>
-        <div class="mk-hero-cta"><button type="button" class="mk-btn gold" data-go="chat">${t('askBtn')}</button>${D.reels.length ? html`<button type="button" class="mk-btn ghost" data-go="reels">${t('reelsBtn')}</button>` : ''}</div>
+        <div class="mk-hero-cta"><button type="button" class="mk-btn gold" data-go="chat">${t('askBtn')}</button>${D.reels.length ? html`<button type="button" class="mk-btn ghost" data-go="reels">${t('reelsBtn')}</button>` : ''}<a class="mk-btn ghost" href="/stores/demo/">${t('demoBtn')}</a></div>
       </div>
       <div class="mk-hero-shield" aria-hidden="true">🛡️</div>
     </section>
@@ -195,7 +195,8 @@ async function showHome(cat) {
         ${cats.map((c) => html`<button type="button" role="listitem" class="mk-chip" data-cat="${c.key}" aria-pressed="${c.key === cat}">${catLabel(c)}</button>`)}
       </div>` : ''}
       ${list.length ? grid(list) : html`<div class="mk-empty small">${t('noCat')}</div>`}
-    </section>`);
+    </section>
+    <a class="mk-demo-card" href="/stores/demo/"><span aria-hidden="true">🧪</span><span><b>${t('demoT')}</b><small>${t('demoP')}</small></span><span aria-hidden="true">←</span></a>`);
 }
 
 function skeleton() {

@@ -392,7 +392,7 @@ async function newReel() {
     const prog = dlg.querySelector('.st-progress');
     const bar = prog.querySelector('i'), label = prog.querySelector('span');
     prog.hidden = false;
-    const step = (p, t) => { bar.style.width = Math.round(p * 100) + '%'; label.textContent = t; };
+    const step = (p, t) => { const n = Math.round(p * 100); bar.style.width = n + '%'; render(label, html`<b class="st-pct">${n}٪</b> ${t}`); };
     try {
       const s = state();
       step(0, 'نقص الفيديو… خل الصفحة مفتوحة');

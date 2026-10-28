@@ -211,3 +211,9 @@ body[data-view="reels"] .mk-view { max-width: none; padding: 0; }
 .mk-burst { position: absolute; top: 45%; left: 50%; z-index: 4; font-size: 96px; transform: translate(-50%, -50%) scale(.4); animation: mk-burst .8s ease-out forwards; pointer-events: none; }
 @keyframes mk-burst { 30% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; } 100% { transform: translate(-50%, -70%) scale(1); opacity: 0; } }
 [dir="ltr"] .mk-p-m::after { content: ""; }
+
+.mk-demo-card { display: flex; align-items: center; gap: 14px; margin-top: 28px; padding: 16px 18px; border-radius: 18px; background: var(--surface); border: 1px dashed var(--gold); color: var(--ink); text-decoration: none; }
+.mk-demo-card > span:first-child { font-size: 28px; }
+.mk-demo-card > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.mk-demo-card small { color: var(--muted, #667); }
+[dir=ltr] .mk-demo-card > span:last-child { transform: scaleX(-1); }
