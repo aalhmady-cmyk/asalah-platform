@@ -127,7 +127,8 @@ function ok(d) {
   shareData = { name: t.product_name || '', brand: d.brand.name };
   show('ok');
   $('ok').classList.add('pop');
-  if (d.loyalty && !t.is_test) setupLoyalty(d.loyalty, d.brand);
+  if (d.loyalty && t.is_test) testReward(d.loyalty);
+  else if (d.loyalty) setupLoyalty(d.loyalty, d.brand);
   if (d.rating) setupRating(d.rating);
   if (d.contest) {
     if (d.contest.entered) return show('entered');
@@ -165,6 +166,14 @@ $('share').addEventListener('click', async () => {
 let loyalty = null, brandKey = '';
 const fmt = (n) => (loyalty.mode === 'cashback' ? (n / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ريال' : n.toLocaleString('en-US') + ' نقطة');
 const savedPhone = () => local?.getItem('asalah_phone_' + brandKey) || '';
+
+// العلامة التجريبية تعرض المكافأة كمعاينة بس، وما تنضاف لأي رصيد
+function testReward(l) {
+  loyalty = l;
+  $('reward-title').textContent = `🎉 حصلت على ${fmt(l.per_tag)}${l.mode === 'cashback' ? ' كاش باك' : ''}`;
+  $('reward-sub').textContent = 'معاينة: هذي علامة تجريبية، فالرصيد ما ينحفظ';
+  show('reward');
+}
 
 function setupLoyalty(l, b) {
   loyalty = l;

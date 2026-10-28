@@ -11,3 +11,5 @@
   Cache-Control: no-store
 /report/*
   Cache-Control: no-store
+/v/*
+  Cache-Control: no-cache
