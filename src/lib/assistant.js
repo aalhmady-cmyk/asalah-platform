@@ -10,14 +10,18 @@ const MODEL = 'claude-opus-5-5';
 export async function merchantContext(db, merchantId) {
   const month = new Date((now() + 10800) * 1000).toISOString().slice(0, 7);
   const [merchant, ov, spots, report, entries, lastDraw] = await Promise.all([
-    db.prepare('SELECT name,max_checks,low_stock_threshold,contest_enabled,contest_title,contest_ends_at,store_url,public_listed FROM merchants WHERE id=?').bind(merchantId).first(),
+    db.prepare('SELECT name,max_checks,low_stock_threshold,contest_enabled,contest_title,contest_ends_at,store_url,public_listed,loyalty_enabled,loyalty_mode,loyalty_per_tag,loyalty_min_redeem,loyalty_reward FROM merchants WHERE id=?').bind(merchantId).first(),
     overviewFor(db, merchantId),
     hotspots(db, merchantId, 30),
     monthlyReport(db, merchantId, month),
     entriesWithFlags(db, merchantId, { limit: 2000 }),
     db.prepare('SELECT title,winners_count,pool_size,created_at FROM draws WHERE merchant_id=? ORDER BY id DESC LIMIT 1').bind(merchantId).first(),
   ]);
-  const sellers = await db.prepare('SELECT COUNT(*) AS n FROM sellers WHERE merchant_id=?').bind(merchantId).first();
+  const [sellers, members, rating] = await Promise.all([
+    db.prepare('SELECT COUNT(*) AS n FROM sellers WHERE merchant_id=?').bind(merchantId).first(),
+    db.prepare('SELECT COUNT(*) AS members,COALESCE(SUM(balance),0) AS outstanding FROM loyalty_members WHERE merchant_id=?').bind(merchantId).first(),
+    db.prepare('SELECT COUNT(*) AS n,ROUND(AVG(stars),2) AS avg FROM ratings WHERE merchant_id=?').bind(merchantId).first(),
+  ]);
   return {
     today: new Date((now() + 10800) * 1000).toISOString().slice(0, 10),
     merchant,
@@ -27,6 +31,9 @@ export async function merchantContext(db, merchantId) {
     counterfeit_hotspots_30d: spots.slice(0, 8),
     contest: { entries: entries.length, suspicious_entries: entries.filter((e) => e.flags.length).length, last_draw: lastDraw },
     authorized_sellers: sellers.n,
+    // الكاش باك بالهللة
+    loyalty: { enabled: Boolean(merchant.loyalty_enabled), mode: merchant.loyalty_mode, per_tag: merchant.loyalty_per_tag, min_redeem: merchant.loyalty_min_redeem, reward: merchant.loyalty_reward, ...members },
+    ratings: rating,
   };
 }
 
@@ -48,6 +55,9 @@ export function tips(c) {
   if (c.contest.suspicious_entries > 0) out.push({ level: 'warn', text: `فيه ${c.contest.suspicious_entries} مشاركة مشبوهة في المسابقة. استبعدها قبل السحب.` });
   if (c.merchant.contest_enabled && c.merchant.contest_ends_at && c.merchant.contest_ends_at < now() + 7 * 86400 && c.merchant.contest_ends_at > now())
     out.push({ level: 'info', text: 'المسابقة تنتهي خلال أقل من أسبوع. جهّز السحب، واعلن الفائزين.' });
+  if (!c.loyalty.enabled && c.this_month.sold >= 30)
+    out.push({ level: 'info', text: 'جرّب تشغيل النقاط أو الكاش باك: العميل يجمع رصيد مع كل منتج أصلي، ويرجع يشتري منك عشان يستبدل.' });
+  if (c.ratings.n >= 5 && c.ratings.avg < 3.5) out.push({ level: 'warn', text: `متوسط تقييم منتجاتك ${c.ratings.avg} من 5. شوف تعليقات العملاء في تبويب النقاط.` });
   if (!c.authorized_sellers) out.push({ level: 'info', text: 'أضف نقاط البيع المعتمدة، عشان العميل يعرف وين يلقى منتجك الأصلي في الموقع العام.' });
   const cities = c.scans.by_city_7d.filter((x) => x.city !== 'غير معروف');
   if (cities.length) out.push({ level: 'good', text: `أكثر مدينة يمسح منها عملاؤك هالأسبوع: ${cities[0].city} (${cities[0].n} مسح).` });
@@ -89,9 +99,10 @@ export async function ask(env, ctx, question, history) {
 مهمتك: تساعد التاجر يفهم أرقامه (المخزون، المسحات، المبيعات التقديرية، التقليد، المسابقة) ويقرر خطوته الجاية.
 - تكلم بلهجة خليجية بسيطة ومهذبة، وباختصار (3 إلى 6 أسطر غالباً). استخدم نقاط إذا فيه أكثر من فكرة.
 - اعتمد فقط على البيانات تحت. لا تخترع أرقام. إذا المعلومة مو موجودة، قل ما عندي هالرقم، واقترح من وين يلقاه في لوحته.
+- الكاش باك في البيانات بالهللة (100 = ريال)، اعرضه بالريال.
 - "انمسحت" أو "sold" تعني علامات انمسحت أول مرة، وهي تقدير للمبيعات مو رقم مبيعات فعلي.
 - لا تعطي نصائح قانونية مؤكدة. للمسابقات ذكّره بترخيص وزارة التجارة، وللبيانات بنظام حماية البيانات الشخصية.
-- أقسام لوحة التاجر: الرئيسية، العلامات (الدفعات وإيقاف العلامات وصور المنتجات)، المسابقة (الإعدادات والمشاركات والسحب)، التقليد (البلاغات وبؤر التقليد)، التقارير (التقرير الشهري)، نقاط البيع، الحساب.`,
+- أقسام لوحة التاجر: الرئيسية، العلامات (الدفعات وإيقاف العلامات وصور المنتجات)، النقاط والكاش باك (الإعدادات وتأكيد أكواد الاستبدال والتقييمات)، المسابقة (الإعدادات والمشاركات والسحب)، التقليد (البلاغات وبؤر التقليد)، التقارير (التقرير الشهري)، نقاط البيع، الحساب.`,
         },
         { type: 'text', text: 'بيانات التاجر الحالية (JSON):\n' + JSON.stringify(ctx) },
       ],

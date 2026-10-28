@@ -118,8 +118,17 @@ function ok(d) {
     $('store-link').href = d.brand.store_url;
     show('store-link');
   }
+  if (t.expires_on) {
+    $('f-exp').textContent = monthName(t.expires_on);
+    show('f-exp-box');
+    show('expired', t.expired);
+  }
+  if (t.details) { $('details').textContent = t.details; show('details'); }
+  shareData = { name: t.product_name || '', brand: d.brand.name };
   show('ok');
   $('ok').classList.add('pop');
+  if (d.loyalty && !t.is_test) setupLoyalty(d.loyalty, d.brand);
+  if (d.rating) setupRating(d.rating);
   if (d.contest) {
     if (d.contest.entered) return show('entered');
     $('c-title').textContent = d.contest.title || 'شارك في المسابقة';
@@ -134,6 +143,163 @@ function ok(d) {
     if (t.check_no >= 3) $('contest').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
+
+const monthName = (ym) => {
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+};
+
+// ---------- مشاركة "اشتريت أصلي" ----------
+let shareData = null;
+$('share').addEventListener('click', async () => {
+  const what = shareData.name ? `${shareData.name} من ${shareData.brand}` : `منتج ${shareData.brand}`;
+  const text = `تأكدت إن ${what} أصلي ✅ عبر علامة أصالة. اشترِ الأصلي دايماً!`;
+  const link = location.origin + '/';
+  if (navigator.share) {
+    try { await navigator.share({ title: 'اشتريت أصلي', text, url: link }); } catch { /* ألغى المشاركة */ }
+  } else window.open('https://wa.me/?text=' + encodeURIComponent(text + ' ' + link), '_blank', 'noopener');
+});
+
+// ---------- النقاط والكاش باك ----------
+// الرقم يُحفظ في الجهاز لكل تاجر، عشان المرة الجاية يضاف الرصيد بضغطة
+let loyalty = null, brandKey = '';
+const fmt = (n) => (loyalty.mode === 'cashback' ? (n / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ريال' : n.toLocaleString('en-US') + ' نقطة');
+const savedPhone = () => local?.getItem('asalah_phone_' + brandKey) || '';
+
+function setupLoyalty(l, b) {
+  loyalty = l;
+  brandKey = b.name;
+  $('l-title').textContent = l.mode === 'cashback' ? 'كاش باك على مشترياتك' : 'اجمع نقاطك';
+  $('l-sub').textContent = `كل منتج أصلي يعطيك ${fmt(l.per_tag)}${l.reward ? '، وعند ' + fmt(l.min_redeem) + ' تحصل على: ' + l.reward : '، وتستبدل عند ' + fmt(l.min_redeem)}.`;
+  const phone = savedPhone();
+  if (phone) $('claim-form').phone.value = phone;
+  show('loyalty');
+  if (l.claimed) {
+    show('claim-form', false);
+    if (phone) loadWallet(phone);
+    else { show('claim-form'); $('claim-btn').textContent = 'اعرض رصيدي'; }
+  }
+}
+
+function renderWallet(w, added) {
+  show('wallet');
+  show('claim-form', false);
+  $('w-balance').textContent = fmt(w.balance);
+  const pct = Math.min(100, Math.round((w.balance / w.min_redeem) * 100));
+  $('w-progress-label').textContent = w.can_redeem ? 'رصيدك يكفي للاستبدال' : `باقي ${fmt(w.min_redeem - w.balance)} للاستبدال`;
+  requestAnimationFrame(() => ($('w-bar').style.width = pct + '%'));
+  show('redeem-btn', w.can_redeem);
+  if (added) {
+    $('w-msg').textContent = `انضاف لك ${fmt(added)} 🎉`;
+    show('w-msg');
+    $('wallet').classList.add('add-pop');
+  }
+  $('w-codes').replaceChildren(
+    ...w.codes.map((c) => {
+      const li = document.createElement('li');
+      const code = document.createElement('b');
+      code.className = 'ltr' + (c.status !== 'issued' ? ' used' : '');
+      code.textContent = c.code;
+      const st = document.createElement('span');
+      st.textContent = c.status === 'issued' ? 'جاهز للاستخدام' : c.status === 'used' ? 'مستخدم' : 'ملغي';
+      li.append(code, st);
+      return li;
+    })
+  );
+}
+
+async function loadWallet(phone) {
+  try {
+    renderWallet((await post('/api/loyalty/wallet', { t: token, sid, phone })).wallet);
+  } catch (err) {
+    show('claim-form');
+    $('claim-btn').textContent = 'اعرض رصيدي';
+    if (err.data?.code !== 'no_member') $('l-sub').textContent = err.message;
+  }
+}
+
+$('claim-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const phone = e.target.phone.value.trim();
+  const btn = $('claim-btn');
+  btn.disabled = true;
+  try {
+    if (loyalty.claimed) await loadWallet(phone);
+    else {
+      const r = await post('/api/loyalty/claim', { t: token, sid, phone });
+      loyalty.claimed = true;
+      renderWallet(r.wallet, r.added);
+    }
+    local?.setItem('asalah_phone_' + brandKey, phone);
+  } catch (err) {
+    if (err.data?.code === 'already_claimed') { loyalty.claimed = true; await loadWallet(phone); }
+    else alert(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('redeem-btn').addEventListener('click', async () => {
+  const phone = savedPhone() || $('claim-form').phone.value.trim();
+  const what = loyalty.reward || fmt(loyalty.min_redeem);
+  if (!confirm(`تبي تستبدل ${fmt(loyalty.min_redeem)} مقابل: ${what}؟`)) return;
+  $('redeem-btn').disabled = true;
+  try {
+    const r = await post('/api/loyalty/redeem', { t: token, sid, phone });
+    renderWallet(r.wallet);
+    $('w-code-val').textContent = r.code;
+    $('w-code-reward').textContent = loyalty.reward || 'قيمة ' + fmt(loyalty.min_redeem);
+    show('w-code');
+    $('w-code').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    $('redeem-btn').disabled = false;
+  }
+});
+
+$('w-other').addEventListener('click', () => {
+  local?.removeItem('asalah_phone_' + brandKey);
+  $('claim-form').phone.value = '';
+  show('wallet', false);
+  show('w-code', false);
+  show('claim-form');
+  if (loyalty.claimed) $('claim-btn').textContent = 'اعرض رصيدي';
+});
+
+// ---------- التقييم ----------
+let stars = 0;
+const paintStars = (n) => document.querySelectorAll('.stars button').forEach((b) => b.classList.toggle('on', Number(b.dataset.star) <= n));
+function setupRating(r) {
+  show('rating');
+  if (r.done) {
+    paintStars(r.stars);
+    document.querySelector('.stars').setAttribute('aria-disabled', 'true');
+    show('rated');
+    return;
+  }
+  document.querySelectorAll('.stars button').forEach((b) =>
+    b.addEventListener('click', () => {
+      stars = Number(b.dataset.star);
+      paintStars(stars);
+      show('rate-form');
+    })
+  );
+}
+$('rate-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = e.target.querySelector('[type=submit]');
+  btn.disabled = true;
+  try {
+    await post('/api/rate', { t: token, sid, stars, comment: e.target.comment.value.trim() || null });
+  } catch (err) {
+    if (err.data?.code !== 'already_rated') { alert(err.message); btn.disabled = false; return; }
+  }
+  show('rate-form', false);
+  show('rated');
+  document.querySelector('.stars').setAttribute('aria-disabled', 'true');
+  document.querySelectorAll('.stars button').forEach((b) => (b.disabled = true));
+});
 
 function bad(result, message) {
   show('loading', false);

@@ -38,7 +38,7 @@ export async function handleMerchant(req, env, path) {
   if (path === '/api/m/batches' && m === 'GET') {
     const r = await db
       .prepare(
-        `SELECT b.code,b.size,b.status,b.product_name,b.produced_on,b.activated_at,b.image_key,
+        `SELECT b.code,b.size,b.status,b.product_name,b.produced_on,b.activated_at,b.image_key,b.expires_on,b.details,
                 (SELECT COUNT(*) FROM tags t WHERE t.batch_id=b.id AND t.first_checked_at IS NOT NULL) AS sold,
                 (SELECT COUNT(*) FROM tags t WHERE t.batch_id=b.id AND t.status<>'active') AS blocked
          FROM batches b WHERE b.merchant_id=? AND b.is_test=0 ORDER BY b.id DESC`
@@ -188,6 +188,102 @@ export async function handleMerchant(req, env, path) {
       .run();
     if (!r.meta.changes) fail(404, 'ما لقينا نقطة البيع');
     return json({ ok: true });
+  }
+
+  // ---------- النقاط والكاش باك ----------
+  // الكاش باك يُخزَّن بالهللة، والواجهة ترسله بالريال
+  if (path === '/api/m/loyalty' && m === 'GET') {
+    const [settings, stats, codes, top, recent, today] = await db.batch([
+      db.prepare('SELECT loyalty_enabled,loyalty_mode,loyalty_per_tag,loyalty_min_redeem,loyalty_reward,ratings_enabled FROM merchants WHERE id=?').bind(mid),
+      db.prepare('SELECT COUNT(*) AS members,COALESCE(SUM(balance),0) AS outstanding,COALESCE(SUM(earned_total),0) AS earned FROM loyalty_members WHERE merchant_id=?').bind(mid),
+      db.prepare("SELECT SUM(status='issued') AS issued,SUM(status='used') AS used,COALESCE(SUM(CASE WHEN status='used' THEN amount END),0) AS used_amount FROM redemptions WHERE merchant_id=?").bind(mid),
+      db.prepare('SELECT name,phone,balance,earned_total,tags_count,last_at FROM loyalty_members WHERE merchant_id=? ORDER BY earned_total DESC LIMIT 50').bind(mid),
+      db.prepare('SELECT r.code,r.amount,r.reward,r.status,r.created_at,r.used_at,lm.phone,lm.name FROM redemptions r JOIN loyalty_members lm ON lm.id=r.member_id WHERE r.merchant_id=? ORDER BY r.id DESC LIMIT 30').bind(mid),
+      db.prepare("SELECT COUNT(*) AS n FROM loyalty_events WHERE merchant_id=? AND kind='earn' AND created_at>=?").bind(mid, now() - 7 * 86400),
+    ]);
+    return json({
+      ok: true,
+      settings: settings.results[0],
+      stats: { ...stats.results[0], issued: codes.results[0].issued ?? 0, used: codes.results[0].used ?? 0, used_amount: codes.results[0].used_amount, earns_7d: today.results[0].n },
+      members: top.results,
+      redemptions: recent.results,
+    });
+  }
+  if (path === '/api/m/loyalty' && m === 'PATCH') {
+    const b = await readJson(req);
+    const cur = await db.prepare('SELECT loyalty_mode FROM merchants WHERE id=?').bind(mid).first();
+    const mode = 'loyalty_mode' in b ? b.loyalty_mode : cur.loyalty_mode;
+    if (!['points', 'cashback'].includes(mode)) fail(400, 'نوع البرنامج لازم يكون نقاط أو كاش باك');
+    const amount = (v, label, opts) => (mode === 'cashback' ? Math.round(Number(v) * 100) : int(v, label, opts));
+    const f = {};
+    if ('loyalty_enabled' in b) f.loyalty_enabled = b.loyalty_enabled ? 1 : 0;
+    if ('loyalty_mode' in b) f.loyalty_mode = mode;
+    if ('loyalty_per_tag' in b) f.loyalty_per_tag = amount(b.loyalty_per_tag, 'المكافأة لكل منتج', { min: 1, max: 100000 });
+    if ('loyalty_min_redeem' in b) f.loyalty_min_redeem = amount(b.loyalty_min_redeem, 'حد الاستبدال', { min: 1, max: 10000000 });
+    if ('loyalty_reward' in b) f.loyalty_reward = str(b.loyalty_reward, 'وصف المكافأة', { max: 150, optional: true });
+    if ('ratings_enabled' in b) f.ratings_enabled = b.ratings_enabled ? 1 : 0;
+    for (const k of ['loyalty_per_tag', 'loyalty_min_redeem']) {
+      if (k in f && !(Number.isInteger(f[k]) && f[k] >= 1 && f[k] <= 10000000)) fail(400, 'اكتب مبلغ صحيح أكبر من صفر');
+    }
+    const keys = Object.keys(f);
+    if (!keys.length) fail(400, 'ما فيه تغييرات');
+    const row = await db
+      .prepare(`UPDATE merchants SET ${keys.map((k) => k + '=?').join(',')} WHERE id=? RETURNING loyalty_enabled,loyalty_mode,loyalty_per_tag,loyalty_min_redeem,loyalty_reward,ratings_enabled`)
+      .bind(...keys.map((k) => f[k]), mid)
+      .first();
+    await audit(db, user, 'loyalty_updated', f);
+    return json({ ok: true, settings: row });
+  }
+  // الكاشير يكتب كود العميل: يتأكد منه ويعلّمه مستخدم
+  if (path === '/api/m/loyalty/use' && m === 'POST') {
+    const b = await readJson(req);
+    const code = String(b.code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length !== 8) fail(400, 'الكود 8 حروف وأرقام');
+    const found = await db
+      .prepare('SELECT r.id,r.code,r.amount,r.reward,r.status,r.used_at,lm.phone,lm.name FROM redemptions r JOIN loyalty_members lm ON lm.id=r.member_id WHERE r.merchant_id=? AND r.code=?')
+      .bind(mid, code)
+      .first();
+    if (!found) fail(404, 'الكود غير صحيح');
+    if (found.status === 'used') fail(409, 'هذا الكود مستخدم من قبل', 'used');
+    if (found.status === 'cancelled') fail(409, 'هذا الكود ملغي', 'cancelled');
+    if (b.check_only) return json({ ok: true, redemption: found });
+    const r = await db.prepare("UPDATE redemptions SET status='used',used_at=?,used_by=? WHERE id=? AND status='issued'").bind(now(), user.id, found.id).run();
+    if (!r.meta.changes) fail(409, 'هذا الكود مستخدم من قبل', 'used');
+    await audit(db, user, 'redemption_used', { code });
+    return json({ ok: true, redemption: { ...found, status: 'used' } });
+  }
+
+  // ---------- تقييمات المنتجات ----------
+  if (path === '/api/m/ratings' && m === 'GET') {
+    const [sum, dist, byBatch, recent] = await db.batch([
+      db.prepare('SELECT COUNT(*) AS n,ROUND(AVG(stars),2) AS avg FROM ratings WHERE merchant_id=?').bind(mid),
+      db.prepare('SELECT stars,COUNT(*) AS n FROM ratings WHERE merchant_id=? GROUP BY stars').bind(mid),
+      db.prepare('SELECT b.code,b.product_name,COUNT(*) AS n,ROUND(AVG(r.stars),2) AS avg FROM ratings r JOIN batches b ON b.id=r.batch_id WHERE r.merchant_id=? GROUP BY b.id ORDER BY n DESC LIMIT 20').bind(mid),
+      db.prepare("SELECT r.stars,r.comment,r.created_at,b.product_name FROM ratings r JOIN batches b ON b.id=r.batch_id WHERE r.merchant_id=? AND r.comment IS NOT NULL AND r.comment<>'' ORDER BY r.created_at DESC LIMIT 30").bind(mid),
+    ]);
+    const d = Object.fromEntries(dist.results.map((x) => [x.stars, x.n]));
+    return json({ ok: true, count: sum.results[0].n, avg: sum.results[0].avg, distribution: [5, 4, 3, 2, 1].map((s) => ({ stars: s, n: d[s] ?? 0 })), batches: byBatch.results, comments: recent.results });
+  }
+
+  // تاريخ الانتهاء وتفاصيل المنتج لكل دفعة (تظهر للعميل بعد التحقق)
+  if ((match = path.match(/^\/api\/m\/batches\/([A-Z0-9]{2,16})$/)) && m === 'PATCH') {
+    const b = await readJson(req);
+    const f = {};
+    if ('expires_on' in b) {
+      const v = b.expires_on ? String(b.expires_on) : null;
+      if (v && !/^\d{4}-(0[1-9]|1[0-2])$/.test(v)) fail(400, 'تاريخ الانتهاء لازم يكون شهر وسنة');
+      f.expires_on = v;
+    }
+    if ('details' in b) f.details = str(b.details, 'تفاصيل المنتج', { max: 500, optional: true });
+    const keys = Object.keys(f);
+    if (!keys.length) fail(400, 'ما فيه تغييرات');
+    const row = await db
+      .prepare(`UPDATE batches SET ${keys.map((k) => k + '=?').join(',')} WHERE code=? AND merchant_id=? RETURNING code,expires_on,details`)
+      .bind(...keys.map((k) => f[k]), match[1], mid)
+      .first();
+    if (!row) fail(404, 'ما لقينا الدفعة');
+    await audit(db, user, 'batch_details_updated', { batch: row.code, ...f });
+    return json({ ok: true, batch: row });
   }
 
   // ---------- المساعد الذكي ----------

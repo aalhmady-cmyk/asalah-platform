@@ -42,9 +42,47 @@
       <div><span>الدفعة</span><b id="f-batch" class="ltr"></b></div>
       <div><span>المنتج</span><b id="f-product"></b></div>
       <div><span>الفحوصات</span><b id="f-checks"></b></div>
+      <div id="f-exp-box" hidden><span>ينتهي</span><b id="f-exp"></b></div>
     </div>
+    <p id="expired" class="expired" hidden>انتبه: المنتج أصلي لكن تاريخه منتهي</p>
+    <p id="details" class="details" hidden></p>
     <p id="test-note" class="soft small" hidden>هذي علامة تجريبية</p>
-    <a id="store-link" class="btn ghost-gold" hidden rel="noopener">زيارة المتجر</a>
+    <div class="ok-actions">
+      <button id="share" class="btn ghost-gold" type="button">شارك: اشتريت أصلي</button>
+      <a id="store-link" class="btn ghost-gold" hidden rel="noopener">زيارة المتجر</a>
+    </div>
+  </section>
+
+  <!-- النقاط أو الكاش باك: العميل يضيف رصيد المنتج لرقم جواله ويستبدله بكود عند التاجر -->
+  <section id="loyalty" class="vcard loyalty" hidden>
+    <div class="l-head">
+      <div class="l-coin" aria-hidden="true"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="#D9B45A"/><circle cx="20" cy="20" r="13" fill="none" stroke="#0F2A21" stroke-opacity=".35" stroke-width="2"/><path d="M20 12l2.4 5 5.4.6-4 3.7 1.1 5.3L20 24l-4.9 2.6 1.1-5.3-4-3.7 5.4-.6z" fill="#0F2A21"/></svg></div>
+      <div><h2 id="l-title">اجمع نقاطك</h2><p id="l-sub" class="muted small"></p></div>
+    </div>
+    <form id="claim-form" class="l-form">
+      <label class="field">رقم الجوال<input name="phone" type="tel" inputmode="numeric" placeholder="05xxxxxxxx" autocomplete="tel" required class="ltr"></label>
+      <button class="btn btn-primary big-btn" type="submit" id="claim-btn">أضف للرصيد</button>
+    </form>
+    <div id="wallet" class="wallet" hidden>
+      <div class="w-balance"><span>رصيدك</span><b id="w-balance"></b><small id="w-progress-label"></small><div class="w-bar"><i id="w-bar"></i></div></div>
+      <p id="w-msg" class="w-msg" hidden></p>
+      <button id="redeem-btn" class="btn btn-primary big-btn" type="button" hidden>استبدل الحين</button>
+      <div id="w-code" class="w-code" hidden><span>أعط هذا الكود للكاشير</span><b id="w-code-val" class="ltr"></b><small id="w-code-reward"></small></div>
+      <ul id="w-codes" class="w-codes"></ul>
+      <button id="w-other" class="linkish" type="button">رقم ثاني؟</button>
+    </div>
+  </section>
+
+  <section id="rating" class="vcard center" hidden>
+    <h2>كيف المنتج؟</h2>
+    <div class="stars" role="radiogroup" aria-label="التقييم">
+      <button type="button" data-star="1" aria-label="نجمة">★</button><button type="button" data-star="2" aria-label="نجمتين">★</button><button type="button" data-star="3" aria-label="3 نجوم">★</button><button type="button" data-star="4" aria-label="4 نجوم">★</button><button type="button" data-star="5" aria-label="5 نجوم">★</button>
+    </div>
+    <form id="rate-form" class="l-form" hidden>
+      <label class="field">تعليقك (اختياري)<textarea name="comment" maxlength="300" rows="2"></textarea></label>
+      <button class="btn btn-primary" type="submit">أرسل التقييم</button>
+    </form>
+    <p id="rated" class="muted" hidden>شكراً على تقييمك!</p>
   </section>
 
   <section id="contest" class="vcard" hidden>

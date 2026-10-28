@@ -326,3 +326,71 @@ test('المساعد الذكي: الملاحظات تشتغل بدون مفتا
   assert.equal(a.status, 503);
   assert.equal((await call('/api/m/assistant', { cookie: S.admin })).status, 403);
 });
+
+test('النقاط والكاش باك: جمع مرة وحدة واستبدال بكود', async () => {
+  let r = await patch('/api/m/loyalty', { loyalty_enabled: true, loyalty_mode: 'points', loyalty_per_tag: 10, loyalty_min_redeem: 20, loyalty_reward: 'علبة مجانية' }, S.merchant);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const [t1, t2] = [tokenOf(S.urls[8]), tokenOf(S.urls[9])];
+  let v = await post('/api/verify', { t: t1, sid: sid('1') });
+  assert.deepEqual(v.data.loyalty, { mode: 'points', per_tag: 10, min_redeem: 20, reward: 'علبة مجانية', claimed: false });
+  assert.equal(v.data.rating.done, false);
+  const phone = '0559990001';
+  assert.equal((await post('/api/loyalty/claim', { t: t1, sid: sid('9'), phone })).status, 403); // جهاز غير مربوط
+  r = await post('/api/loyalty/claim', { t: t1, sid: sid('1'), phone });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.wallet.balance, 10);
+  assert.equal(r.data.wallet.can_redeem, false);
+  assert.equal((await post('/api/loyalty/claim', { t: t1, sid: sid('1'), phone: '0559990002' })).status, 409);
+  assert.equal((await post('/api/verify', { t: t1, sid: sid('1') })).data.loyalty.claimed, true);
+  // منتج ثاني من جهاز ثاني لنفس الرقم
+  await post('/api/verify', { t: t2, sid: sid('2') });
+  r = await post('/api/loyalty/claim', { t: t2, sid: sid('2'), phone });
+  assert.equal(r.data.wallet.balance, 20);
+  assert.equal(r.data.wallet.can_redeem, true);
+  // جهاز ما جمع لهذا الرقم ما يشوف رصيده
+  await post('/api/verify', { t: tokenOf(S.urls[10]), sid: sid('3') });
+  assert.equal((await post('/api/loyalty/wallet', { t: tokenOf(S.urls[10]), sid: sid('3'), phone })).status, 403);
+  assert.equal((await post('/api/loyalty/wallet', { t: t1, sid: sid('1'), phone })).data.wallet.balance, 20);
+  // الاستبدال يخصم ويطلع كود
+  r = await post('/api/loyalty/redeem', { t: t1, sid: sid('1'), phone });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.match(r.data.code, /^[A-Z2-9]{8}$/);
+  assert.equal(r.data.wallet.balance, 0);
+  assert.equal((await post('/api/loyalty/redeem', { t: t1, sid: sid('1'), phone })).status, 400);
+  const code = r.data.code;
+  // التاجر يتحقق من الكود ويأكده مرة وحدة
+  assert.equal((await post('/api/m/loyalty/use', { code: 'ZZZZZZZZ' }, S.merchant)).status, 404);
+  assert.equal((await post('/api/m/loyalty/use', { code: code.toLowerCase(), check_only: true }, S.merchant)).data.redemption.status, 'issued');
+  assert.equal((await post('/api/m/loyalty/use', { code }, S.merchant)).status, 200);
+  assert.equal((await post('/api/m/loyalty/use', { code }, S.merchant)).status, 409);
+  const l = await call('/api/m/loyalty', { cookie: S.merchant });
+  assert.equal(l.data.stats.members, 1);
+  assert.equal(l.data.stats.used, 1);
+  assert.equal(l.data.members[0].earned_total, 20);
+  // الكاش باك يتخزن بالهللة
+  r = await patch('/api/m/loyalty', { loyalty_mode: 'cashback', loyalty_per_tag: 2.5, loyalty_min_redeem: 25 }, S.merchant);
+  assert.equal(r.data.settings.loyalty_per_tag, 250);
+  assert.equal(r.data.settings.loyalty_min_redeem, 2500);
+  assert.equal((await patch('/api/m/loyalty', { loyalty_mode: 'cashback', loyalty_per_tag: 0 }, S.merchant)).status, 400);
+});
+
+test('التقييم وتاريخ الانتهاء', async () => {
+  const t = tokenOf(S.urls[8]);
+  assert.equal((await post('/api/rate', { t, sid: sid('1'), stars: 6 })).status, 400);
+  assert.equal((await post('/api/rate', { t, sid: sid('9'), stars: 5 })).status, 403);
+  assert.equal((await post('/api/rate', { t, sid: sid('1'), stars: 4, comment: 'ممتاز' })).status, 200);
+  assert.equal((await post('/api/rate', { t, sid: sid('1'), stars: 5 })).status, 409);
+  const r = await call('/api/m/ratings', { cookie: S.merchant });
+  assert.equal(r.data.count, 1);
+  assert.equal(r.data.avg, 4);
+  assert.equal(r.data.comments[0].comment, 'ممتاز');
+  assert.equal((await patch('/api/m/batches/GK2610', { expires_on: '2026-13' }, S.merchant)).status, 400);
+  assert.equal((await patch('/api/m/batches/GK2610', { expires_on: '2020-01', details: 'الوزن 250 جرام' }, S.merchant)).status, 200);
+  let v = await post('/api/verify', { t, sid: sid('1') });
+  assert.equal(v.data.tag.expired, true);
+  assert.equal(v.data.tag.details, 'الوزن 250 جرام');
+  assert.equal(v.data.rating.done, true);
+  await patch('/api/m/batches/GK2610', { expires_on: '2099-12' }, S.merchant);
+  v = await post('/api/verify', { t, sid: sid('1') });
+  assert.equal(v.data.tag.expired, false);
+});

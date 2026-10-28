@@ -19,6 +19,7 @@
       <button type="button" data-tab="home">الرئيسية</button>
       <button type="button" data-tab="assistant">المساعد الذكي ✨</button>
       <button type="button" data-tab="tags">العلامات</button>
+      <button type="button" data-tab="loyalty">النقاط والكاش باك 🪙</button>
       <button type="button" data-tab="contest">المسابقة</button>
       <button type="button" data-tab="reports">التقليد والبلاغات</button>
       <button type="button" data-tab="monthly">التقارير</button>
@@ -49,6 +50,16 @@
       <div class="page-head"><div><h1>العلامات</h1><p>دفعاتك، والبحث عن أي علامة، وإيقافها أو تفعيلها</p></div></div>
       <div style="display:flex;flex-direction:column;gap:24px;margin-top:24px">
         <div class="card"><h2>دفعاتك</h2><div class="table-wrap" id="batches"></div></div>
+        <form class="card" id="batch-details-form" style="max-width:720px">
+          <h2>تاريخ الانتهاء وتفاصيل المنتج</h2>
+          <p class="small muted" style="margin:0">تظهر للعميل بعد التحقق. لو انتهى التاريخ، تطلع له رسالة تنبيه.</p>
+          <div class="form-grid">
+            <label class="field">الدفعة<select name="code" id="bd-code" required></select></label>
+            <label class="field">ينتهي في (شهر وسنة)<input name="expires_on" type="month" class="ltr"></label>
+          </div>
+          <label class="field">تفاصيل المنتج (اختياري)<textarea name="details" maxlength="500" rows="3" placeholder="مثال: الوزن 250 جرام، طريقة التحضير…"></textarea></label>
+          <div><button class="btn btn-primary" type="submit">حفظ</button></div>
+        </form>
         <div class="row">
           <form class="card" id="lookup-form">
             <h2>البحث عن علامة</h2>
@@ -70,6 +81,43 @@
             </div>
           </form>
         </div>
+      </div>
+    </section>
+
+    <section id="loyalty" hidden>
+      <div class="page-head"><div><h1>النقاط والكاش باك 🪙</h1><p>كل منتج أصلي يمسحه العميل يضيف له رصيد برقم جواله، ويستبدله عندك بكود.</p></div></div>
+      <div class="kpis" id="l-kpis" style="margin-top:24px"></div>
+      <div class="row" style="margin-top:24px">
+        <form class="card wide" id="loyalty-form">
+          <div class="card-head"><h2>إعدادات البرنامج</h2><label class="check" style="margin:0"><input type="checkbox" name="loyalty_enabled"> البرنامج شغّال</label></div>
+          <div class="mode-pick">
+            <label><input type="radio" name="loyalty_mode" value="points"><span><b>نقاط</b><small>العميل يجمع نقاط ويستبدلها بهدية أو خصم</small></span></label>
+            <label><input type="radio" name="loyalty_mode" value="cashback"><span><b>كاش باك</b><small>العميل يجمع ريالات ويستبدلها كخصم</small></span></label>
+          </div>
+          <div class="form-grid">
+            <label class="field"><span id="lf-per">النقاط لكل منتج</span><input name="loyalty_per_tag" type="number" min="0.01" step="any" required class="ltr"></label>
+            <label class="field"><span id="lf-min">النقاط المطلوبة للاستبدال</span><input name="loyalty_min_redeem" type="number" min="0.01" step="any" required class="ltr"></label>
+          </div>
+          <label class="field">وش يحصل العميل عند الاستبدال؟<input name="loyalty_reward" maxlength="150" placeholder="مثال: علبة مجانية، أو خصم 20 ريال"></label>
+          <p id="lf-preview" class="tip info" style="margin:0"></p>
+          <label class="check"><input type="checkbox" name="ratings_enabled"> اسمح للعملاء يقيّمون المنتج بعد التحقق</label>
+          <div><button class="btn btn-primary" type="submit">حفظ</button></div>
+        </form>
+        <form class="card" id="use-form">
+          <h2>تأكيد كود استبدال</h2>
+          <p class="small muted" style="margin:0">العميل يوريك الكود في جواله. اكتبه هنا قبل ما تعطيه المكافأة.</p>
+          <label class="field">الكود<input name="code" required maxlength="12" placeholder="ABCD2345" class="ltr" style="font-size:20px;letter-spacing:3px;text-transform:uppercase"></label>
+          <div class="actions"><button class="btn" type="submit" name="act" value="check">تحقق</button><button class="btn btn-gold" type="submit" name="act" value="use">تأكيد الاستخدام</button></div>
+          <div id="use-result"></div>
+        </form>
+      </div>
+      <div class="row" style="margin-top:24px">
+        <div class="card wide"><h2>أكثر العملاء ولاءً</h2><div class="table-wrap" id="l-members"></div></div>
+        <div class="card"><h2>آخر الاستبدالات</h2><div class="table-wrap" id="l-redemptions"></div></div>
+      </div>
+      <div class="row" style="margin-top:24px">
+        <div class="card"><div class="card-head"><h2>تقييم منتجاتك ⭐</h2><span id="r-summary" class="small muted"></span></div><div id="r-dist"></div></div>
+        <div class="card wide"><h2>تعليقات العملاء</h2><div id="r-comments"></div></div>
       </div>
     </section>
 

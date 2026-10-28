@@ -81,7 +81,25 @@ async function loadTags() {
     <td class="mono"><b>${b.code}</b></td><td>${b.product_name || '-'}</td><td>${num(b.size)}</td><td>${num(b.sold)}</td><td>${num(b.blocked)}</td><td>${pill(BATCH_STATUS, b.status)}</td></tr>`)}</tbody></table>
     <p class="small muted" style="margin:12px 0 0">صورة المنتج تظهر للعميل بعد ما يتأكد إن المنتج أصلي. لو الدفعة ما لها صورة، يظهر شعارك.</p>`);
   if (batches[0] && !$('status-form').batch_code.value) $('status-form').batch_code.value = batches[0].code;
+  batchList = batches;
+  const sel = $('bd-code'), cur = sel.value;
+  render(sel, html`${batches.map((b) => html`<option value="${b.code}">${b.code}${b.product_name ? ' · ' + b.product_name : ''}</option>`)}`);
+  if (cur && batches.some((b) => b.code === cur)) sel.value = cur;
+  fillBatchDetails();
 }
+let batchList = [];
+function fillBatchDetails() {
+  const f = $('batch-details-form');
+  const b = batchList.find((x) => x.code === f.code.value);
+  f.expires_on.value = b?.expires_on || '';
+  f.details.value = b?.details || '';
+}
+$('bd-code').addEventListener('change', fillBatchDetails);
+onSubmit($('batch-details-form'), async (f) => {
+  await api('/api/m/batches/' + f.code, { method: 'PATCH', body: { expires_on: f.expires_on || null, details: f.details || null } });
+  toast('تم حفظ تفاصيل الدفعة');
+  loadTags();
+});
 $('batches').addEventListener('click', async (e) => {
   const up = e.target.closest('[data-image]'), del = e.target.closest('[data-image-del]');
   if (!up && !del) return;
@@ -147,6 +165,76 @@ async function loadReports() {
   render($('reports-table'), !reports.length ? html`<div class="empty">ما فيه بلاغات</div>` : html`<table style="min-width:560px"><thead><tr><th>المدينة</th><th>المحل</th><th>السبب</th><th>ملاحظة</th><th>الوقت</th></tr></thead><tbody>${reports.map((r) => html`<tr><td>${r.city}</td><td><b>${r.point_of_sale}</b></td><td>${pill(RESULT, r.reason)}</td><td>${r.note || '-'}</td><td>${when(r.created_at)}</td></tr>`)}</tbody></table>`);
 }
 $('hot-days').addEventListener('change', () => loadReports().catch((e) => toast(e.message, true)));
+
+// ---------- النقاط والكاش باك ----------
+let loyalty = null;
+const isCash = () => $('loyalty-form').querySelector('[name=loyalty_mode]:checked')?.value === 'cashback';
+// الكاش باك يرجع من الخادم بالهللة
+const lfmt = (n, mode = loyalty.settings.loyalty_mode) => (mode === 'cashback' ? (n / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ريال' : num(n) + ' نقطة');
+function loyaltyLabels() {
+  const f = $('loyalty-form'), cash = isCash();
+  $('lf-per').textContent = cash ? 'الكاش باك لكل منتج (ريال)' : 'النقاط لكل منتج';
+  $('lf-min').textContent = cash ? 'المبلغ المطلوب للاستبدال (ريال)' : 'النقاط المطلوبة للاستبدال';
+  const per = Number(f.loyalty_per_tag.value), min = Number(f.loyalty_min_redeem.value);
+  const unit = cash ? 'ريال' : 'نقطة';
+  $('lf-preview').textContent = per > 0 && min > 0
+    ? `العميل يحتاج يشتري ${Math.ceil(min / per)} منتج عشان يستبدل${f.loyalty_reward.value ? ' ويحصل على: ' + f.loyalty_reward.value : ''}. كل منتج = ${per} ${unit}.`
+    : 'اكتب المكافأة لكل منتج وحد الاستبدال.';
+}
+$('loyalty-form').addEventListener('input', loyaltyLabels);
+$('loyalty-form').addEventListener('change', (e) => {
+  // عند تغيير النوع نحوّل الأرقام بين النقاط والريال عشان ما تنقلب القيم
+  if (e.target.name !== 'loyalty_mode') return;
+  const f = $('loyalty-form');
+  if (isCash()) { f.loyalty_per_tag.value = 1; f.loyalty_min_redeem.value = 10; }
+  else { f.loyalty_per_tag.value = 10; f.loyalty_min_redeem.value = 100; }
+  loyaltyLabels();
+});
+async function loadLoyalty() {
+  const [d, r] = await Promise.all([api('/api/m/loyalty'), api('/api/m/ratings')]);
+  loyalty = d;
+  const s = d.settings, st = d.stats, cash = s.loyalty_mode === 'cashback';
+  const f = $('loyalty-form');
+  f.loyalty_enabled.checked = Boolean(s.loyalty_enabled);
+  f.querySelector(`[name=loyalty_mode][value=${s.loyalty_mode}]`).checked = true;
+  f.loyalty_per_tag.value = cash ? s.loyalty_per_tag / 100 : s.loyalty_per_tag;
+  f.loyalty_min_redeem.value = cash ? s.loyalty_min_redeem / 100 : s.loyalty_min_redeem;
+  f.loyalty_reward.value = s.loyalty_reward || '';
+  f.ratings_enabled.checked = Boolean(s.ratings_enabled);
+  loyaltyLabels();
+  render($('l-kpis'), html`
+    <div class="kpi"><span class="label">الأعضاء</span><span class="value">${num(st.members)}</span><span class="note">${s.loyalty_enabled ? 'البرنامج شغّال' : 'البرنامج موقوف'}</span></div>
+    <div class="kpi"><span class="label">انضاف هالأسبوع</span><span class="value">${num(st.earns_7d)}</span><span class="note">منتج أضافه العملاء لرصيدهم</span></div>
+    <div class="kpi"><span class="label">رصيد العملاء الحالي</span><span class="value">${lfmt(st.outstanding)}</span><span class="note">من أصل ${lfmt(st.earned)} انجمعت</span></div>
+    <div class="kpi"><span class="label">أكواد الاستبدال</span><span class="value">${num(st.used)}</span><span class="note">مستخدمة · ${num(st.issued)} بانتظار الاستخدام</span></div>`);
+  render($('l-members'), !d.members.length ? html`<div class="empty">ما فيه أعضاء للحين. أول ما يمسح العميل منتجك ويضيف رقمه، بيظهر هنا.</div>` : html`<table style="min-width:520px"><thead><tr><th>العميل</th><th>المنتجات</th><th>الرصيد</th><th>جمع إجمالاً</th><th>آخر مرة</th></tr></thead><tbody>${d.members.map((m) => html`<tr><td><span class="mono">${m.phone}</span>${m.name ? html` <span class="small muted">${m.name}</span>` : ''}</td><td>${num(m.tags_count)}</td><td><b>${lfmt(m.balance)}</b></td><td>${lfmt(m.earned_total)}</td><td class="muted">${when(m.last_at)}</td></tr>`)}</tbody></table>`);
+  render($('l-redemptions'), !d.redemptions.length ? html`<div class="empty">ما فيه استبدالات للحين</div>` : html`<table><tbody>${d.redemptions.map((x) => html`<tr><td class="mono"><b>${x.code}</b><div class="small muted">${x.phone}</div></td><td>${x.status === 'used' ? html`<span class="pill ok">مستخدم</span>` : x.status === 'issued' ? html`<span class="pill">بانتظار</span>` : html`<span class="pill err">ملغي</span>`}<div class="small muted">${when(x.created_at)}</div></td></tr>`)}</tbody></table>`);
+  const max = Math.max(1, ...r.distribution.map((x) => x.n));
+  $('r-summary').textContent = r.count ? `${r.avg} من 5 · ${num(r.count)} تقييم` : '';
+  render($('r-dist'), !r.count ? html`<div class="empty">ما فيه تقييمات للحين</div>` : html`<div style="display:flex;flex-direction:column;gap:8px">${r.distribution.map((x) => html`<div class="stars-row"><span style="width:44px">${x.stars} ★</span><span class="bar"><i style="width:${Math.round((x.n / max) * 100)}%"></i></span><span class="muted" style="width:40px">${num(x.n)}</span></div>`)}</div>
+    ${r.batches.length ? html`<table style="margin-top:12px"><tbody>${r.batches.map((b) => html`<tr><td>${b.product_name || b.code}</td><td><b>${b.avg}</b> ★</td><td class="muted">${num(b.n)}</td></tr>`)}</tbody></table>` : ''}`);
+  render($('r-comments'), !r.comments.length ? html`<div class="empty">ما فيه تعليقات للحين</div>` : html`${r.comments.map((c) => html`<div class="comment"><div><span class="gold-stars">${'★'.repeat(c.stars)}</span> <span class="small muted">${c.product_name || ''} · ${when(c.created_at)}</span></div><div>${c.comment}</div></div>`)}`);
+}
+onSubmit($('loyalty-form'), async (f) => {
+  const d = await api('/api/m/loyalty', {
+    method: 'PATCH',
+    body: { loyalty_enabled: f.loyalty_enabled === 'on', loyalty_mode: f.loyalty_mode, loyalty_per_tag: Number(f.loyalty_per_tag), loyalty_min_redeem: Number(f.loyalty_min_redeem), loyalty_reward: f.loyalty_reward || null, ratings_enabled: f.ratings_enabled === 'on' },
+  });
+  toast(d.settings.loyalty_enabled ? 'تم الحفظ، والبرنامج يظهر للعملاء عند المسح' : 'تم الحفظ');
+  loadLoyalty();
+});
+onSubmit($('use-form'), async (f, form) => {
+  const use = f.act === 'use';
+  if (use && !confirm(`تأكيد استخدام الكود ${f.code.toUpperCase()}؟ ما يقدر العميل يستخدمه مرة ثانية.`)) return;
+  const box = $('use-result');
+  try {
+    const { redemption: x } = await api('/api/m/loyalty/use', { method: 'POST', body: { code: f.code, check_only: !use } });
+    render(box, html`<div class="alert ${use ? 'info' : 'warn'}"><div>${use ? '✅ تم تأكيد الاستخدام. أعط العميل مكافأته.' : 'الكود صحيح وما استُخدم.'}<br><b>${x.reward || lfmt(x.amount)}</b> · <span class="mono">${x.phone}</span></div></div>`);
+    if (use) { form.reset(); loadLoyalty(); }
+  } catch (e) {
+    render(box, html`<div class="alert err"><div>${e.message}</div></div>`);
+  }
+});
 
 // ---------- المسابقة: المشاركات والاستبعاد والسحب ----------
 async function loadContestData() {
@@ -309,7 +397,7 @@ onSubmit($('password-form'), async (f) => {
   setTimeout(() => (location.href = '/login/'), 1200);
 });
 
-const loaders = { home: loadHome, assistant: async () => { if (!merchant) merchant = (await api('/api/m/overview')).merchant; return loadAssistant(); }, tags: loadTags, contest: async () => { await loadContest(); await loadContestData(); }, reports: loadReports, monthly: async () => {}, sellers: loadSellers, account: loadAccount };
+const loaders = { home: loadHome, assistant: async () => { if (!merchant) merchant = (await api('/api/m/overview')).merchant; return loadAssistant(); }, tags: loadTags, loyalty: loadLoyalty, contest: async () => { await loadContest(); await loadContestData(); }, reports: loadReports, monthly: async () => {}, sellers: loadSellers, account: loadAccount };
 // هوية التاجر في القائمة الجانبية حتى لو فتح اللوحة على غير الرئيسية
 api('/api/m/overview').then((d) => { merchant = merchant || d.merchant; brandHeader(d.merchant); }).catch(() => {});
 tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => loaders[id]().catch((e) => toast(e.message, true)));

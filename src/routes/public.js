@@ -1,7 +1,7 @@
 // المسارات العامة: التحقق من العلامة، المشاركة في المسابقة، بلاغ التقليد.
 import { imageUrl } from '../lib/images.js';
 import { checkSignature, parseToken, publicId } from '../lib/tags.js';
-import { fail, geo, ipHash, json, now, rateLimit, readJson, saPhone, sha256, str } from '../lib/util.js';
+import { fail, geo, int, ipHash, json, now, rateLimit, readJson, saPhone, sha256, str } from '../lib/util.js';
 
 const SECOND_DEVICE_SECONDS = 600; // جهاز ثانٍ مسموح خلال 10 دقائق من أول فحص (مثل الانتقال من سناب إلى سفاري)
 const SID_RE = /^[a-f0-9]{64}$/;
@@ -48,7 +48,8 @@ async function resolve(env, db, raw) {
     .prepare(
       `SELECT b.id,b.code,b.size,b.salt,b.status,b.is_test,b.product_name,b.produced_on,b.merchant_id,b.image_key,
               m.name,m.logo_url,m.logo_key,m.brand_color,m.store_url,m.whatsapp,m.status AS merchant_status,m.max_checks,
-              m.contest_enabled,m.contest_title,m.contest_ends_at,m.contest_terms_url
+              m.contest_enabled,m.contest_title,m.contest_ends_at,m.contest_terms_url,b.expires_on,b.details,
+              m.loyalty_enabled,m.loyalty_mode,m.loyalty_per_tag,m.loyalty_min_redeem,m.loyalty_reward,m.ratings_enabled
        FROM batches b JOIN merchants m ON m.id=b.merchant_id WHERE b.id=?`
     )
     .bind(p.batchId)
@@ -56,6 +57,137 @@ async function resolve(env, db, raw) {
   if (!b) return { state: 'unknown' };
   if (!(await checkSignature(env, b, p))) return { state: 'unknown', merchantId: b.merchant_id };
   return { state: 'found', batch: b, serial: p.serial };
+}
+
+// "2026-12" = ينتهي آخر يوم في ديسمبر 2026 بتوقيت الرياض
+function expired(expiresOn) {
+  if (!/^\d{4}-\d{2}$/.test(expiresOn || '')) return false;
+  const [y, m] = expiresOn.split('-').map(Number);
+  return now() >= Date.UTC(y, m, 1) / 1000 - 10800;
+}
+
+const loyaltyInfo = (b) => ({ mode: b.loyalty_mode, per_tag: b.loyalty_per_tag, min_redeem: b.loyalty_min_redeem, reward: b.loyalty_reward });
+
+// العلامة لازم تكون أصلية ومفعّلة ومربوطة بهذا الجهاز (نفس شروط المسابقة)
+async function boundTag(env, db, body) {
+  if (typeof body.sid !== 'string' || !SID_RE.test(body.sid)) fail(400, 'أعد فتح الرابط من جديد');
+  const r = await resolve(env, db, body.t);
+  if (r.state !== 'found') fail(403, MESSAGES.unknown, 'unknown');
+  const b = r.batch;
+  if (b.status !== 'active' || b.merchant_status !== 'active') fail(403, MESSAGES.blocked, 'blocked');
+  const device = await sha256('device:' + body.sid);
+  const tag = await db
+    .prepare("SELECT id,loyalty_claimed FROM tags WHERE batch_id=? AND serial=? AND status='active' AND (first_device=? OR second_device=?)")
+    .bind(b.id, r.serial, device, device)
+    .first();
+  if (!tag) fail(403, MESSAGES.other_device, 'other_device');
+  return { b, tag, device };
+}
+
+async function wallet(db, b, member) {
+  const codes = await db
+    .prepare("SELECT code,amount,reward,status,created_at FROM redemptions WHERE member_id=? ORDER BY id DESC LIMIT 5")
+    .bind(member.id)
+    .all();
+  return {
+    ...loyaltyInfo(b),
+    phone: member.phone,
+    balance: member.balance,
+    earned_total: member.earned_total,
+    tags_count: member.tags_count,
+    can_redeem: member.balance >= b.loyalty_min_redeem,
+    codes: codes.results,
+  };
+}
+
+// العميل يضيف رصيد العلامة لرقم جواله. كل علامة تنحسب مرة وحدة.
+export async function loyaltyClaim(req, env) {
+  const db = env.DB;
+  await rateLimit(db, 'loyalty:' + (await ipHash(req)), 30, 3600);
+  const body = await readJson(req);
+  const phone = saPhone(body.phone);
+  const name = str(body.name, 'الاسم', { max: 100, optional: true });
+  const { b, tag, device } = await boundTag(env, db, body);
+  if (!b.loyalty_enabled) fail(403, 'برنامج النقاط غير مفعّل لهذا المنتج', 'loyalty_off');
+  if (b.is_test) fail(403, 'العلامات التجريبية ما تجمع نقاط', 'test_tag');
+  const t = now();
+  const claimed = await db.prepare('UPDATE tags SET loyalty_claimed=1 WHERE id=? AND loyalty_claimed=0 RETURNING id').bind(tag.id).first();
+  if (!claimed) fail(409, 'سبق إضافة رصيد هذي العلامة', 'already_claimed');
+  const member = await db
+    .prepare(
+      `INSERT INTO loyalty_members(merchant_id,phone,name,balance,earned_total,tags_count,created_at,last_at) VALUES(?,?,?,?,?,1,?,?)
+       ON CONFLICT(merchant_id,phone) DO UPDATE SET balance=balance+excluded.balance,earned_total=earned_total+excluded.earned_total,
+         tags_count=tags_count+1,last_at=excluded.last_at,name=COALESCE(excluded.name,name)
+       RETURNING *`
+    )
+    .bind(b.merchant_id, phone, name, b.loyalty_per_tag, b.loyalty_per_tag, t, t)
+    .first();
+  await db.batch([
+    db.prepare('INSERT OR IGNORE INTO loyalty_devices(member_id,device,created_at) VALUES(?,?,?)').bind(member.id, device, t),
+    db.prepare("INSERT INTO loyalty_events(merchant_id,member_id,kind,amount,tag_id,created_at) VALUES(?,?,'earn',?,?,?)").bind(b.merchant_id, member.id, b.loyalty_per_tag, tag.id, t),
+  ]);
+  return json({ ok: true, added: b.loyalty_per_tag, wallet: await wallet(db, b, member) });
+}
+
+async function memberForDevice(db, b, phone, device) {
+  const member = await db.prepare('SELECT * FROM loyalty_members WHERE merchant_id=? AND phone=?').bind(b.merchant_id, phone).first();
+  if (!member) fail(404, 'ما عندك رصيد بهذا الرقم للحين', 'no_member');
+  const known = await db.prepare('SELECT 1 FROM loyalty_devices WHERE member_id=? AND device=?').bind(member.id, device).first();
+  // حماية: رصيد الرقم يظهر ويُستبدل بس من جهاز جمع فيه نقاط لنفس الرقم
+  if (!known) fail(403, 'افتح رصيدك من نفس الجوال اللي جمعت فيه النقاط', 'unknown_device');
+  return member;
+}
+
+export async function loyaltyWallet(req, env) {
+  const db = env.DB;
+  await rateLimit(db, 'loyalty:' + (await ipHash(req)), 30, 3600);
+  const body = await readJson(req);
+  const { b, device } = await boundTag(env, db, body);
+  if (!b.loyalty_enabled) fail(403, 'برنامج النقاط غير مفعّل', 'loyalty_off');
+  return json({ ok: true, wallet: await wallet(db, b, await memberForDevice(db, b, saPhone(body.phone), device)) });
+}
+
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const redeemCode = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (x) => CODE_CHARS[x % CODE_CHARS.length]).join('');
+
+export async function loyaltyRedeem(req, env) {
+  const db = env.DB;
+  await rateLimit(db, 'loyalty:' + (await ipHash(req)), 30, 3600);
+  const body = await readJson(req);
+  const { b, device } = await boundTag(env, db, body);
+  if (!b.loyalty_enabled) fail(403, 'برنامج النقاط غير مفعّل', 'loyalty_off');
+  const member = await memberForDevice(db, b, saPhone(body.phone), device);
+  const cost = b.loyalty_min_redeem;
+  // نخصم الرصيد أول بشرط إنه يكفي، عشان طلبين مع بعض ما يستبدلون مرتين
+  const left = await db.prepare('UPDATE loyalty_members SET balance=balance-? WHERE id=? AND balance>=? RETURNING *').bind(cost, member.id, cost).first();
+  if (!left) fail(400, 'رصيدك ما يكفي للاستبدال للحين', 'insufficient');
+  const t = now();
+  let row = null;
+  for (let i = 0; i < 3 && !row; i++) {
+    row = await db
+      .prepare('INSERT INTO redemptions(merchant_id,member_id,code,amount,reward,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(merchant_id,code) DO NOTHING RETURNING id,code')
+      .bind(b.merchant_id, member.id, redeemCode(), cost, b.loyalty_reward, t)
+      .first();
+  }
+  await db.prepare("INSERT INTO loyalty_events(merchant_id,member_id,kind,amount,redemption_id,created_at) VALUES(?,?,'redeem',?,?,?)").bind(b.merchant_id, member.id, -cost, row.id, t).run();
+  return json({ ok: true, code: row.code, wallet: await wallet(db, b, left) });
+}
+
+// تقييم المنتج: مرة وحدة لكل علامة، من الجهاز المربوط
+export async function rate(req, env) {
+  const db = env.DB;
+  await rateLimit(db, 'rate:' + (await ipHash(req)), 20, 3600);
+  const body = await readJson(req);
+  const stars = int(body.stars, 'التقييم', { min: 1, max: 5 });
+  const comment = str(body.comment, 'التعليق', { max: 300, optional: true });
+  const { b, tag } = await boundTag(env, db, body);
+  if (!b.ratings_enabled) fail(403, 'التقييم غير متاح', 'ratings_off');
+  const r = await db
+    .prepare('INSERT INTO ratings(tag_id,merchant_id,batch_id,stars,comment,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(tag_id) DO NOTHING')
+    .bind(tag.id, b.merchant_id, b.id, stars, comment, now())
+    .run();
+  if (!r.meta.changes) fail(409, 'سبق تقييم هذا المنتج', 'already_rated');
+  return json({ ok: true, message: 'شكراً على تقييمك!' });
 }
 
 function contestOpen(b) {
@@ -87,7 +219,7 @@ export async function verify(req, env) {
     .prepare(
       `UPDATE tags SET check_count=check_count+1,last_checked_at=?,first_checked_at=COALESCE(first_checked_at,?)
        WHERE batch_id=? AND serial=? AND status='active'
-       RETURNING id,check_count,first_device,second_device,first_checked_at,entry_done`
+       RETURNING id,check_count,first_device,second_device,first_checked_at,entry_done,loyalty_claimed`
     )
     .bind(t, t, b.id, r.serial)
     .first();
@@ -119,6 +251,7 @@ export async function verify(req, env) {
 
   await logScan(db, req, tag.id, b.merchant_id, 'original', tag.check_count);
   const open = contestOpen(b);
+  const rated = b.ratings_enabled ? await db.prepare('SELECT stars FROM ratings WHERE tag_id=?').bind(tag.id).first() : null;
   return json({
     ok: true,
     result: 'original',
@@ -131,11 +264,16 @@ export async function verify(req, env) {
       // صورة المنتج للدفعة، وإذا ما فيه صورة تظهر الواجهة شعار التاجر
       image_url: imageUrl(b.image_key),
       produced_on: b.produced_on,
+      expires_on: b.expires_on,
+      expired: expired(b.expires_on),
+      details: b.details,
       is_test: Boolean(b.is_test),
       check_no: tag.check_count,
       checks_left: max ? max - tag.check_count : null,
     },
     contest: open ? { title: b.contest_title, ends_at: b.contest_ends_at, terms_url: b.contest_terms_url, entered: Boolean(tag.entry_done) } : null,
+    loyalty: b.loyalty_enabled ? { ...loyaltyInfo(b), claimed: Boolean(tag.loyalty_claimed) } : null,
+    rating: b.ratings_enabled ? { done: Boolean(rated), stars: rated?.stars ?? null } : null,
   });
 }
 

@@ -154,6 +154,7 @@ dialog form { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .tip.warn { background: var(--amber-tint); border-color: var(--amber-line); color: var(--amber-ink); } .tip.warn::before { content: "⚠️"; }
 .tip.err { background: var(--red-tint); border-color: var(--red-line); color: var(--red-ink); } .tip.err::before { content: "🚨"; }
 .tip.good { background: var(--green-tint); border-color: #BFDCCF; color: var(--green-ink); } .tip.good::before { content: "✅"; }
+.tip.info { background: #FFFBEF; border-color: #EBD9A6; color: #5A4300; }
 .chat-card { min-height: 420px; }
 .chat-log { flex: 1; display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; padding: 4px; }
 .msg { max-width: 85%; padding: 10px 14px; border-radius: 14px; font-size: 15px; line-height: 1.7; white-space: pre-wrap; }
@@ -171,3 +172,18 @@ dialog form { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .winner b.rank { width: 30px; height: 30px; border-radius: 50%; background: var(--gold); color: var(--gold-ink); display: inline-flex; align-items: center; justify-content: center; flex: none; }
 .risk { height: 8px; border-radius: 4px; background: var(--line-soft); overflow: hidden; min-width: 80px; }
 .risk i { display: block; height: 100%; background: linear-gradient(90deg, #F0B429, var(--red)); }
+
+/* النقاط والكاش باك */
+.mode-pick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.mode-pick label { cursor: pointer; }
+.mode-pick input { position: absolute; opacity: 0; }
+.mode-pick span { display: flex; flex-direction: column; gap: 4px; border: 2px solid var(--line); border-radius: 14px; padding: 14px; height: 100%; }
+.mode-pick small { color: var(--muted); }
+.mode-pick input:checked + span { border-color: var(--gold); background: #FFFBEF; }
+.mode-pick input:focus-visible + span { outline: 2px solid var(--green); outline-offset: 2px; }
+.stars-row { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.stars-row .bar { flex: 1; height: 8px; background: var(--ground); border-radius: 8px; overflow: hidden; }
+.stars-row .bar i { display: block; height: 100%; background: var(--gold); }
+.comment { border-top: 1px solid var(--line-soft); padding: 10px 0; display: flex; flex-direction: column; gap: 4px; }
+.gold-stars { color: var(--gold); letter-spacing: 2px; }
+@media (max-width: 560px) { .mode-pick { grid-template-columns: minmax(0, 1fr); } }
