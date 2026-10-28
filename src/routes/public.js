@@ -109,7 +109,6 @@ export async function loyaltyClaim(req, env) {
   const name = str(body.name, 'الاسم', { max: 100, optional: true });
   const { b, tag, device } = await boundTag(env, db, body);
   if (!b.loyalty_enabled) fail(403, 'برنامج النقاط غير مفعّل لهذا المنتج', 'loyalty_off');
-  if (b.is_test) fail(403, 'العلامات التجريبية ما تجمع نقاط', 'test_tag');
   const t = now();
   const claimed = await db.prepare('UPDATE tags SET loyalty_claimed=1 WHERE id=? AND loyalty_claimed=0 RETURNING id').bind(tag.id).first();
   if (!claimed) fail(409, 'سبق إضافة رصيد هذي العلامة', 'already_claimed');
