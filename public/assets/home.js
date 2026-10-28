@@ -30,28 +30,8 @@ function countUp(el, to) {
 
 // الأقسام تظهر بحركة خفيفة وقت النزول
 const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && (e.target.classList.add('in'), io.unobserve(e.target))), { threshold: 0.12 }) : null;
-if (io) document.querySelectorAll('.step, .feat, .split, .faq details, .merchants').forEach((el) => { el.classList.add('reveal'); io.observe(el); });
+if (io) document.querySelectorAll('.step, .feat, .split, .merchants').forEach((el) => { el.classList.add('reveal'); io.observe(el); });
 
-// طلب انضمام تاجر
-const join = document.getElementById('join-form');
-join.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const btn = join.querySelector('[type=submit]');
-  btn.disabled = true;
-  try {
-    const res = await fetch('/api/public/join', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(join))) });
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.message || 'صار خطأ، حاول مرة ثانية');
-    join.reset();
-    const ok = document.getElementById('join-ok');
-    ok.textContent = '✅ ' + d.message;
-    ok.hidden = false;
-  } catch (err) {
-    alert(err.message);
-  } finally {
-    btn.disabled = false;
-  }
-});
 
 try {
   brands = (await (await fetch('/api/public/brands')).json()).brands || [];

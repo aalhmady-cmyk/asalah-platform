@@ -15,7 +15,7 @@
 <body class="site">
 <header class="site-nav">
   <a class="site-logo" href="/"><svg width="34" height="34" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="11" fill="#D9B45A"/><path d="M12 21l5 5 11-12" fill="none" stroke="#0F2A21" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg><b>أصالة</b></a>
-  <nav><a href="#how">كيف تشتغل</a><a href="#features">المزايا</a><a href="#brands">العلامات المحمية</a><a href="#faq">أسئلة</a><a class="btn btn-gold btn-sm" href="/login/">دخول التجار</a></nav>
+  <nav><a href="#how">كيف تشتغل</a><a href="#features">المزايا</a><a href="#brands">العلامات المحمية</a><a href="#" data-guide="">اسأل المساعد</a><a class="btn btn-gold btn-sm" href="/login/">دخول التجار</a></nav>
 </header>
 
 <section class="scene site-hero">
@@ -25,7 +25,7 @@
       <div class="scene-badge"><span class="dot"></span> تحقق فوري عبر NFC</div>
       <h1>المنتج الأصلي <span>يثبت نفسه</span> بلمسة جوال</h1>
       <p>نلصق على منتجك علامة ذكية ما تتكرر. العميل يقرّب جواله منها، ويعرف خلال ثانية إن المنتج أصلي، وأنت تعرف وين ينباع منتجك ووين يتقلّد.</p>
-      <div class="hero-cta"><a class="btn btn-gold big" href="#brands">العلامات المحمية</a><a class="btn ghost big" href="#merchants">أنا صاحب علامة تجارية</a></div>
+      <div class="hero-cta"><a class="btn btn-gold big" href="#brands">العلامات المحمية</a><a class="btn ghost big" href="#" data-guide="أبي أحمي منتجي">أنا صاحب علامة تجارية</a></div>
     </div>
         <svg class="scene-art" viewBox="0 0 360 360">
       <defs>
@@ -138,38 +138,28 @@
     <div class="brands" id="brand-list"><div class="empty">جاري التحميل…</div></div>
   </section>
 
-  <section class="sec" id="faq">
-    <h2>أسئلة شائعة</h2>
-    <div class="faq">
-      <details><summary>هل العميل يحتاج تطبيق؟</summary><p>لا. أغلب الجوالات تقرأ علامات NFC مباشرة، يقرّب الجوال من العلامة وتفتح صفحة التحقق في المتصفح.</p></details>
-      <details><summary>وش يصير لو أحد نسخ الرابط؟</summary><p>العلامة ترتبط بأول جوال يمسحها، ولها حد أعلى لعدد الفحوصات. الرابط المنسوخ يطلع تحذير، وينحسب في بؤر التقليد.</p></details>
-      <details><summary>كيف أعرف إن المنتج مقلّد؟</summary><p>لو طلعت لك رسالة إن العلامة غير مسجلة أو موقوفة أو انفحصت من جهاز آخر، لا تستخدم المنتج، وبلّغ من نفس الصفحة.</p></details>
-      <details><summary>كيف أستبدل نقاطي؟</summary><p>لما يكمل رصيدك يطلع لك زر "استبدل"، وتاخذ كود توريه للكاشير عند التاجر.</p></details>
-      <details><summary>أنا تاجر، كم ياخذ التفعيل؟</summary><p>نجهّز حسابك ولوحتك في نفس اليوم، ونصدر لك العلامات بعدد منتجاتك وتلصقها في المصنع أو المستودع.</p></details>
-    </div>
-  </section>
 
   <section class="sec merchants" id="merchants">
     <div>
-      <h2>تبي تحمي منتجك؟</h2>
-      <p>اترك بياناتك ونتواصل معك: نصدر لك علامات NFC بعدد منتجاتك، ونعطيك لوحة تحكم كاملة فيها المخزون والتقليد والنقاط والمسابقات والمساعد الذكي.</p>
-      <a class="btn ghost" href="/login/" style="align-self:flex-start">عندي حساب: دخول التجار</a>
-    </div>
-    <form id="join-form" class="join">
-      <div class="join-grid">
-        <label class="field">اسمك<input name="name" required minlength="2" autocomplete="name"></label>
-        <label class="field">اسم علامتك التجارية<input name="brand" required minlength="2"></label>
-        <label class="field">رقم الجوال<input name="phone" type="tel" inputmode="numeric" placeholder="05xxxxxxxx" required class="ltr" autocomplete="tel"></label>
-        <label class="field">نوع المنتج (اختياري)<input name="product" placeholder="عطور، شاي، مكملات…"></label>
+      <span class="kicker">مساعد أصالة ✨</span>
+      <h2>تبي تحمي منتجك؟ أو عندك سؤال؟</h2>
+      <p>كلّم مساعد أصالة: يجاوبك عن أي شي في المنصة، ولو عندك علامة تجارية يسجّل طلبك في دقيقة ويتواصل معك الفريق.</p>
+      <div class="hero-cta">
+        <a class="btn btn-gold big" href="#" data-guide="أبي أحمي منتجي">سجّل علامتك التجارية</a>
+        <a class="btn ghost big" href="#" data-guide="">اسأل المساعد</a>
       </div>
-      <label class="field">كم منتج تبيع شهرياً؟ (اختياري)<select name="qty"><option value="">اختر</option><option>أقل من 1000</option><option>1000 إلى 10 آلاف</option><option>10 آلاف إلى 50 ألف</option><option>أكثر من 50 ألف</option></select></label>
-      <button class="btn btn-gold big" type="submit">أرسل طلب الانضمام</button>
-      <p id="join-ok" class="join-ok" hidden></p>
-    </form>
+      <a class="small" href="/login/" style="color:var(--forest-ink)">عندي حساب: دخول التجار ←</a>
+    </div>
+    <div class="ask-mock" aria-hidden="true">
+      <div class="g-msg bot">هلا 👋 وش أقدر أساعدك فيه؟</div>
+      <div class="g-msg me">عندي محل عطور وأبي أحمي منتجاتي من التقليد</div>
+      <div class="g-msg bot">حياك! نصدر لك علامات بعدد منتجاتك ولوحة تحكم كاملة. وش اسم علامتك التجارية؟</div>
+    </div>
   </section>
 </main>
 
 <footer class="site-foot">© أصالة المنتجات الأصلية · <a href="/login/">دخول التجار والإدارة</a></footer>
 <script type="module" src="/assets/home.js"></script>
+<script type="module" src="/assets/guide.js"></script>
 </body>
 </html>

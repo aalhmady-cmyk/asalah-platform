@@ -405,3 +405,8 @@ test('أرقام المنصة وطلب الانضمام', async () => {
   const ov = await call('/api/admin/overview', { cookie: S.admin });
   assert.ok(ov.data.alerts.some((a) => a.kind === 'join_request' && a.message.includes('عطور الورد')));
 });
+
+test('مساعد أصالة للزوار بدون مفتاح', async () => {
+  assert.equal((await call('/api/public/assistant')).data.chat, false);
+  assert.equal((await post('/api/public/assistant', { messages: [{ role: 'user', content: 'هلا' }] })).status, 503);
+});

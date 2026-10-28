@@ -1,4 +1,6 @@
 // المسارات العامة: التحقق من العلامة، المشاركة في المسابقة، بلاغ التقليد.
+import { assistantEnabled } from '../lib/assistant.js';
+import { guide } from '../lib/guide.js';
 import { imageUrl } from '../lib/images.js';
 import { checkSignature, parseToken, publicId } from '../lib/tags.js';
 import { fail, geo, int, ipHash, json, now, rateLimit, readJson, saPhone, sha256, str } from '../lib/util.js';
@@ -376,11 +378,9 @@ export async function stats(env) {
   return json({ ok: true, original: s.original ?? 0, caught: s.caught ?? 0, cities: s.cities ?? 0, brands: merchants.results[0].n }, 200, { 'Cache-Control': 'public, max-age=600' });
 }
 
-// طلب انضمام تاجر جديد: يوصل للمدير العام كتنبيه في اللوحة الأم
-export async function joinRequest(req, env) {
-  const db = env.DB;
-  await rateLimit(db, 'join:' + (await ipHash(req)), 3, 3600);
-  const b = await readJson(req);
+// طلب انضمام تاجر جديد: يوصل للمدير العام كتنبيه في اللوحة الأم.
+// يستخدمه النموذج والمساعد الذكي.
+export async function saveJoin(db, b) {
   const f = {
     name: str(b.name, 'اسمك', { min: 2, max: 100 }),
     brand: str(b.brand, 'اسم العلامة التجارية', { min: 2, max: 100 }),
@@ -390,5 +390,30 @@ export async function joinRequest(req, env) {
   };
   const msg = `طلب انضمام: ${f.brand} · ${f.name} · ${f.phone}${f.product ? ' · ' + f.product : ''}${f.qty ? ' · ' + f.qty + ' منتج شهرياً' : ''}`;
   await db.prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(NULL,'join_request',?,?)").bind(msg, now()).run();
+  return f;
+}
+
+export async function joinRequest(req, env) {
+  const db = env.DB;
+  await rateLimit(db, 'join:' + (await ipHash(req)), 3, 3600);
+  await saveJoin(db, await readJson(req));
   return json({ ok: true, message: 'وصلنا طلبك، بنتواصل معك قريب' });
+}
+
+// ---------- مساعد أصالة للزوار ----------
+export async function guideInfo(env) {
+  return json({ ok: true, chat: assistantEnabled(env) });
+}
+
+export async function guideChat(req, env) {
+  const db = env.DB;
+  const ih = await ipHash(req);
+  await rateLimit(db, 'guide:' + ih, 30, 3600);
+  const b = await readJson(req, 30000);
+  // طلبات الانضمام من المساعد لها نفس حد النموذج
+  const r = await guide(env, b.messages, async (input) => {
+    await rateLimit(db, 'join:' + ih, 3, 3600);
+    await saveJoin(db, input);
+  });
+  return json({ ok: true, ...r });
 }
