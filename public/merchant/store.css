@@ -70,3 +70,7 @@
 .st-reel-media { cursor: pointer; }
 .st-tap { position: absolute; inset: 0; margin: auto; width: 46px; height: 46px; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; pointer-events: none; }
 .st-reel-media.playing .st-tap { display: none; }
+.st-cm-list { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; }
+.st-cm { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+.st-cm p { margin: 4px 0 0; }
+.st-cm-dlg { width: min(560px, calc(100vw - 24px)); }

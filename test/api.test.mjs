@@ -465,6 +465,27 @@ test('متجر التاجر: الاشتراك والمنتجات والريلز 
   assert.equal(vid.headers.get('Content-Range'), 'bytes 0-99/4096');
   assert.equal((await vid.arrayBuffer()).byteLength, 100);
 
+  // التعليقات والتقييم
+  const rc = `/api/public/store/reels/${reel.id}/comments`;
+  assert.equal((await post(rc, { name: 'نورة' })).status, 400);
+  assert.equal((await post(rc, { name: 'نورة', body: 'شوفوا https://x.com' })).status, 400);
+  assert.equal((await post(rc, { name: 'نورة', body: 'شاي رهيب', rating: 5 })).status, 201);
+  assert.equal((await post(rc, { name: 'نورة', rating: 4 })).status, 409);
+  assert.equal((await post(rc, { name: 'خالد', body: 'كم سعره؟' })).status, 201);
+  let cm = await call(rc);
+  assert.equal(cm.data.count, 2);
+  assert.deepEqual(cm.data.rating, { avg: 5, n: 1 });
+  const feed = (await call('/api/public/store/reels')).data.reels.find((x) => x.id === reel.id);
+  assert.equal(feed.comments, 2);
+  assert.equal(feed.rating.avg, 5);
+  const mine = await call(`/api/m/store/reels/${reel.id}/comments`, { cookie: S.merchant });
+  assert.equal(mine.data.comments.length, 2);
+  const rated = mine.data.comments.find((c) => c.rating);
+  assert.equal((await call(`/api/m/store/reels/${reel.id}/comments/${rated.id}`, { method: 'DELETE', cookie: S.merchant })).status, 200);
+  cm = await call(rc);
+  assert.equal(cm.data.count, 1);
+  assert.equal(cm.data.rating, null);
+
   // ريل أصلي (فيديو الآيفون MOV) مع أرقام القص، والملف اللي مو فيديو ينرفض
   const c = await post('/api/m/store/reels', { title: 'ريل من الآيفون', duration: 15, clip: { start: 4.5, zoom: 1.4, x: 0.2, y: 9 } }, S.merchant);
   assert.equal(c.status, 201);
@@ -541,4 +562,40 @@ test('تطويرات المتاجر: اطلبه مرة ثانية والكوبو
   assert.equal((await post('/api/m/notify/test', {}, S.merchant)).status, 503);
   // تشغيل الفحص الدوري ما يتعطل بسبب الإشعارات والمزامنة
   assert.equal((await fetch(BASE + '/cdn-cgi/local/scheduled?cron=0+*+*+*+*')).status, 200);
+});
+
+test('التصفح: الترتيب والميزانية والحالات وسلة العائلة', async () => {
+  const st = await call('/api/m/store', { cookie: S.merchant });
+  const pid = st.data.products[0].id;
+  const price = st.data.products[0].price;
+  assert.equal((await call('/api/public/store/products?limit=200&sort=cheap')).status, 200);
+  assert.equal((await call(`/api/public/store/products?max=${price}`)).data.products.length >= 1, true);
+  assert.equal((await call(`/api/public/store/products?max=${price - 1}`)).data.products.length, 0);
+  const stories = (await call('/api/public/store/stories')).data.stories;
+  assert.equal(stories[0].slug, 'green-kif');
+  assert.equal(stories[0].items[0].id, pid);
+
+  // سلة العائلة: إنشاء، إضافة من شخصين، شراء، حذف
+  const c = await post('/api/public/store/family', { title: 'مقاضي البيت' });
+  assert.equal(c.status, 201);
+  const code = c.data.code;
+  assert.match(code, /^[a-f0-9]{12}$/);
+  assert.equal((await call('/api/public/store/family/ffffffffffff')).status, 404);
+  let r = await post(`/api/public/store/family/${code}/items`, { product_id: pid, who: 'أبو محمد' });
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  r = await post(`/api/public/store/family/${code}/items`, { product_id: pid, who: 'أبو محمد', qty: 2 });
+  assert.equal(r.data.list.items.length, 1);
+  assert.equal(r.data.list.items[0].qty, 3);
+  r = await post(`/api/public/store/family/${code}/items`, { product_id: pid, who: 'سارة' });
+  assert.equal(r.data.list.items.length, 2);
+  assert.equal((await post(`/api/public/store/family/${code}/items`, { product_id: pid })).status, 400);
+  assert.equal((await post(`/api/public/store/family/${code}/items`, { product_id: 99999, who: 'سارة' })).status, 404);
+  const it = r.data.list.items.find((x) => x.who === 'سارة');
+  r = await patch(`/api/public/store/family/${code}/items/${it.id}`, { bought: true });
+  assert.equal(r.data.list.items.find((x) => x.id === it.id).bought, true);
+  assert.equal(r.data.list.items[0].bought, false);
+  assert.equal((await call(`/api/public/store/family/${code}/items/${it.id}`, { method: 'DELETE' })).data.list.items.length, 1);
+  const g = await call('/api/public/store/family/' + code);
+  assert.equal(g.data.list.title, 'مقاضي البيت');
+  assert.equal(g.data.list.items[0].product.buy_url.startsWith('https://'), true);
 });

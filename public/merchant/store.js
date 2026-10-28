@@ -319,9 +319,10 @@ function renderReels() {
       <div class="st-reel-media">${r.video_url ? html`<video data-rid="${r.id}" src="${r.video_url}${r.clip ? '#t=' + r.clip.start : ''}" poster="${r.poster_url || ''}" preload="${r.poster_url ? 'none' : 'metadata'}" playsinline></video><span class="st-tap" aria-hidden="true">▶</span>` : r.poster_url ? html`<img src="${r.poster_url}" alt="" loading="lazy">` : ''}<span class="st-dur">${r.duration} ث</span></div>
       ${r.status === 'active' ? html`<a class="small" href="/stores/?v=reels&r=${r.id}" target="_blank" rel="noopener">✅ منشور في المتاجر ↗</a>` : r.status === 'uploading' ? html`<span class="small" style="color:var(--danger,#b42318)">⚠️ الفيديو ما وصل كامل. احذفه وارفعه مرة ثانية</span>` : html`<span class="small muted">مخفي عن المتاجر</span>`}
       <b>${r.title}</b>
-      <div class="small muted">👁 ${num(r.views)} · 🛒 ${num(r.clicks)}</div>
+      <div class="small muted">👁 ${num(r.views)} · 🛒 ${num(r.clicks)} · ❤️ ${num(r.likes || 0)} · 💬 ${num(r.comments || 0)}${r.rating ? ` · ⭐ ${r.rating.avg}` : ''}</div>
       <div class="actions">
         ${r.status === 'uploading' ? '' : html`<button class="btn btn-sm" type="button" data-st="reel-toggle" data-id="${r.id}">${r.status === 'hidden' ? 'إظهار' : 'إخفاء'}</button>`}
+        ${r.comments || r.rating ? html`<button class="btn btn-sm" type="button" data-st="reel-comments" data-id="${r.id}">التعليقات</button>` : ''}
         <button class="btn btn-sm btn-danger" type="button" data-st="reel-del" data-id="${r.id}">حذف</button>
       </div>
     </article>`
@@ -443,6 +444,25 @@ async function newReel() {
   });
 }
 
+// تعليقات الريل: التاجر يقراها ويحذف المسيء
+async function reelComments(id) {
+  const dlg = Object.assign(document.createElement('dialog'), { className: 'st-reel-dlg st-cm-dlg' });
+  document.body.append(dlg);
+  const draw = async () => {
+    const { comments } = await api(`/api/m/store/reels/${id}/comments`);
+    render(dlg, html`<div class="card-head"><h2>تعليقات الريل 💬</h2><button class="btn btn-sm" type="button" data-x>إغلاق</button></div>
+      ${comments.length ? html`<div class="st-cm-list">${comments.map((c) => html`<div class="st-cm"><div><b>${c.name}</b> ${c.rating ? '⭐'.repeat(c.rating) : ''}<div class="small muted">${new Date(c.created_at * 1000).toLocaleString('ar-SA-u-nu-latn')}</div>${c.body ? html`<p>${c.body}</p>` : ''}</div>
+        <button class="btn btn-sm btn-danger" type="button" data-del="${c.id}">حذف</button></div>`)}</div>` : html`<div class="empty">ما فيه تعليقات</div>`}`);
+  };
+  dlg.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-x]')) { dlg.close(); dlg.remove(); return loadStore(); }
+    const d = e.target.closest('[data-del]');
+    if (d && confirm('تحذف التعليق؟')) { await api(`/api/m/store/reels/${id}/comments/${d.dataset.del}`, { method: 'DELETE' }); await draw(); }
+  });
+  await draw();
+  dlg.showModal();
+}
+
 function upload(path, blob, onProgress) {
   return new Promise((resolve, reject) => {
     const x = new XMLHttpRequest();
@@ -509,6 +529,7 @@ document.addEventListener('click', async (e) => {
       toast('انحذف المنتج');
       await loadStore();
     } else if (act === 'reel-new') await newReel();
+    else if (act === 'reel-comments') await reelComments(id);
     else if (act === 'reel-toggle') {
       const r = S.reels.find((x) => x.id === id);
       await api('/api/m/store/reels/' + id, { method: 'PATCH', body: { status: r.status === 'hidden' ? 'active' : 'hidden' } });

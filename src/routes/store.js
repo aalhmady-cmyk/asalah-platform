@@ -3,7 +3,7 @@ import { assistantEnabled } from '../lib/assistant.js';
 import { deleteImage, imageUrl, ownsImage, saveImage, saveImageBytes } from '../lib/images.js';
 import { draftProduct, storeChat } from '../lib/shop.js';
 import { CATEGORIES, ORIGINAL_MAX_BYTES, REEL_MAX, REEL_MIN, VIDEO_MAX_BYTES, discoverProducts, importLink, productFields, proxyImage, videoType } from '../lib/store.js';
-import { audit, fail, int, ipHash, json, now, randomHex, rateLimit, readJson, str, url } from '../lib/util.js';
+import { audit, fail, int, ipHash, json, now, randomHex, rateLimit, readJson, sha256, str, url } from '../lib/util.js';
 
 const MAX_PRODUCTS = 500;
 const MAX_REELS = 200;
@@ -19,7 +19,9 @@ function reelOut(r) {
   const { video_key, poster_key, clip_mode, clip_start, clip_zoom, clip_x, clip_y, ...rest } = r;
   // clip: الفيديو أصلي، والعرض يبدأ من start لمدة duration ويقص بـ zoom و x و y
   const clip = clip_mode ? { start: clip_start, zoom: clip_zoom, x: clip_x, y: clip_y } : null;
-  return { ...rest, clip, video_url: mediaUrl(video_key), poster_url: imageUrl(poster_key) };
+  const { rating_sum, rating_n, ...out } = rest;
+  const rating = rating_n ? { avg: Math.round((rating_sum / rating_n) * 10) / 10, n: rating_n } : null;
+  return { ...out, clip, rating, video_url: mediaUrl(video_key), poster_url: imageUrl(poster_key) };
 }
 
 const clamp = (v, lo, hi, d) => (Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Number(v))) : d);
@@ -233,12 +235,31 @@ export async function handleMerchantStore(req, env, path, user) {
     await audit(db, user, 'reel_published', { id: reel.id, title: reel.title, bytes: stored });
     return json({ ok: true, reel: reelOut(row) });
   }
+  // التاجر يشوف تعليقات ريلزه ويحذف المسيء منها
+  if ((match = path.match(/^\/api\/m\/store\/reels\/(\d+)\/comments(?:\/(\d+))?$/))) {
+    const reel = await db.prepare('SELECT id FROM reels WHERE id=? AND merchant_id=?').bind(Number(match[1]), mid).first();
+    if (!reel) fail(404, 'ما لقينا الريل');
+    if (!match[2] && m === 'GET') return json({ ok: true, comments: await reelComments(db, reel.id) });
+    if (match[2] && m === 'DELETE') {
+      const c = await db.prepare('SELECT * FROM reel_comments WHERE id=? AND reel_id=?').bind(Number(match[2]), reel.id).first();
+      if (!c) fail(404, 'ما لقينا التعليق');
+      await db.batch([
+        db.prepare('DELETE FROM reel_comments WHERE id=?').bind(c.id),
+        db
+          .prepare('UPDATE reels SET comments=MAX(0,comments-?),rating_sum=rating_sum-?,rating_n=MAX(0,rating_n-?) WHERE id=?')
+          .bind(c.body ? 1 : 0, c.rating || 0, c.rating ? 1 : 0, reel.id),
+      ]);
+      await audit(db, user, 'reel_comment_deleted', { reel: reel.id, name: c.name });
+      return json({ ok: true });
+    }
+    fail(405, 'غير مسموح');
+  }
   if ((match = path.match(/^\/api\/m\/store\/reels\/(\d+)$/)) && (m === 'PATCH' || m === 'DELETE')) {
     const reel = await db.prepare('SELECT * FROM reels WHERE id=? AND merchant_id=?').bind(Number(match[1]), mid).first();
     if (!reel) fail(404, 'ما لقينا الريل');
     if (m === 'DELETE') {
       await deleteReelFiles(env, reel);
-      await db.prepare('DELETE FROM reels WHERE id=?').bind(reel.id).run();
+      await db.batch([db.prepare('DELETE FROM reel_comments WHERE reel_id=?').bind(reel.id), db.prepare('DELETE FROM reels WHERE id=?').bind(reel.id)]);
       await audit(db, user, 'reel_deleted', { id: reel.id, title: reel.title });
       return json({ ok: true });
     }
@@ -271,12 +292,19 @@ function publicProduct(p) {
   return { ...rest, merchant_logo: imageUrl(merchant_logo), coupon: store_coupon ? { code: store_coupon, note: store_coupon_note } : null };
 }
 
-async function listProducts(db, { cat, merchant, q, ids, limit = 60, offset = 0 }) {
+const PRODUCT_SORT = {
+  cheap: 'p.price IS NULL, p.price ASC, p.id DESC',
+  popular: 'p.views + p.clicks * 4 DESC, p.id DESC',
+  discount: '(p.old_price > p.price) DESC, (p.old_price - p.price) * 1.0 / p.old_price DESC, p.id DESC',
+};
+
+async function listProducts(db, { cat, merchant, q, ids, sort, max, limit = 60, offset = 0 }) {
   const where = [LIVE, "p.status='active'"];
   const args = [];
   if (ids?.length) { where.push(`p.id IN (${ids.map(() => '?').join(',')})`); args.push(...ids); }
   if (cat && CATEGORIES[cat]) { where.push('p.category=?'); args.push(cat); }
   if (merchant) { where.push('m.slug=?'); args.push(merchant); }
+  if (max > 0) { where.push('p.price IS NOT NULL AND p.price<=?'); args.push(Math.round(max * 100)); }
   if (q) {
     for (const w of q.split(/\s+/).filter((x) => x.length > 1).slice(0, 4)) {
       where.push('(p.title LIKE ? OR p.description LIKE ? OR m.name LIKE ?)');
@@ -285,10 +313,15 @@ async function listProducts(db, { cat, merchant, q, ids, limit = 60, offset = 0 
     }
   }
   const r = await db
-    .prepare(`SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE ${where.join(' AND ')} ORDER BY p.id DESC LIMIT ? OFFSET ?`)
+    .prepare(`SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE ${where.join(' AND ')} ORDER BY ${PRODUCT_SORT[sort] || 'p.id DESC'} LIMIT ? OFFSET ?`)
     .bind(...args, limit, offset)
     .all();
   return r.results.map(publicProduct);
+}
+
+async function reelComments(db, reelId) {
+  const r = await db.prepare('SELECT id,name,body,rating,created_at FROM reel_comments WHERE reel_id=? ORDER BY id DESC LIMIT 100').bind(reelId).all();
+  return r.results;
 }
 
 async function listReels(db, { merchant, product, sort, limit = 20, offset = 0 }) {
@@ -298,7 +331,7 @@ async function listReels(db, { merchant, product, sort, limit = 20, offset = 0 }
   if (product) { where.push('r.product_id=?'); args.push(product); }
   const r = await db
     .prepare(
-      `SELECT r.id,r.title,r.video_key,r.poster_key,r.duration,r.clip_mode,r.clip_start,r.clip_zoom,r.clip_x,r.clip_y,r.product_id,r.created_at,r.likes,r.views,m.name AS merchant_name,m.slug AS merchant_slug,m.logo_key AS merchant_logo,
+      `SELECT r.id,r.title,r.video_key,r.poster_key,r.duration,r.comments,r.rating_sum,r.rating_n,r.clip_mode,r.clip_start,r.clip_zoom,r.clip_x,r.clip_y,r.product_id,r.created_at,r.likes,r.views,m.name AS merchant_name,m.slug AS merchant_slug,m.logo_key AS merchant_logo,
               p.title AS product_title,p.price AS product_price,p.buy_url AS product_buy_url,p.image_key AS product_image
        FROM reels r JOIN merchants m ON m.id=r.merchant_id LEFT JOIN store_products p ON p.id=r.product_id AND p.status='active'
        WHERE ${where.join(' AND ')} ORDER BY ${sort === 'popular' ? 'r.views + r.likes * 5 DESC, r.id DESC' : 'r.id DESC'} LIMIT ? OFFSET ?`
@@ -345,8 +378,32 @@ export async function handlePublicStore(req, env, path) {
   if (path === '/api/public/store/products' && m === 'GET') {
     const q = (sp.get('q') || '').trim().slice(0, 80);
     const ids = (sp.get('ids') || '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 60);
-    return json({ ok: true, products: await listProducts(db, { cat: sp.get('cat'), merchant: slug, q, ids, offset, limit: ids.length ? 60 : 40 }) });
+    // limit حتى 200 لصفحة التصفح واكتشف (الترتيب حسب الذوق يصير في الجهاز)
+    const limit = ids.length ? 60 : Math.max(1, Math.min(200, Number(sp.get('limit')) || 40));
+    const max = Math.min(1_000_000, Number(sp.get('max')) || 0);
+    return json({ ok: true, products: await listProducts(db, { cat: sp.get('cat'), merchant: slug, q, ids, sort: sp.get('sort'), max, offset, limit }) });
   }
+  // حالات التاجر: آخر منتجات نزلت عند كل متجر (آخر 14 يوم، أو آخر 4 لو ما نزّل جديد)
+  if (path === '/api/public/store/stories' && m === 'GET') {
+    const r = await db
+      .prepare(
+        `SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id
+         WHERE ${LIVE} AND p.status='active' AND p.id IN (
+           SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY merchant_id ORDER BY id DESC) AS rn, created_at FROM store_products WHERE status='active')
+           WHERE rn<=6 AND (rn<=4 OR created_at>?))
+         ORDER BY p.created_at DESC`
+      )
+      .bind(now() - 14 * 86400)
+      .all();
+    const by = new Map();
+    for (const row of r.results) {
+      const x = publicProduct(row);
+      if (!by.has(x.merchant_slug)) by.set(x.merchant_slug, { slug: x.merchant_slug, name: x.merchant_name, logo_url: x.merchant_logo, latest: x.created_at, items: [] });
+      by.get(x.merchant_slug).items.push(x);
+    }
+    return json({ ok: true, stories: [...by.values()].slice(0, 30) });
+  }
+  if (path.startsWith('/api/public/store/family')) return handleFamily(req, db, path, m);
   let match;
   if ((match = path.match(/^\/api\/public\/store\/products\/(\d+)$/)) && m === 'GET') {
     const p = await db.prepare(`SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE p.id=? AND ${LIVE} AND p.status='active'`).bind(Number(match[1])).first();
@@ -367,6 +424,35 @@ export async function handlePublicStore(req, env, path) {
       return json({ ok: true, reels: ids.map((id) => all.find((r) => r.id === id)).filter(Boolean) });
     }
     return json({ ok: true, reels: await listReels(db, { merchant: slug, sort: sp.get('sort'), offset, limit: 20 }) });
+  }
+  if ((match = path.match(/^\/api\/public\/store\/reels\/(\d+)\/comments$/))) {
+    const reel = await db.prepare(`SELECT r.id,r.rating_sum,r.rating_n,r.comments FROM reels r JOIN merchants m ON m.id=r.merchant_id WHERE r.id=? AND r.status='active' AND ${LIVE}`).bind(Number(match[1])).first();
+    if (!reel) fail(404, 'الريل غير متاح');
+    if (m === 'GET') {
+      const rating = reel.rating_n ? { avg: Math.round((reel.rating_sum / reel.rating_n) * 10) / 10, n: reel.rating_n } : null;
+      return json({ ok: true, comments: await reelComments(db, reel.id), rating, count: reel.comments });
+    }
+    if (m === 'POST') {
+      const ip = await ipHash(req);
+      await rateLimit(db, 'rc:' + ip, 8, 600);
+      const b = await readJson(req);
+      const name = str(b.name, 'اسمك', { min: 1, max: 30 });
+      const body = str(b.body, 'التعليق', { min: 1, max: 300, optional: true });
+      const rating = b.rating == null || b.rating === '' ? null : int(b.rating, 'التقييم', { min: 1, max: 5 });
+      if (!body && !rating) fail(400, 'اكتب تعليق أو اختر تقييم');
+      if (body && /https?:\/\/|www\.|\.com\b/i.test(body)) fail(400, 'الروابط ممنوعة في التعليقات');
+      // تقييم واحد لكل جهاز على نفس الريل
+      // رقم الجهاز (من المتصفح) أدق من الـ IP، لأن شبكات الجوال تشارك نفس الـ IP بين ناس كثير
+      const who = typeof b.device === 'string' && /^[a-z0-9]{16,40}$/.test(b.device) ? await sha256('dev:' + b.device) : ip;
+      if (rating && (await db.prepare('SELECT 1 FROM reel_comments WHERE reel_id=? AND ip_hash=? AND rating IS NOT NULL').bind(reel.id, who).first())) fail(409, 'قيّمت هذا الريل من قبل');
+      const t = now();
+      const [ins] = await db.batch([
+        db.prepare('INSERT INTO reel_comments(reel_id,name,body,rating,ip_hash,created_at) VALUES(?,?,?,?,?,?) RETURNING id').bind(reel.id, name, body, rating, who, t),
+        db.prepare('UPDATE reels SET comments=comments+?,rating_sum=rating_sum+?,rating_n=rating_n+? WHERE id=?').bind(body ? 1 : 0, rating || 0, rating ? 1 : 0, reel.id),
+      ]);
+      return json({ ok: true, comment: { id: ins.results[0].id, name, body, rating, created_at: t } }, 201);
+    }
+    fail(405, 'غير مسموح');
   }
   // عدّاد المشاهدات والضغطات (تقريبي، بحد طلبات لكل جهاز)
   if (path === '/api/public/store/track' && m === 'POST') {
@@ -423,4 +509,82 @@ export async function shopForVerify(db, b) {
   const others = more.filter((p) => p.id !== product?.id).slice(0, 4);
   if (!product && !others.length && !reels.length) return null;
   return { slug: b.slug, product, more: others, reels, coupon: b.store_coupon ? { code: b.store_coupon, note: b.store_coupon_note } : null };
+}
+
+// ================= سلة العائلة =================
+// قائمة مشتركة برابط سري: كل واحد من العائلة يضيف اللي يبيه باسمه، واللي يشتري يعلّم عليه.
+// الشراء نفسه من متجر التاجر (سلة)، فما فيه دفع هنا.
+const FAMILY_MAX_ITEMS = 100;
+
+async function familyOut(db, list) {
+  const r = await db
+    .prepare(
+      `SELECT f.id AS item_id,f.who,f.qty,f.bought,f.created_at AS added_at,${PRODUCT_COLS}
+       FROM family_items f JOIN store_products p ON p.id=f.product_id JOIN merchants m ON m.id=p.merchant_id
+       WHERE f.list_id=? AND ${LIVE} AND p.status='active' ORDER BY f.bought, f.id DESC`
+    )
+    .bind(list.id)
+    .all();
+  return {
+    code: list.code,
+    title: list.title,
+    updated_at: list.updated_at,
+    items: r.results.map(({ item_id, who, qty, bought, added_at, ...p }) => ({ id: item_id, who, qty, bought: !!bought, added_at, product: publicProduct(p) })),
+  };
+}
+
+async function handleFamily(req, db, path, m) {
+  if (path === '/api/public/store/family' && m === 'POST') {
+    await rateLimit(db, 'famnew:' + (await ipHash(req)), 10, 3600);
+    const b = await readJson(req);
+    const title = str(b.title, 'اسم السلة', { max: 60, optional: true }) || 'سلة العائلة';
+    const code = randomHex(6);
+    const t = now();
+    await db.prepare('INSERT INTO family_lists(code,title,created_at,updated_at) VALUES(?,?,?,?)').bind(code, title, t, t).run();
+    return json({ ok: true, code }, 201);
+  }
+  const match = path.match(/^\/api\/public\/store\/family\/([a-f0-9]{12})(?:\/items(?:\/(\d+))?)?$/);
+  if (!match) fail(404, 'المسار غير موجود');
+  const list = await db.prepare('SELECT * FROM family_lists WHERE code=?').bind(match[1]).first();
+  if (!list) fail(404, 'ما لقينا السلة، تأكد من الرابط');
+  const items = path.includes('/items');
+  const touch = () => db.prepare('UPDATE family_lists SET updated_at=? WHERE id=?').bind(now(), list.id).run();
+  if (!items && m === 'GET') return json({ ok: true, list: await familyOut(db, list) });
+  if (!items && m === 'PATCH') {
+    const b = await readJson(req);
+    const title = str(b.title, 'اسم السلة', { min: 1, max: 60 });
+    await db.prepare('UPDATE family_lists SET title=?,updated_at=? WHERE id=?').bind(title, now(), list.id).run();
+    return json({ ok: true, list: await familyOut(db, { ...list, title }) });
+  }
+  await rateLimit(db, 'famw:' + (await ipHash(req)), 120, 3600);
+  if (items && !match[2] && m === 'POST') {
+    const b = await readJson(req);
+    const product_id = int(b.product_id, 'المنتج', { min: 1 });
+    const who = str(b.who, 'اسمك', { min: 1, max: 30 });
+    const qty = int(b.qty ?? 1, 'الكمية', { min: 1, max: 20 });
+    const p = await db.prepare(`SELECT p.id FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE p.id=? AND ${LIVE} AND p.status='active'`).bind(product_id).first();
+    if (!p) fail(404, 'المنتج غير متاح');
+    const same = await db.prepare('SELECT id FROM family_items WHERE list_id=? AND product_id=? AND who=? AND bought=0').bind(list.id, product_id, who).first();
+    if (same) await db.prepare('UPDATE family_items SET qty=MIN(20,qty+?) WHERE id=?').bind(qty, same.id).run();
+    else {
+      const n = await db.prepare('SELECT COUNT(*) AS n FROM family_items WHERE list_id=?').bind(list.id).first();
+      if (n.n >= FAMILY_MAX_ITEMS) fail(400, 'السلة امتلت، احذف أغراض اشتريتوها');
+      await db.prepare('INSERT INTO family_items(list_id,product_id,who,qty,created_at) VALUES(?,?,?,?,?)').bind(list.id, product_id, who, qty, now()).run();
+    }
+    await touch();
+    return json({ ok: true, list: await familyOut(db, list) }, 201);
+  }
+  if (items && match[2] && (m === 'PATCH' || m === 'DELETE')) {
+    const it = await db.prepare('SELECT id FROM family_items WHERE id=? AND list_id=?').bind(Number(match[2]), list.id).first();
+    if (!it) fail(404, 'ما لقينا الغرض');
+    if (m === 'DELETE') await db.prepare('DELETE FROM family_items WHERE id=?').bind(it.id).run();
+    else {
+      const b = await readJson(req);
+      if ('bought' in b) await db.prepare('UPDATE family_items SET bought=? WHERE id=?').bind(b.bought ? 1 : 0, it.id).run();
+      if ('qty' in b) await db.prepare('UPDATE family_items SET qty=? WHERE id=?').bind(int(b.qty, 'الكمية', { min: 1, max: 20 }), it.id).run();
+    }
+    await touch();
+    return json({ ok: true, list: await familyOut(db, list) });
+  }
+  fail(404, 'المسار غير موجود');
 }
