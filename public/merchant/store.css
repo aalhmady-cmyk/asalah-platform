@@ -74,3 +74,71 @@
 .st-cm { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
 .st-cm p { margin: 4px 0 0; }
 .st-cm-dlg { width: min(560px, calc(100vw - 24px)); }
+
+/* سحب المنتجات: قائمة التحديد */
+.st-pick { display: flex; flex-direction: column; gap: 10px; }
+.st-pick-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.st-pick-bar b { margin-inline-end: auto; }
+.st-pick-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); max-height: 460px; overflow-y: auto; }
+.st-pick-row { display: grid; grid-template-columns: auto 52px 1fr auto; gap: 12px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line-soft); cursor: pointer; }
+.st-pick-row:first-child { border-top: 0; }
+.st-pick-row.fail, .st-pick-row.wait, .st-pick-row.load { opacity: .6; cursor: default; }
+.st-pick-row input { width: 20px; height: 20px; accent-color: var(--green); }
+.st-pick-img { width: 52px; height: 52px; border-radius: 10px; background: var(--ground); overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.st-pick-img img { width: 100%; height: 100%; object-fit: cover; }
+.st-pick-row.load .st-pick-img { animation: st-pulse 1s infinite alternate; }
+@keyframes st-pulse { to { background: var(--line); } }
+.st-pick-t { display: flex; flex-direction: column; min-width: 0; }
+.st-pick-t b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-pick-t small { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-pick-p { font-weight: 700; white-space: nowrap; }
+.st-pick-go { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+/* جدول المنتجات */
+.st-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.st-tools input, .st-tools select { font: inherit; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--field-line); background: var(--field); color: var(--ink); }
+.st-tools input { flex: 1; min-width: 180px; }
+.st-bulk { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.st-bulk:not(:empty) { padding: 8px 12px; margin-bottom: 10px; border-radius: 12px; background: var(--green-tint); }
+.st-table { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.st-tr { display: grid; grid-template-columns: 36px minmax(220px, 2.4fr) 110px 120px 140px 70px 150px; gap: 10px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line-soft); background: var(--surface); }
+.st-th { border-top: 0; background: var(--ground); font-size: 13px; font-weight: 700; color: var(--muted); }
+.st-tr.off { background: #FAFAF8; } .st-tr.off .st-td-p b { color: var(--muted); }
+.st-tr input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--green); }
+.st-td-p { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.st-td-p > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.st-td-p b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-td-img { width: 52px; height: 52px; flex: none; border-radius: 10px; background: var(--ground); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+.st-td-img img { width: 100%; height: 100%; object-fit: cover; }
+.st-td-price { display: flex; flex-direction: column; }
+.st-td-price s { color: var(--muted); font-size: 12px; }
+.st-q { display: flex; flex-direction: column; gap: 4px; }
+.st-q i { display: block; height: 6px; border-radius: 6px; background: linear-gradient(90deg, var(--green) var(--q), var(--line) var(--q)); }
+[dir=rtl] .st-q i { background: linear-gradient(-90deg, var(--green) var(--q), var(--line) var(--q)); }
+.st-q small { font-size: 12px; color: var(--muted); }
+.st-td-acts { display: flex; gap: 6px; justify-content: flex-end; }
+.st-switch { position: relative; display: inline-block; width: 44px; height: 26px; cursor: pointer; }
+.st-switch input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.st-switch i { position: absolute; inset: 0; border-radius: 999px; background: var(--line); transition: background .2s; pointer-events: none; }
+.st-switch i::after { content: ""; position: absolute; top: 3px; inset-inline-start: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .2s; }
+.st-switch input:checked + i { background: var(--green); }
+.st-switch input:checked + i::after { transform: translateX(18px); }
+[dir=rtl] .st-switch input:checked + i::after { transform: translateX(-18px); }
+.st-switch input:focus-visible + i { outline: 2px solid var(--gold); outline-offset: 2px; }
+@media (max-width: 900px) {
+  .st-th { display: none; }
+  .st-tr { grid-template-columns: 28px 1fr auto; grid-template-areas: "c p s" "c pr pr" "c q q" "c a a"; row-gap: 6px; }
+  .st-tr > :nth-child(1) { grid-area: c; align-self: start; padding-top: 16px; }
+  .st-tr > :nth-child(2) { grid-area: p; }
+  .st-tr > :nth-child(3) { grid-area: pr; flex-direction: row; gap: 8px; align-items: baseline; }
+  .st-tr > :nth-child(4) { display: none; }
+  .st-tr > :nth-child(5) { grid-area: q; }
+  .st-tr > :nth-child(6) { grid-area: s; }
+  .st-tr > :nth-child(7) { grid-area: a; justify-content: flex-start; }
+}
+.st-ai-mini { margin-inline-start: 8px; padding: 2px 10px; min-height: 0; font-size: 12px; }
+.st-ideas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+.st-idea { border: 1px dashed var(--gold); background: var(--amber-tint); color: var(--amber-ink); border-radius: 999px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 13px; }
+.st-coach { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 12px; border-radius: var(--radius); background: var(--amber-tint); border: 1px solid var(--amber-line); color: var(--amber-ink); font-size: 14px; }
+.st-coach > span { font-size: 22px; }
+.st-coach > div { flex: 1; }

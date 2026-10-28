@@ -90,6 +90,8 @@ function applyLang() {
     const b = $(`.mk-tabs [data-go="${k}"]`);
     if (b) b.innerHTML = `<span aria-hidden="true">${ic}</span>${t(k === 'browse' ? 'browseTab' : k)}`;
   }
+  $('.mk-to-asalah b').textContent = t('asalah');
+  $('.mk-to-asalah').setAttribute('aria-label', lang === 'en' ? 'Asalah main site' : 'موقع أصالة الرئيسي');
   $('.mk-home-link').innerHTML = `<span aria-hidden="true">🛡️</span>${t('asalah')}`;
   $('#lang').textContent = t('langBtn');
   $('#ai-fab').setAttribute('aria-label', t('chat'));

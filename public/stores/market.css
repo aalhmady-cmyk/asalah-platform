@@ -410,3 +410,7 @@ body[data-view="reels"] .mk-view { max-width: none; padding: 0; }
 body[data-view="chat"] .mk-fab, body[data-view="reels"] .mk-fab { display: none; }
 @media (max-width: 760px) { .mk-fab { padding: 0; justify-content: center; } .mk-fab small { display: none; } .mk-sheet:not([hidden]) ~ .mk-fab { bottom: calc(96px + env(safe-area-inset-bottom)); } }
 .mk-toast { z-index: 80; }
+.mk-to-asalah { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(217,180,90,.55); color: var(--gold-2); text-decoration: none; font-weight: 700; font-size: 14px; white-space: nowrap; }
+.mk-to-asalah:hover { background: rgba(217,180,90,.12); }
+@media (min-width: 761px) { .mk-to-asalah { order: 4; } .mk-tabs .mk-home-link { display: none; } }
+@media (max-width: 760px) { .mk-to-asalah { padding: 6px 12px; } }

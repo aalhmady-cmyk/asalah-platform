@@ -1,7 +1,7 @@
 // متاجر أصالة: لوحة "متجري" للتاجر، والواجهة العامة للمنتجات والريلز.
 import { assistantEnabled } from '../lib/assistant.js';
 import { deleteImage, imageUrl, ownsImage, saveImage, saveImageBytes } from '../lib/images.js';
-import { draftProduct, storeChat } from '../lib/shop.js';
+import { draftProduct, reelTitles, storeChat } from '../lib/shop.js';
 import { CATEGORIES, ORIGINAL_MAX_BYTES, REEL_MAX, REEL_MIN, VIDEO_MAX_BYTES, discoverProducts, importLink, productFields, proxyImage, videoType } from '../lib/store.js';
 import { audit, fail, int, ipHash, json, now, randomHex, rateLimit, readJson, sha256, str, url } from '../lib/util.js';
 
@@ -106,13 +106,14 @@ export async function handleMerchantStore(req, env, path, user) {
     const links = await discoverProducts(b.url || merchant.store_url);
     const have = new Set((await db.prepare('SELECT buy_url FROM store_products WHERE merchant_id=?').bind(mid).all()).results.map((r) => r.buy_url.replace(/\/$/, '')));
     const fresh = links.filter((l) => !have.has(l.replace(/\/$/, '')));
-    return json({ ok: true, found: links.length, links: fresh.slice(0, 100) });
+    return json({ ok: true, found: links.length, links: fresh.slice(0, 300) });
   }
 
   // ---------- الذكاء الاصطناعي والروابط ----------
   if (path === '/api/m/store/ai' && m === 'POST') {
     await rateLimit(db, 'storeai:' + mid, 120, 3600);
     const b = await readJson(req, 2_000_000);
+    if (b.mode === 'reel') return json({ ok: true, titles: await reelTitles(env, b.product) });
     return json({ ok: true, draft: await draftProduct(env, b) });
   }
   if (path === '/api/m/store/import' && m === 'POST') {

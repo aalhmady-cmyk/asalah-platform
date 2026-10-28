@@ -62,9 +62,9 @@ export async function loadStore() {
     </div>
     <div class="row" style="margin-top:24px">
       <form class="card" id="st-sync">
-        <div class="card-head"><h2>🔄 اسحب كل منتجات متجرك</h2></div>
-        <p class="small muted" style="margin:0">نقرأ منتجاتك من متجرك في سلة ونضيفها هنا مرة وحدة، مع الصور والأسعار. وتقدر تخلي الأسعار تتحدث لحالها.</p>
-        <div class="st-inline"><input name="store_url" type="url" required class="ltr" value="${S.store_url || ''}" placeholder="https://your-store.salla.sa" aria-label="رابط متجرك"><button class="btn btn-primary" type="submit">ابحث عن منتجاتي</button></div>
+        <div class="card-head"><h2>🔄 اسحب منتجاتك من سلة</h2></div>
+        <p class="small muted" style="margin:0">الصق رابط متجرك كامل أو رابط منتج واحد. نقرأ المنتجات بصورها وأسعارها، وأنت تعلّم على اللي تبي تنشره.</p>
+        <div class="st-inline"><input name="store_url" type="url" required class="ltr" value="${S.store_url || ''}" placeholder="https://your-store.salla.sa" aria-label="رابط متجرك أو رابط منتج"><button class="btn btn-primary" type="submit">اقرأ المنتجات</button></div>
         <label class="check"><input type="checkbox" name="auto" data-st="auto" ${S.auto_sync ? 'checked' : ''}> حدّث الأسعار تلقائياً من سلة (كل 12 ساعة)</label>
         <div id="st-sync-body"></div>
       </form>
@@ -156,7 +156,7 @@ function wayBody(way) {
   if (way === 'link')
     render(el, html`<form class="st-inline" id="st-link"><input name="url" type="url" required class="ltr" placeholder="https://your-store.salla.sa/p/..." aria-label="رابط المنتج"><button class="btn btn-primary" type="submit">اسحب البيانات</button></form>`);
   if (way === 'text')
-    render(el, html`<form id="st-text" class="st-text"><textarea name="text" rows="3" required maxlength="1500" placeholder="مثال: عطر عود كمبودي 50 مل، ثباته عالي، مناسب للمناسبات" aria-label="وصف المنتج"></textarea><div><button class="btn btn-primary" type="submit">${S.ai ? '✨ جهّز البطاقة' : 'التالي'}</button></div></form>`);
+    render(el, html`<form id="st-text" class="st-text"><textarea name="text" rows="3" required maxlength="1500" placeholder="اكتب عن المنتج مثل ما تكلم عميل. مثال: عطر عود كمبودي 50 مل، ثباته عالي، سعره 289 بدل 349، ورابطه في سلة https://..." aria-label="وصف المنتج"></textarea><p class="small muted" style="margin:0">✨ لو كتبت السعر أو الرابط، الذكاء يحطهم في البطاقة لحاله.</p><div><button class="btn btn-primary" type="submit">${S.ai ? '✨ جهّز البطاقة' : 'التالي'}</button></div></form>`);
   el.querySelector('input,textarea')?.focus();
 }
 
@@ -208,15 +208,21 @@ async function fromLink(link) {
     thinking('الذكاء يرتّب الوصف ويحدد الفئة…');
     ai = await aiDraft({ link: { title: p.title, description: p.description } });
   }
-  draft = { title: ai.title || p.title, description: ai.description || p.description, category: ai.category || 'other', price: p.price, buy_url: p.buy_url, ...img };
+  draft = { title: ai.title || p.title, description: withHighlights(ai.description || p.description, ai.highlights), category: ai.category || 'other', price: p.price, old_price: p.old_price, buy_url: p.buy_url, ...img };
   renderCompose();
   if (!img.image_key) toast('ما قدرنا نجيب الصورة، أضفها بنفسك');
+}
+
+// مميزات قصيرة يقترحها الذكاء، تنضاف تحت الوصف
+function withHighlights(desc, hl) {
+  if (!hl?.length || !desc) return desc;
+  return desc.trim() + '\n' + hl.map((x) => '✓ ' + x).join('\n');
 }
 
 async function fromText(text) {
   thinking('الذكاء يكتب البطاقة…');
   const ai = await aiDraft({ text });
-  draft = { title: ai.title || text.slice(0, 60), description: ai.description || text, category: ai.category || 'other', buy_url: S.store_url || '' };
+  draft = { title: ai.title || text.slice(0, 60), description: withHighlights(ai.description || text, ai.highlights), category: ai.category || 'other', price: ai.price ?? undefined, old_price: ai.old_price ?? undefined, buy_url: ai.buy_url || S.store_url || '' };
   renderCompose();
 }
 
@@ -239,34 +245,83 @@ async function saveDraft(form) {
   await loadStore();
 }
 
-// ---------- سحب كل المنتجات ----------
-let found = [];
-async function discover(storeUrl) {
+// ---------- سحب المنتجات من سلة: نقرأها، التاجر يعلّم، وبعدين ننشر ----------
+const PRODUCT_LINK = /\/p\d{4,}(?:[/?#]|$)|\/products?\/[^/]+|\/product-[^/]+/i;
+let pick = null; // { rows: [{ url, state: 'wait'|'load'|'ok'|'fail', p, on }], shown }
+async function discover(input) {
   const el = $('st-sync-body');
-  render(el, html`<div class="st-thinking"><span class="st-dots" aria-hidden="true"><i></i><i></i><i></i></span>نقرأ متجرك…</div>`);
+  let u;
+  try { u = new URL(input.trim()); } catch { return toast('الرابط غير صحيح', true); }
+  render(el, html`<div class="st-thinking"><span class="st-dots" aria-hidden="true"><i></i><i></i><i></i></span>نقرأ ${PRODUCT_LINK.test(u.pathname) ? 'المنتج' : 'متجرك'}…</div>`);
   try {
-    if (storeUrl !== S.store_url) await api('/api/m/store', { method: 'PATCH', body: { store_url: storeUrl } });
-    S.store_url = storeUrl;
-    const d = await api('/api/m/store/discover', { method: 'POST', body: { url: storeUrl } });
-    found = d.links;
-    if (!found.length) return render(el, html`<p class="tip good" style="margin:0">لقينا ${num(d.found)} منتج، وكلها مضافة عندك من قبل 👌</p>`);
-    render(el, html`<p class="tip info" style="margin:0">لقينا ${num(d.found)} منتج، منها ${num(found.length)} جديدة.</p>
-      <div class="actions"><button class="btn btn-gold" type="button" data-st="import-all">أضف الـ ${num(found.length)} منتج</button></div>`);
+    let links;
+    if (PRODUCT_LINK.test(u.pathname)) links = [u.toString()];
+    else {
+      if (u.origin !== (S.store_url && new URL(S.store_url).origin)) await api('/api/m/store', { method: 'PATCH', body: { store_url: u.origin } });
+      S.store_url = S.store_url || u.origin;
+      const d = await api('/api/m/store/discover', { method: 'POST', body: { url: u.toString() } });
+      links = d.links;
+      if (!links.length) return render(el, html`<p class="tip good" style="margin:0">لقينا ${num(d.found)} منتج، وكلها مضافة عندك من قبل 👌</p>`);
+    }
+    pick = { rows: links.map((url) => ({ url, state: 'wait', p: null, on: true })), shown: 24 };
+    drawPick();
+    loadPick();
   } catch (e) {
     render(el, html`<p class="tip warn" style="margin:0">${e.message}</p>`);
   }
 }
-
-async function importAll() {
+// نقرأ تفاصيل المنتجات الظاهرة، 4 مع بعض
+async function loadPick() {
+  const queue = pick.rows.slice(0, pick.shown).filter((r) => r.state === 'wait');
+  const cur = pick;
+  const worker = async () => {
+    for (let r = queue.shift(); r; r = queue.shift()) {
+      if (cur !== pick) return;
+      r.state = 'load';
+      try {
+        r.p = (await api('/api/m/store/import', { method: 'POST', body: { url: r.url } })).product;
+        r.state = 'ok';
+        if (!r.p.price) r.on = false;
+      } catch {
+        r.state = 'fail';
+        r.on = false;
+      }
+      drawPick();
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+}
+function drawPick() {
   const el = $('st-sync-body');
-  busy = true;
+  if (!el || !pick) return;
+  const vis = pick.rows.slice(0, pick.shown);
+  const sel = pick.rows.filter((r) => r.on && r.state === 'ok').length;
+  const loading = vis.filter((r) => r.state === 'wait' || r.state === 'load').length;
+  render(el, html`<div class="st-pick">
+    <div class="st-pick-bar"><b>${num(pick.rows.length)} منتج</b>${loading ? html`<span class="small muted">نقرأ… باقي ${num(loading)}</span>` : ''}
+      <button class="btn btn-sm" type="button" data-st="pick-all">تحديد الكل</button><button class="btn btn-sm" type="button" data-st="pick-none">إلغاء التحديد</button></div>
+    <div class="st-pick-list">${vis.map((r, i) => html`<label class="st-pick-row ${r.state}">
+      <input type="checkbox" data-pick="${i}" ${raw(r.on ? 'checked' : '')} ${raw(r.state === 'ok' ? '' : 'disabled')}>
+      <span class="st-pick-img">${r.p?.image ? html`<img src="${r.p.image}" alt="" loading="lazy" referrerpolicy="no-referrer">` : raw(r.state === 'fail' ? '⚠️' : '')}</span>
+      <span class="st-pick-t"><b>${r.p?.title || (r.state === 'fail' ? 'ما قدرنا نقرأ هذا المنتج' : 'نقرأ…')}</b><small class="ltr">${decodeURI(r.url).replace(/^https?:\/\//, '').slice(0, 60)}</small></span>
+      <span class="st-pick-p">${r.p?.price ? sar(r.p.price) : r.state === 'ok' ? html`<span class="small muted">بدون سعر</span>` : ''}</span>
+    </label>`)}</div>
+    ${pick.shown < pick.rows.length ? html`<button class="btn btn-sm" type="button" data-st="pick-more">اعرض ${num(Math.min(24, pick.rows.length - pick.shown))} منتج زيادة</button>` : ''}
+    <div class="st-pick-go">
+      ${S.ai ? html`<label class="check"><input type="checkbox" id="pick-ai" checked> ✨ الذكاء يرتّب الاسم والوصف ويحدد الفئة</label>` : ''}
+      <button class="btn btn-gold" type="button" data-st="pick-publish" ${raw(sel ? '' : 'disabled')}>انشر المحدد (${num(sel)})</button>
+    </div>
+  </div>`);
+}
+async function publishPick() {
+  const rows = pick.rows.filter((r) => r.on && r.state === 'ok');
+  const useAi = S.ai && $('pick-ai')?.checked !== false;
+  const el = $('st-sync-body');
   let done = 0, failed = 0;
-  const step = () => render(el, html`<div class="st-progress"><div class="bar"><i style="width:${Math.round(((done + failed) / found.length) * 100)}%"></i></div><span>نضيف المنتجات… ${done + failed} من ${found.length}${failed ? ` (تعذر ${failed})` : ''}</span></div>`);
+  const step = () => render(el, html`<div class="st-progress"><div class="bar"><i style="width:${Math.round(((done + failed) / rows.length) * 100)}%"></i></div><span><b class="st-pct">${Math.round(((done + failed) / rows.length) * 100)}٪</b> ننشر المنتجات… ${done + failed} من ${rows.length}${failed ? ` (تعذر ${failed})` : ''}</span></div>`);
   step();
-  for (const link of found) {
+  for (const { p } of rows) {
     try {
-      const p = (await api('/api/m/store/import', { method: 'POST', body: { url: link } })).product;
-      if (!p.price) throw new Error('بدون سعر');
       let img = {};
       if (p.image) {
         try {
@@ -274,40 +329,95 @@ async function importAll() {
           if (r.ok) img = await uploadImage(await shrink(await r.blob()));
         } catch {}
       }
-      const ai = S.ai ? await aiDraft({ link: { title: p.title, description: p.description } }) : {};
-      await api('/api/m/store/products', { method: 'POST', body: { title: ai.title || p.title, description: ai.description || p.description, category: ai.category || 'other', price: p.price, buy_url: p.buy_url, image_key: img.image_key ?? null, status: 'active', imported: true } });
+      const ai = useAi ? await aiDraft({ link: { title: p.title, description: p.description } }) : {};
+      await api('/api/m/store/products', { method: 'POST', body: { title: ai.title || p.title, description: ai.description || p.description, category: ai.category || 'other', price: p.price, old_price: p.old_price || null, buy_url: p.buy_url, image_key: img.image_key ?? null, status: 'active', imported: true } });
       done++;
     } catch {
       failed++;
     }
     step();
   }
-  busy = false;
+  pick = null;
   toast(`انضاف ${done} منتج لمتجرك 🎉`);
-  found = [];
   await loadStore();
 }
 
 // ---------- القوائم ----------
+// جدول المنتجات مثل لوحة سلة: بحث وفلترة وتحديد جماعي
+const PF = { q: '', status: 'all', cat: 'all', sel: new Set() };
+// جودة البطاقة: نصايح سريعة تخلي المنتج يبيع أكثر
+function quality(p) {
+  const tips = [];
+  if (!p.image_url) tips.push('أضف صورة');
+  if (!p.description || p.description.length < 60) tips.push('الوصف قصير');
+  if (p.title.length < 8) tips.push('الاسم قصير');
+  if (p.category === 'other') tips.push('حدد الفئة');
+  if (!S.reels.some((r) => r.product_id === p.id)) tips.push('سوّ له ريل');
+  return { score: Math.round(((5 - tips.length) / 5) * 100), tips };
+}
 function renderProducts() {
   const el = $('st-products');
-  if (!S.products.length) return render(el, html`<div class="empty">ما أضفت منتجات للحين. ابدأ بصورة أو رابط من فوق.</div>`);
-  render(el, html`<div class="st-grid">${S.products.map(
-    (p) => html`<article class="st-card ${p.status === 'hidden' ? 'off' : ''}">
-      <div class="st-thumb">${p.image_url ? html`<img src="${p.image_url}" alt="" loading="lazy">` : raw('<span aria-hidden="true">🛍️</span>')}${p.status === 'hidden' ? raw('<span class="pill">مخفي</span>') : ''}</div>
-      <div class="st-body">
-        <b>${p.title}</b>
-        <div class="st-price">${sar(p.price)}${p.old_price ? html` <s>${sar(p.old_price)}</s>` : ''}</div>
-        <div class="small muted">${S.categories[p.category]} · 👁 ${num(p.views)} · 🛒 ${num(p.clicks)}</div>
-        ${p.sync_error ? html`<div class="small" style="color:var(--red-ink)" title="${p.sync_error}">⚠️ ما قدرنا نحدّث السعر من سلة</div>` : ''}
-        <div class="actions">
-          <button class="btn btn-sm" type="button" data-st="edit" data-id="${p.id}">تعديل</button>
-          <button class="btn btn-sm" type="button" data-st="toggle" data-id="${p.id}">${p.status === 'hidden' ? 'إظهار' : 'إخفاء'}</button>
-          <button class="btn btn-sm btn-danger" type="button" data-st="del" data-id="${p.id}">حذف</button>
-        </div>
-      </div>
-    </article>`
-  )}</div>`);
+  if (!S.products.length) return render(el, html`<div class="empty">ما أضفت منتجات للحين. اسحبها من سلة أو أضفها بصورة من فوق.</div>`);
+  const cats = [...new Set(S.products.map((p) => p.category))];
+  const weak = S.products.filter((p) => quality(p).tips.length > 1).length;
+  const noReel = S.products.filter((p) => p.status === 'active' && !S.reels.some((r) => r.product_id === p.id)).length;
+  render(el, html`${weak || noReel ? html`<div class="st-coach"><span aria-hidden="true">💡</span><div>
+      ${weak ? html`<b>${num(weak)} منتج بطاقته تحتاج تحسين.</b> المنتج اللي وصفه كامل وصورته واضحة يجيب ضغطات أكثر. ` : ''}${noReel ? html`<span>${num(noReel)} منتج ما له ريل، والريل يضاعف المشاهدات.</span>` : ''}</div>
+      ${weak ? html`<button class="btn btn-sm" type="button" data-st="show-weak">اعرضها</button>` : ''}</div>` : ''}
+    <div class="st-tools">
+      <input type="search" id="pf-q" placeholder="ابحث باسم المنتج…" value="${PF.q}" aria-label="ابحث في منتجاتك">
+      <select id="pf-status" aria-label="الحالة"><option value="all">كل الحالات</option><option value="active" ${raw(PF.status === 'active' ? 'selected' : '')}>معروض</option><option value="hidden" ${raw(PF.status === 'hidden' ? 'selected' : '')}>مخفي</option><option value="tips" ${raw(PF.status === 'tips' ? 'selected' : '')}>يحتاج تحسين</option></select>
+      <select id="pf-cat" aria-label="الفئة"><option value="all">كل الفئات</option>${cats.map((c) => html`<option value="${c}" ${raw(PF.cat === c ? 'selected' : '')}>${S.categories[c]}</option>`)}</select>
+    </div>
+    <div class="st-bulk" id="pf-bulk"></div>
+    <div class="st-table" role="table" aria-label="منتجاتك">
+      <div class="st-tr st-th" role="row"><span role="columnheader"><input type="checkbox" id="pf-all" aria-label="تحديد الكل"></span><span role="columnheader">المنتج</span><span role="columnheader">السعر</span><span role="columnheader">الأداء</span><span role="columnheader">البطاقة</span><span role="columnheader">معروض</span><span role="columnheader"></span></div>
+      <div id="pf-rows"></div>
+    </div>`);
+  drawRows();
+}
+function drawRows() {
+  const q = PF.q.trim().toLowerCase();
+  const list = S.products.filter((p) => (!q || p.title.toLowerCase().includes(q)) && (PF.cat === 'all' || p.category === PF.cat) && (PF.status === 'all' || (PF.status === 'tips' ? quality(p).tips.length > 1 : p.status === PF.status)));
+  render($('pf-rows'), list.length ? html`${list.map((p) => {
+    const qy = quality(p);
+    return html`<div class="st-tr ${p.status === 'hidden' ? 'off' : ''}" role="row">
+      <span role="cell"><input type="checkbox" data-sel="${p.id}" ${raw(PF.sel.has(p.id) ? 'checked' : '')} aria-label="تحديد ${p.title}"></span>
+      <span role="cell" class="st-td-p"><span class="st-td-img">${p.image_url ? html`<img src="${p.image_url}" alt="" loading="lazy">` : raw('🛍️')}</span><span><b>${p.title}</b><small class="muted">${S.categories[p.category]}${p.sync_error ? ' · ⚠️ ما تحدّث السعر' : ''}</small></span></span>
+      <span role="cell" class="st-td-price"><b>${sar(p.price)}</b>${p.old_price ? html`<s>${sar(p.old_price)}</s>` : ''}</span>
+      <span role="cell" class="small muted">👁 ${num(p.views)} · 🛒 ${num(p.clicks)}</span>
+      <span role="cell" class="st-q" title="${qy.tips.join('، ') || 'البطاقة كاملة'}"><i style="--q:${qy.score}%"></i><small>${qy.tips[0] || 'ممتازة ✓'}</small></span>
+      <span role="cell"><label class="st-switch" aria-label="معروض في المتاجر"><input type="checkbox" data-live="${p.id}" ${raw(p.status === 'active' ? 'checked' : '')}><i></i></label></span>
+      <span role="cell" class="st-td-acts"><button class="btn btn-sm" type="button" data-st="edit" data-id="${p.id}">تعديل</button>${S.ai ? html`<button class="btn btn-sm" type="button" data-st="ai-fix" data-id="${p.id}" title="الذكاء يحسّن الاسم والوصف">✨</button>` : ''}<button class="btn btn-sm btn-danger" type="button" data-st="del" data-id="${p.id}" aria-label="حذف">🗑</button></span>
+    </div>`;
+  })}` : html`<div class="empty">ما فيه منتجات بهالبحث</div>`);
+  const n = PF.sel.size;
+  render($('pf-bulk'), n ? html`<b>${num(n)} محدد</b><button class="btn btn-sm" type="button" data-st="bulk-show">إظهار</button><button class="btn btn-sm" type="button" data-st="bulk-hide">إخفاء</button>${S.ai ? html`<button class="btn btn-sm btn-gold" type="button" data-st="bulk-ai">✨ حسّن بالذكاء</button>` : ''}<button class="btn btn-sm btn-danger" type="button" data-st="bulk-del">حذف</button><button class="btn btn-sm" type="button" data-st="bulk-clear">إلغاء</button>` : raw(''));
+  const all = $('pf-all');
+  if (all) all.checked = list.length > 0 && list.every((p) => PF.sel.has(p.id));
+}
+// الذكاء يعيد كتابة الاسم والوصف والفئة لمنتج موجود
+async function aiFix(p) {
+  const ai = await aiDraft({ link: { title: p.title, description: p.description || '' } });
+  if (!ai.title) return false;
+  await api('/api/m/store/products/' + p.id, { method: 'PATCH', body: { title: ai.title, description: ai.description || p.description, category: ai.category || p.category } });
+  return true;
+}
+async function bulk(act) {
+  const ids = [...PF.sel];
+  let n = 0;
+  if (act === 'bulk-del' && !confirm(`تحذف ${ids.length} منتج نهائياً؟`)) return;
+  for (const id of ids) {
+    const p = S.products.find((x) => x.id === id);
+    if (!p) continue;
+    toast(`نشتغل… ${++n} من ${ids.length}`);
+    if (act === 'bulk-del') await api('/api/m/store/products/' + id, { method: 'DELETE' });
+    else if (act === 'bulk-ai') await aiFix(p);
+    else await api('/api/m/store/products/' + id, { method: 'PATCH', body: { status: act === 'bulk-show' ? 'active' : 'hidden' } });
+  }
+  PF.sel.clear();
+  toast('تم ✅');
+  await loadStore();
 }
 
 function renderReels() {
@@ -351,7 +461,8 @@ function reelDialog(file, duration, original) {
         <p class="small muted" style="margin:0;text-align:center">اسحب الفيديو بإصبعك عشان تختار الجزء اللي يظهر</p>
       </div>
       <div class="st-ed-side">
-        <label class="field">عنوان الريل<input name="title" required minlength="2" maxlength="90" placeholder="مثال: طريقة تحضير الشاي الأخضر"></label>
+        <label class="field"><span>عنوان الريل ${S.ai ? html`<button class="btn btn-sm st-ai-mini" type="button" data-reel-ai>✨ اقترح لي</button>` : ''}</span><input name="title" required minlength="2" maxlength="90" placeholder="مثال: طريقة تحضير الشاي الأخضر"></label>
+        <div class="st-ideas" data-ideas hidden></div>
         <label class="field">المنتج اللي يظهر تحت الريل<select name="product_id"><option value="">بدون منتج</option>${S.products.filter((p) => p.status === 'active').map((p) => html`<option value="${p.id}">${p.title}</option>`)}</select></label>
         <label class="field"><span>يبدأ من الثانية <b data-out="start">0</b></span><input name="start" type="range" min="0" max="${Math.max(0, Math.floor(duration - S.reel_limits.min))}" step="0.5" value="0"></label>
         <label class="field"><span>المدة <b data-out="dur">${maxDur}</b> ثانية <small class="muted">(من ${S.reel_limits.min} إلى ${S.reel_limits.max})</small></span><input name="dur" type="range" min="${S.reel_limits.min}" max="${maxDur}" step="1" value="${maxDur}"></label>
@@ -403,6 +514,25 @@ async function newReel() {
   dlg.querySelector('[data-x]').addEventListener('click', close);
   dlg.addEventListener('cancel', (e) => { e.preventDefault(); close(); });
   dlg.querySelector('[data-play]').addEventListener('click', () => editor.preview());
+  // الذكاء يقترح عناوين من المنتج المختار
+  dlg.querySelector('[data-reel-ai]')?.addEventListener('click', async (e) => {
+    const p = S.products.find((x) => x.id === Number(form.product_id.value));
+    if (!p) return toast('اختر المنتج اللي يظهر تحت الريل أول', true);
+    const btn = e.currentTarget, box = dlg.querySelector('[data-ideas]');
+    btn.disabled = true;
+    btn.textContent = '✨ يفكر…';
+    try {
+      const { titles } = await api('/api/m/store/ai', { method: 'POST', body: { mode: 'reel', product: { title: p.title, description: p.description } } });
+      render(box, html`${titles.map((x) => html`<button type="button" class="st-idea" data-idea>${x}</button>`)}`);
+      box.hidden = !titles.length;
+    } catch (err) { toast(err.message, true); }
+    btn.disabled = false;
+    btn.textContent = '✨ اقترح لي';
+  });
+  dlg.querySelector('[data-ideas]').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-idea]');
+    if (b) form.title.value = b.textContent;
+  });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (working) return;
@@ -492,7 +622,26 @@ document.addEventListener('click', async (e) => {
     } else if (act === 'auto') {
       await api('/api/m/store', { method: 'PATCH', body: { store_auto_sync: b.checked } });
       toast(b.checked ? 'بنحدّث أسعارك تلقائياً من سلة' : 'وقفنا التحديث التلقائي');
-    } else if (act === 'import-all') await importAll();
+    } else if (act === 'pick-all' || act === 'pick-none') {
+      pick.rows.forEach((r) => { if (r.state === 'ok' && r.p.price) r.on = act === 'pick-all'; });
+      drawPick();
+    } else if (act === 'pick-more') {
+      pick.shown += 24;
+      drawPick();
+      loadPick();
+    } else if (act === 'pick-publish') await publishPick();
+    else if (act === 'bulk-clear') { PF.sel.clear(); drawRows(); }
+    else if (act === 'show-weak') {
+      PF.status = 'tips';
+      S.products.filter((p) => quality(p).tips.length > 1).forEach((p) => PF.sel.add(p.id));
+      renderProducts();
+    }
+    else if (act.startsWith('bulk-')) await bulk(act);
+    else if (act === 'ai-fix') {
+      b.textContent = '…';
+      if (await aiFix(S.products.find((x) => x.id === id))) toast('حسّنا البطاقة ✨');
+      await loadStore();
+    }
     else if (act === 'way') wayBody(b.dataset.way);
     else if (act === 'cancel') { draft = null; renderCompose(); }
     else if (act === 'img') {
@@ -583,4 +732,29 @@ document.addEventListener('submit', async (e) => {
     busy = false;
     if (btn) btn.disabled = false;
   }
+});
+
+// تحديد المنتجات، والبحث والفلترة، ومفتاح العرض، وتحديد منتجات السحب
+document.addEventListener('change', async (e) => {
+  const el = e.target;
+  if (!$('store')?.contains(el)) return;
+  if (el.dataset.pick != null && pick) { pick.rows[Number(el.dataset.pick)].on = el.checked; return drawPick(); }
+  if (el.dataset.sel) { el.checked ? PF.sel.add(Number(el.dataset.sel)) : PF.sel.delete(Number(el.dataset.sel)); return drawRows(); }
+  if (el.id === 'pf-all') {
+    document.querySelectorAll('[data-sel]').forEach((c) => (el.checked ? PF.sel.add(Number(c.dataset.sel)) : PF.sel.delete(Number(c.dataset.sel))));
+    return drawRows();
+  }
+  if (el.id === 'pf-status' || el.id === 'pf-cat') { PF[el.id === 'pf-status' ? 'status' : 'cat'] = el.value; return drawRows(); }
+  if (el.dataset.live) {
+    const p = S.products.find((x) => x.id === Number(el.dataset.live));
+    try {
+      await api('/api/m/store/products/' + p.id, { method: 'PATCH', body: { status: el.checked ? 'active' : 'hidden' } });
+      p.status = el.checked ? 'active' : 'hidden';
+      el.closest('.st-tr').classList.toggle('off', !el.checked);
+      toast(el.checked ? 'المنتج معروض في المتاجر' : 'خفينا المنتج');
+    } catch (err) { el.checked = !el.checked; toast(err.message, true); }
+  }
+});
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'pf-q') { PF.q = e.target.value; drawRows(); }
 });

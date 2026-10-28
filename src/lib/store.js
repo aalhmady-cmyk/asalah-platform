@@ -236,6 +236,25 @@ export async function discoverProducts(storeUrl) {
       else if (lu.origin === origin && PRODUCT_URL.test(lu.pathname)) products.add(lu.toString());
     }
   }
-  if (!products.size) fail(422, 'ما لقينا منتجات في خريطة متجرك. تأكد من رابط المتجر، أو أضف المنتجات بروابطها وحدة وحدة');
+  // ما فيه خريطة؟ نقرأ صفحات المتجر نفسها (الرئيسية والرابط اللي أعطانا وأقسامه) ونلقط روابط المنتجات
+  if (products.size < 5) {
+    const pages = [...new Set([base.toString(), origin + '/'])], done = new Set();
+    while (pages.length && done.size < 10 && products.size < 300) {
+      const u = pages.shift();
+      if (done.has(u)) continue;
+      done.add(u);
+      const page = await fetchText(u, 2_000_000);
+      if (!page) continue;
+      for (const m of page.matchAll(/href=["']([^"'#]+)["']/gi)) {
+        let lu;
+        try { lu = new URL(decode(m[1]), u); } catch { continue; }
+        if (lu.origin !== origin) continue;
+        lu.hash = '';
+        if (PRODUCT_URL.test(lu.pathname)) products.add(lu.origin + lu.pathname);
+        else if (/\/c\d{4,}(?:[/?]|$)|\/categor(?:y|ies)\/|\/collections\//i.test(lu.pathname) && done.size + pages.length < 12) pages.push(lu.toString());
+      }
+    }
+  }
+  if (!products.size) fail(422, 'ما لقينا منتجات في متجرك. تأكد من الرابط، أو الصق رابط كل منتج لحاله');
   return [...products];
 }
