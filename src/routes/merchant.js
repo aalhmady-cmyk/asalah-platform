@@ -1,5 +1,6 @@
 // لوحة التاجر: كل استعلام مقيّد بتاجر المستخدم.
 import { requireUser } from '../lib/auth.js';
+import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
 import { lookupTag, overviewFor, setTagStatus } from '../lib/ops.js';
 import { audit, csvResponse, fail, int, json, now, readJson, str, url } from '../lib/util.js';
 
@@ -12,24 +13,45 @@ export async function handleMerchant(req, env, path) {
   if (path === '/api/m/overview' && m === 'GET') {
     const [ov, merchant, alerts] = await Promise.all([
       overviewFor(db, mid),
-      db.prepare('SELECT id,name,slug,logo_url,brand_color,store_url,low_stock_threshold,max_checks,contest_enabled,contest_title,contest_ends_at,contest_terms_url FROM merchants WHERE id=?').bind(mid).first(),
+      db.prepare('SELECT id,name,slug,logo_url,logo_key,brand_color,store_url,low_stock_threshold,max_checks,contest_enabled,contest_title,contest_ends_at,contest_terms_url FROM merchants WHERE id=?').bind(mid).first(),
       db.prepare("SELECT id,kind,message,created_at,read_at FROM alerts WHERE merchant_id=? AND kind<>'tag_request' ORDER BY id DESC LIMIT 10").bind(mid).all(),
     ]);
     const entries = await db.prepare('SELECT COUNT(*) AS n FROM entries WHERE merchant_id=?').bind(mid).first();
+    merchant.logo_url = imageUrl(merchant.logo_key) || merchant.logo_url;
     return json({ ok: true, merchant, overview: ov, alerts: alerts.results, entries: entries.n });
   }
 
   if (path === '/api/m/batches' && m === 'GET') {
     const r = await db
       .prepare(
-        `SELECT b.code,b.size,b.status,b.product_name,b.produced_on,b.activated_at,
+        `SELECT b.code,b.size,b.status,b.product_name,b.produced_on,b.activated_at,b.image_key,
                 (SELECT COUNT(*) FROM tags t WHERE t.batch_id=b.id AND t.first_checked_at IS NOT NULL) AS sold,
                 (SELECT COUNT(*) FROM tags t WHERE t.batch_id=b.id AND t.status<>'active') AS blocked
          FROM batches b WHERE b.merchant_id=? AND b.is_test=0 ORDER BY b.id DESC`
       )
       .bind(mid)
       .all();
-    return json({ ok: true, batches: r.results });
+    return json({ ok: true, batches: r.results.map(({ image_key, ...b }) => ({ ...b, image_url: imageUrl(image_key) })) });
+  }
+
+  // صورة المنتج لدفعة: ترفع كملف خام، والقديمة تنحذف
+  let match;
+  if ((match = path.match(/^\/api\/m\/batches\/([A-Z0-9]{2,16})\/image$/)) && (m === 'POST' || m === 'DELETE')) {
+    const batch = await db.prepare('SELECT id,code,image_key FROM batches WHERE code=? AND merchant_id=?').bind(match[1], mid).first();
+    if (!batch) fail(404, 'ما لقينا الدفعة');
+    const key = m === 'POST' ? await saveImage(env, req, 'products', mid) : null;
+    await db.prepare('UPDATE batches SET image_key=? WHERE id=?').bind(key, batch.id).run();
+    await deleteImage(env, batch.image_key);
+    await audit(db, user, m === 'POST' ? 'product_image_set' : 'product_image_removed', { batch: batch.code });
+    return json({ ok: true, image_url: imageUrl(key) });
+  }
+  if (path === '/api/m/logo' && (m === 'POST' || m === 'DELETE')) {
+    const cur = await db.prepare('SELECT logo_key FROM merchants WHERE id=?').bind(mid).first();
+    const key = m === 'POST' ? await saveImage(env, req, 'logos', mid) : null;
+    await db.prepare('UPDATE merchants SET logo_key=? WHERE id=?').bind(key, mid).run();
+    await deleteImage(env, cur.logo_key);
+    await audit(db, user, m === 'POST' ? 'logo_set' : 'logo_removed');
+    return json({ ok: true, logo_url: imageUrl(key) });
   }
 
   if (path === '/api/m/tags/lookup' && m === 'GET') {

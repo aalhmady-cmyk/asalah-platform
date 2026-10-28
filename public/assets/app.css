@@ -145,3 +145,6 @@ dialog form { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
   .main { padding: 16px; }
   .hero .big { font-size: 34px; }
 }
+.btn-sm { min-height: 32px; padding: 4px 12px; font-size: 13px; }
+.thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; border: 1px solid var(--line); background: var(--ground); flex: none; }
+.thumb-empty { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); font-weight: 700; }

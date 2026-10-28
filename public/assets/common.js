@@ -4,8 +4,8 @@ export async function api(path, { method = 'GET', body } = {}) {
   const res = await fetch(path, {
     method,
     credentials: 'same-origin',
-    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: body === undefined ? {} : { 'Content-Type': body instanceof Blob ? body.type : 'application/json' },
+    body: body === undefined || body instanceof Blob ? body : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({ ok: false, message: 'رد غير متوقع من الخادم' }));
   if (res.status === 401 && data.code === 'unauthenticated' && !location.pathname.startsWith('/login')) {
@@ -151,3 +151,27 @@ export async function logout() {
 
 // الحرف الأول من اسم التاجر بدون "ال" التعريف، للشعار المؤقت
 export const initial = (name) => name.trim().replace(/^ال(?=\S{2})/, '').charAt(0);
+
+// يختار صورة من الجهاز ويصغّرها (1200 بكسل كحد أقصى) قبل الرفع. يرجع null لو ألغى المستخدم.
+export function pickImage(maxSide = 1200) {
+  return new Promise((resolve, reject) => {
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/jpeg,image/png,image/webp' });
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      if (!file) return resolve(null);
+      try {
+        const bmp = await createImageBitmap(file);
+        const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+        const canvas = Object.assign(document.createElement('canvas'), { width: Math.round(bmp.width * k), height: Math.round(bmp.height * k) });
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('تعذر قراءة الصورة'))), 'image/jpeg', 0.85);
+      } catch {
+        reject(new Error('تعذر قراءة الصورة، جرّب صورة ثانية'));
+      }
+    });
+    input.click();
+  });
+}

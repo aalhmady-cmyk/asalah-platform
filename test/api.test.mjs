@@ -197,3 +197,41 @@ test('المخزون وتنبيه قرب الخلوص', async () => {
   const after2 = await call('/api/m/overview', { cookie: S.merchant });
   assert.equal(after2.data.alerts.filter((a) => a.kind === 'low_stock').length, 1); // ما يتكرر خلال 24 ساعة
 });
+
+test('صورة المنتج وشعار التاجر بعد التحقق', async () => {
+  // أصغر PNG صالح (1×1)
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+  const upload = (path, body, type = 'image/png', cookie = S.merchant) =>
+    fetch(BASE + path, { method: 'POST', headers: { 'Content-Type': type, Cookie: cookie, Origin: BASE }, body }).then(async (r) => ({ status: r.status, data: await r.json() }));
+  const t = tokenOf(S.urls[4]);
+  let v = await post('/api/verify', { t, sid: sid('e') });
+  assert.equal(v.data.tag.image_url, null);
+  assert.equal(v.data.brand.logo_url, null);
+
+  assert.equal((await upload('/api/m/logo', Buffer.from('not an image'))).status, 415);
+  assert.equal((await upload('/api/m/logo', png, 'text/plain')).status, 415);
+  const logo = await upload('/api/m/logo', png);
+  assert.equal(logo.status, 200, JSON.stringify(logo.data));
+  v = await post('/api/verify', { t, sid: sid('e') });
+  assert.equal(v.data.brand.logo_url, logo.data.logo_url);
+  assert.equal(v.data.tag.image_url, null);
+
+  const img = await upload('/api/m/batches/GK2610/image', png);
+  assert.equal(img.status, 200);
+  assert.match(img.data.image_url, /^\/img\/products\/\d+\/[a-f0-9]{24}\.png$/);
+  v = await post('/api/verify', { t, sid: sid('e') });
+  assert.equal(v.data.tag.image_url, img.data.image_url);
+  const file = await fetch(BASE + img.data.image_url);
+  assert.equal(file.status, 200);
+  assert.equal(file.headers.get('Content-Type'), 'image/png');
+  assert.deepEqual(Buffer.from(await file.arrayBuffer()), png);
+  assert.equal((await fetch(BASE + '/img/products/1/../../x.png')).status, 404);
+
+  // التاجر ما يقدر يغيّر صورة دفعة تاجر ثاني
+  assert.equal((await upload('/api/m/batches/SD2610/image', png)).status, 404);
+
+  const del = await call('/api/m/batches/GK2610/image', { method: 'DELETE', cookie: S.merchant });
+  assert.equal(del.status, 200);
+  assert.equal((await fetch(BASE + img.data.image_url)).status, 404);
+  assert.equal((await call('/api/m/batches', { cookie: S.merchant })).data.batches[0].image_url, null);
+});

@@ -1,5 +1,6 @@
 // اللوحة الأم: المدير العام يدير التجار والحسابات والدفعات وكل العلامات.
 import { hashPassword, requireUser, validPassword } from '../lib/auth.js';
+import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
 import { lookupTag, overviewFor, setTagStatus } from '../lib/ops.js';
 import { publicId, stockFor, tokenFor } from '../lib/tags.js';
 import { audit, csvResponse, fail, int, json, now, randomHex, readJson, str, url } from '../lib/util.js';
@@ -84,6 +85,18 @@ export async function handleAdmin(req, env, path) {
     return json({ ok: true, merchant: row });
   }
 
+  // المدير العام يقدر يرفع شعار التاجر وصورة أي دفعة نيابة عنه
+  if ((match = path.match(/^\/api\/admin\/merchants\/(\d+)\/logo$/)) && (m === 'POST' || m === 'DELETE')) {
+    const id = Number(match[1]);
+    const cur = await db.prepare('SELECT logo_key FROM merchants WHERE id=?').bind(id).first();
+    if (!cur) fail(404, 'ما لقينا التاجر');
+    const key = m === 'POST' ? await saveImage(env, req, 'logos', id) : null;
+    await db.prepare('UPDATE merchants SET logo_key=? WHERE id=?').bind(key, id).run();
+    await deleteImage(env, cur.logo_key);
+    await audit(db, user, m === 'POST' ? 'logo_set' : 'logo_removed', null, id);
+    return json({ ok: true, logo_url: imageUrl(key) });
+  }
+
   // ---------- الحسابات ----------
   if (path === '/api/admin/users' && m === 'GET') {
     const r = await db.prepare('SELECT u.id,u.email,u.name,u.role,u.merchant_id,u.status,u.last_login_at,m.name AS merchant_name FROM users u LEFT JOIN merchants m ON m.id=u.merchant_id ORDER BY u.id').all();
@@ -127,8 +140,8 @@ export async function handleAdmin(req, env, path) {
 
   // ---------- الدفعات ----------
   if (path === '/api/admin/batches' && m === 'GET') {
-    const r = await db.prepare('SELECT b.id,b.code,b.size,b.status,b.is_test,b.product_name,b.produced_on,b.created_at,b.activated_at,b.merchant_id,m.name AS merchant_name FROM batches b JOIN merchants m ON m.id=b.merchant_id ORDER BY b.id DESC').all();
-    return json({ ok: true, batches: r.results });
+    const r = await db.prepare('SELECT b.id,b.code,b.size,b.status,b.is_test,b.product_name,b.produced_on,b.created_at,b.activated_at,b.merchant_id,b.image_key,m.name AS merchant_name FROM batches b JOIN merchants m ON m.id=b.merchant_id ORDER BY b.id DESC').all();
+    return json({ ok: true, batches: r.results.map(({ image_key, ...b }) => ({ ...b, image_url: imageUrl(image_key) })) });
   }
   if (path === '/api/admin/batches' && m === 'POST') {
     const b = await readJson(req);
@@ -158,6 +171,15 @@ export async function handleAdmin(req, env, path) {
     if (!row) fail(404, 'ما لقينا الدفعة');
     await audit(db, user, 'batch_' + b.status, { code: row.code }, row.merchant_id);
     return json({ ok: true, batch: row });
+  }
+  if ((match = path.match(/^\/api\/admin\/batches\/(\d+)\/image$/)) && (m === 'POST' || m === 'DELETE')) {
+    const batch = await db.prepare('SELECT id,code,merchant_id,image_key FROM batches WHERE id=?').bind(Number(match[1])).first();
+    if (!batch) fail(404, 'ما لقينا الدفعة');
+    const key = m === 'POST' ? await saveImage(env, req, 'products', batch.merchant_id) : null;
+    await db.prepare('UPDATE batches SET image_key=? WHERE id=?').bind(key, batch.id).run();
+    await deleteImage(env, batch.image_key);
+    await audit(db, user, m === 'POST' ? 'product_image_set' : 'product_image_removed', { batch: batch.code }, batch.merchant_id);
+    return json({ ok: true, image_url: imageUrl(key) });
   }
   // ملف المصنع: رابط لكل علامة. يتولّد من التوقيع، فينزل كامل أو على أجزاء في أي وقت.
   if ((match = path.match(/^\/api\/admin\/batches\/(\d+)\/factory\.csv$/)) && m === 'GET') {

@@ -1,4 +1,5 @@
 // المسارات العامة: التحقق من العلامة، المشاركة في المسابقة، بلاغ التقليد.
+import { imageUrl } from '../lib/images.js';
 import { checkSignature, parseToken, publicId } from '../lib/tags.js';
 import { fail, geo, ipHash, json, now, rateLimit, readJson, saPhone, sha256, str } from '../lib/util.js';
 
@@ -15,7 +16,7 @@ const MESSAGES = {
 };
 
 function brand(m) {
-  return m ? { name: m.name, logo_url: m.logo_url, brand_color: m.brand_color, store_url: m.store_url, whatsapp: m.whatsapp } : null;
+  return m ? { name: m.name, logo_url: imageUrl(m.logo_key) || m.logo_url, brand_color: m.brand_color, store_url: m.store_url, whatsapp: m.whatsapp } : null;
 }
 
 async function logScan(db, req, tagId, merchantId, result, checkNo) {
@@ -45,8 +46,8 @@ async function resolve(env, db, raw) {
   if (!p) return { state: 'unknown' };
   const b = await db
     .prepare(
-      `SELECT b.id,b.code,b.size,b.salt,b.status,b.is_test,b.product_name,b.produced_on,b.merchant_id,
-              m.name,m.logo_url,m.brand_color,m.store_url,m.whatsapp,m.status AS merchant_status,m.max_checks,
+      `SELECT b.id,b.code,b.size,b.salt,b.status,b.is_test,b.product_name,b.produced_on,b.merchant_id,b.image_key,
+              m.name,m.logo_url,m.logo_key,m.brand_color,m.store_url,m.whatsapp,m.status AS merchant_status,m.max_checks,
               m.contest_enabled,m.contest_title,m.contest_ends_at,m.contest_terms_url
        FROM batches b JOIN merchants m ON m.id=b.merchant_id WHERE b.id=?`
     )
@@ -127,6 +128,8 @@ export async function verify(req, env) {
       public_id: publicId(b, r.serial),
       batch: b.code,
       product_name: b.product_name,
+      // صورة المنتج للدفعة، وإذا ما فيه صورة تظهر الواجهة شعار التاجر
+      image_url: imageUrl(b.image_key),
       produced_on: b.produced_on,
       is_test: Boolean(b.is_test),
       check_no: tag.check_count,

@@ -1,4 +1,4 @@
-import { api, initial, bars, BATCH_STATUS, hbars, html, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
+import { api, initial, pickImage, bars, BATCH_STATUS, hbars, html, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
 const me = await api('/api/auth/me');
@@ -74,9 +74,31 @@ function renderContestCard(entries) {
 
 async function loadTags() {
   const { batches } = await api('/api/m/batches');
-  render($('batches'), !batches.length ? html`<div class="empty">ما عندك دفعات للحين. تواصل مع إدارة أصالة.</div>` : html`<table style="min-width:620px"><thead><tr><th>الدفعة</th><th>المنتج</th><th>العدد</th><th>انمسحت</th><th>موقوفة</th><th>الحالة</th></tr></thead><tbody>${batches.map((b) => html`<tr><td class="mono"><b>${b.code}</b></td><td>${b.product_name || '-'}</td><td>${num(b.size)}</td><td>${num(b.sold)}</td><td>${num(b.blocked)}</td><td>${pill(BATCH_STATUS, b.status)}</td></tr>`)}</tbody></table>`);
+  render($('batches'), !batches.length ? html`<div class="empty">ما عندك دفعات للحين. تواصل مع إدارة أصالة.</div>` : html`<table style="min-width:720px"><thead><tr><th>صورة المنتج</th><th>الدفعة</th><th>المنتج</th><th>العدد</th><th>انمسحت</th><th>موقوفة</th><th>الحالة</th></tr></thead><tbody>${batches.map((b) => html`<tr>
+    <td><div style="display:flex;align-items:center;gap:8px">${b.image_url ? html`<img src="${b.image_url}" alt="" class="thumb">` : html`<span class="thumb thumb-empty" aria-hidden="true">+</span>`}
+      <button class="btn btn-sm" type="button" data-image="${b.code}">${b.image_url ? 'تغيير' : 'رفع صورة'}</button>
+      ${b.image_url ? html`<button class="btn btn-sm" type="button" data-image-del="${b.code}">حذف</button>` : ''}</div></td>
+    <td class="mono"><b>${b.code}</b></td><td>${b.product_name || '-'}</td><td>${num(b.size)}</td><td>${num(b.sold)}</td><td>${num(b.blocked)}</td><td>${pill(BATCH_STATUS, b.status)}</td></tr>`)}</tbody></table>
+    <p class="small muted" style="margin:12px 0 0">صورة المنتج تظهر للعميل بعد ما يتأكد إن المنتج أصلي. لو الدفعة ما لها صورة، يظهر شعارك.</p>`);
   if (batches[0] && !$('status-form').batch_code.value) $('status-form').batch_code.value = batches[0].code;
 }
+$('batches').addEventListener('click', async (e) => {
+  const up = e.target.closest('[data-image]'), del = e.target.closest('[data-image-del]');
+  if (!up && !del) return;
+  try {
+    if (up) {
+      const img = await pickImage();
+      if (!img) return;
+      await api(`/api/m/batches/${up.dataset.image}/image`, { method: 'POST', body: img });
+      toast('تم رفع صورة المنتج');
+    } else {
+      if (!confirm('حذف صورة المنتج؟ بيظهر شعارك بدالها.')) return;
+      await api(`/api/m/batches/${del.dataset.imageDel}/image`, { method: 'DELETE' });
+      toast('تم حذف الصورة');
+    }
+    loadTags();
+  } catch (err) { toast(err.message, true); }
+});
 onSubmit($('lookup-form'), async (f) => {
   const { tag: t } = await api('/api/m/tags/lookup?q=' + encodeURIComponent(f.q));
   render($('lookup-result'), html`<div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line-soft);padding-top:14px">
@@ -122,11 +144,37 @@ async function loadReports() {
   const { reports } = await api('/api/m/reports');
   render($('reports-table'), !reports.length ? html`<div class="empty">ما فيه بلاغات</div>` : html`<table style="min-width:560px"><thead><tr><th>المدينة</th><th>المحل</th><th>السبب</th><th>ملاحظة</th><th>الوقت</th></tr></thead><tbody>${reports.map((r) => html`<tr><td>${r.city}</td><td><b>${r.point_of_sale}</b></td><td>${pill(RESULT, r.reason)}</td><td>${r.note || '-'}</td><td>${when(r.created_at)}</td></tr>`)}</tbody></table>`);
 }
+async function loadAccount() {
+  if (!merchant) merchant = (await api('/api/m/overview')).merchant;
+  render($('logo-box'), html`<div style="display:flex;align-items:center;gap:16px">
+    ${merchant.logo_url ? html`<img src="${merchant.logo_url}" alt="" class="thumb" style="width:72px;height:72px">` : html`<span class="thumb thumb-empty" style="width:72px;height:72px;font-size:28px" aria-hidden="true">${initial(merchant.name)}</span>`}
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" type="button" id="logo-up">${merchant.logo_url ? 'تغيير الشعار' : 'رفع الشعار'}</button>
+    ${merchant.logo_url ? html`<button class="btn" type="button" id="logo-del">حذف</button>` : ''}</div></div>`);
+  $('logo-up').addEventListener('click', async () => {
+    try {
+      const img = await pickImage(600);
+      if (!img) return;
+      merchant.logo_url = (await api('/api/m/logo', { method: 'POST', body: img })).logo_url;
+      brandHeader(merchant);
+      loadAccount();
+      toast('تم رفع الشعار');
+    } catch (e) { toast(e.message, true); }
+  });
+  $('logo-del')?.addEventListener('click', async () => {
+    if (!confirm('حذف الشعار؟')) return;
+    try {
+      await api('/api/m/logo', { method: 'DELETE' });
+      merchant = (await api('/api/m/overview')).merchant;
+      brandHeader(merchant);
+      loadAccount();
+    } catch (e) { toast(e.message, true); }
+  });
+}
 onSubmit($('password-form'), async (f) => {
   const d = await api('/api/auth/password', { method: 'POST', body: f });
   toast(d.message);
   setTimeout(() => (location.href = '/login/'), 1200);
 });
 
-const loaders = { home: loadHome, tags: loadTags, contest: loadContest, reports: loadReports, account: async () => {} };
+const loaders = { home: loadHome, tags: loadTags, contest: loadContest, reports: loadReports, account: loadAccount };
 tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => loaders[id]().catch((e) => toast(e.message, true)));

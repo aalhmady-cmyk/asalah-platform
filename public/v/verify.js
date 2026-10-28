@@ -85,6 +85,15 @@ function ok(d) {
   $('f-product').textContent = t.product_name || (t.produced_on ? 'إنتاج ' + t.produced_on : '-');
   $('f-checks').textContent = t.checks_left == null ? String(t.check_no) : `${t.check_no} من ${t.check_no + t.checks_left}`;
   show('test-note', t.is_test);
+  // صورة المنتج للدفعة، وإذا ما فيه، شعار التاجر
+  const pic = t.image_url || d.brand.logo_url;
+  if (pic) {
+    $('product-img').src = pic;
+    $('product-img').alt = t.product_name || d.brand.name;
+    $('product').classList.toggle('is-logo', !t.image_url);
+    show('product');
+    show('seal', false);
+  }
   if (d.brand.store_url) {
     $('store-link').href = d.brand.store_url;
     show('store-link');
