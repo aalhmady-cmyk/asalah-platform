@@ -6,7 +6,7 @@ import { HttpError, json } from './lib/util.js';
 import { handleAdmin } from './routes/admin.js';
 import { changePassword, login, logout, me, setup } from './routes/auth.js';
 import { handleMerchant } from './routes/merchant.js';
-import { brandPage, brands, enter, guideChat, guideInfo, joinRequest, stats, loyaltyClaim, loyaltyRedeem, loyaltyWallet, rate, report, verify } from './routes/public.js';
+import { brandPage, brands, enter, guideChat, guideInfo, joinRequest, shopAiRoute, stats, loyaltyClaim, loyaltyRedeem, loyaltyWallet, rate, report, verify } from './routes/public.js';
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
@@ -28,6 +28,7 @@ async function route(req, env) {
   if (path === '/api/public/brands' && m === 'GET') return brands(env);
   if (path === '/api/public/stats' && m === 'GET') return stats(env);
   if (path === '/api/public/join' && m === 'POST') return joinRequest(req, env);
+  if (path === '/api/public/shop-ai' && (m === 'GET' || m === 'POST')) return shopAiRoute(req, env);
   if (path === '/api/public/assistant' && m === 'GET') return guideInfo(env);
   if (path === '/api/public/assistant' && m === 'POST') return guideChat(req, env);
   const bm = path.match(/^\/api\/public\/brands\/([a-z0-9-]{2,40})$/);

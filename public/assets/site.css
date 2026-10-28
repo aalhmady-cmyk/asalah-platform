@@ -152,3 +152,20 @@ body.site { background: var(--ground); }
 }
 @media (prefers-reduced-motion: reduce) { .guide-fab, .guide-panel, .g-msg.typing i { animation: none; } }
 @keyframes pop { from { transform: scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* متاجر أصالة */
+.site-nav nav a.nav-shop { color: #F3D68C; font-weight: 700; }
+.shop-banner { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 28px; align-items: center; background: linear-gradient(135deg, #0F2A21, #16463A); color: #fff; border-radius: 28px; padding: 36px; text-decoration: none; border: 2px solid transparent; transition: border-color .2s, transform .2s; }
+.shop-banner:hover { color: #fff; border-color: var(--gold); transform: translateY(-2px); }
+.shop-copy { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.shop-copy h2 { font-size: 32px; color: #F3D68C; }
+.shop-copy p { margin: 0; color: var(--forest-ink); font-size: 16px; }
+.shop-art { display: flex; flex-direction: column; gap: 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); border-radius: 20px; padding: 18px; }
+.shop-art .g-msg.me { background: var(--gold); color: var(--forest); }
+.shop-cards { display: flex; gap: 10px; }
+.shop-cards i { font-style: normal; flex: 1; aspect-ratio: 1; border-radius: 14px; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 34px; }
+@media (max-width: 860px) {
+  .shop-banner { grid-template-columns: minmax(0, 1fr); padding: 24px 20px; }
+  .shop-copy h2 { font-size: 26px; }
+  .site-nav nav a.nav-shop { display: inline; }
+}

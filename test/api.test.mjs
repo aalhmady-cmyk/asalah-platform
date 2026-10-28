@@ -410,3 +410,11 @@ test('مساعد أصالة للزوار بدون مفتاح', async () => {
   assert.equal((await call('/api/public/assistant')).data.chat, false);
   assert.equal((await post('/api/public/assistant', { messages: [{ role: 'user', content: 'هلا' }] })).status, 503);
 });
+
+test('متاجر أصالة: الصفحة والذكاء بدون مفتاح', async () => {
+  assert.equal((await call('/api/public/shop-ai')).data.chat, false);
+  assert.equal((await post('/api/public/shop-ai', { task: 'filters', text: 'تيشيرت أسود' })).status, 503);
+  const page = await fetch(BASE + '/stores/');
+  assert.equal(page.status, 200);
+  assert.ok((await page.text()).includes('متاجر أصالة'));
+});

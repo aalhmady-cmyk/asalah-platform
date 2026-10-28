@@ -13,3 +13,5 @@
   Cache-Control: no-store
 /v/*
   Cache-Control: no-cache
+/stores/*
+  Cache-Control: no-cache

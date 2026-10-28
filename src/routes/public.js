@@ -1,6 +1,7 @@
 // المسارات العامة: التحقق من العلامة، المشاركة في المسابقة، بلاغ التقليد.
 import { assistantEnabled } from '../lib/assistant.js';
 import { guide } from '../lib/guide.js';
+import { shopAI } from '../lib/shop.js';
 import { imageUrl } from '../lib/images.js';
 import { checkSignature, parseToken, publicId } from '../lib/tags.js';
 import { fail, geo, int, ipHash, json, now, rateLimit, readJson, saPhone, sha256, str } from '../lib/util.js';
@@ -416,4 +417,12 @@ export async function guideChat(req, env) {
     await saveJoin(db, input);
   });
   return json({ ok: true, ...r });
+}
+
+// ---------- متاجر أصالة (نسخة تجريبية) ----------
+export async function shopAiRoute(req, env) {
+  if (req.method === 'GET') return json({ ok: true, chat: assistantEnabled(env) });
+  await rateLimit(env.DB, 'shopai:' + (await ipHash(req)), 40, 3600);
+  const b = await readJson(req, 2_000_000);
+  return json({ ok: true, result: await shopAI(env, b) });
 }
