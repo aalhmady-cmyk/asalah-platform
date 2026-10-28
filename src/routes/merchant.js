@@ -13,7 +13,7 @@ export async function handleMerchant(req, env, path) {
     const [ov, merchant, alerts] = await Promise.all([
       overviewFor(db, mid),
       db.prepare('SELECT id,name,slug,logo_url,brand_color,store_url,low_stock_threshold,max_checks,contest_enabled,contest_title,contest_ends_at,contest_terms_url FROM merchants WHERE id=?').bind(mid).first(),
-      db.prepare('SELECT id,kind,message,created_at,read_at FROM alerts WHERE merchant_id=? AND kind<>'tag_request' ORDER BY id DESC LIMIT 10').bind(mid).all(),
+      db.prepare("SELECT id,kind,message,created_at,read_at FROM alerts WHERE merchant_id=? AND kind<>'tag_request' ORDER BY id DESC LIMIT 10").bind(mid).all(),
     ]);
     const entries = await db.prepare('SELECT COUNT(*) AS n FROM entries WHERE merchant_id=?').bind(mid).first();
     return json({ ok: true, merchant, overview: ov, alerts: alerts.results, entries: entries.n });
