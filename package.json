@@ -1,0 +1,17 @@
+{
+  "name": "asalah-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "أصالة المنتجات الأصلية: منصة مركزية لعلامات NFC للتحقق من المنتجات الأصلية",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "deploy": "wrangler deploy",
+    "test": "node --test --test-concurrency=1 test/*.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.149.0"
+  }
+}

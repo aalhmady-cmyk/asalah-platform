@@ -1,0 +1,27 @@
+name = "asalah-platform"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# الصفحات الثابتة (اللوحات وصفحة التحقق). كل مسارات /api تمر على الـ Worker أولاً.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "404-page"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "asalah"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+# فحص المخزون والتنبيهات كل ساعة
+[triggers]
+crons = ["0 * * * *"]
+
+[vars]
+PLATFORM_NAME = "أصالة المنتجات الأصلية"
+
+# أسرار تضاف بـ: wrangler secret put <الاسم>
+#   TAG_SECRET   : 32 حرف أو أكثر. يوقّع روابط العلامات، ولا يتغيّر بعد أول دفعة.
+#   SETUP_TOKEN  : 32 حرف أو أكثر. لإنشاء أول حساب مدير عام فقط.
