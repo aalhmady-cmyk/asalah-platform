@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>اللوحة الأم - أصالة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><rect x="2" y="2" width="36" height="36" rx="10" fill="none" stroke="#D9B45A" stroke-width="2"/><path d="M12 21l5 5 11-12" fill="none" stroke="#D9B45A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><b>أصالة</b><small>المنتجات الأصلية · اللوحة الأم</small></div>
+    </div>
+    <nav id="nav" aria-label="القائمة الرئيسية">
+      <button type="button" data-tab="home">الرئيسية</button>
+      <button type="button" data-tab="merchants">التجار</button>
+      <button type="button" data-tab="batches">الدفعات</button>
+      <button type="button" data-tab="tags">العلامات</button>
+      <button type="button" data-tab="reports">التقليد والبلاغات <span class="badge" id="unknown-badge"></span></button>
+      <button type="button" data-tab="users">الحسابات</button>
+      <button type="button" data-tab="audit">سجل العمليات</button>
+    </nav>
+    <div class="foot"><span id="me"></span><button type="button" id="logout">تسجيل الخروج</button></div>
+  </aside>
+
+  <main class="main">
+    <section id="home">
+      <div class="page-head">
+        <div><h1 id="greet">أهلاً</h1><p>نظرة على كل التجار والعلامات اليوم</p></div>
+        <div class="actions">
+          <button class="btn" type="button" data-open="dlg-merchant">تاجر جديد</button>
+          <button class="btn btn-primary" type="button" data-open="dlg-batch">+ إنشاء دفعة</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:24px;margin-top:24px">
+        <div class="kpis" id="home-kpis"></div>
+        <div id="home-alerts" style="display:flex;flex-direction:column;gap:12px"></div>
+        <div class="row">
+          <div class="card wide"><div class="card-head"><h2>المسحات، آخر 14 يوم</h2><span class="small muted">كل التجار</span></div><div id="home-bars"></div></div>
+          <div class="card"><div class="card-head"><h2>المسحات حسب المدينة</h2><span class="small muted">آخر 7 أيام</span></div><div id="home-cities" style="display:flex;flex-direction:column;gap:12px"></div></div>
+        </div>
+        <div class="card"><div class="card-head"><h2>التجار</h2></div><div class="table-wrap" id="home-merchants"></div></div>
+      </div>
+    </section>
+
+    <section id="merchants" hidden>
+      <div class="page-head"><div><h1>التجار</h1><p>حساب لكل تاجر، بهويته وحدوده</p></div><button class="btn btn-primary" type="button" data-open="dlg-merchant">تاجر جديد</button></div>
+      <div class="card" style="margin-top:24px"><div class="table-wrap" id="merchants-table"></div></div>
+    </section>
+
+    <section id="batches" hidden>
+      <div class="page-head"><div><h1>الدفعات</h1><p>كل دفعة تُنشأ موقوفة، وتفعّلها لما تُشحن للتاجر</p></div><button class="btn btn-primary" type="button" data-open="dlg-batch">+ إنشاء دفعة</button></div>
+      <div class="card" style="margin-top:24px"><div class="table-wrap" id="batches-table"></div></div>
+    </section>
+
+    <section id="tags" hidden>
+      <div class="page-head"><div><h1>العلامات</h1><p>ابحث عن أي علامة، أو أوقف وفعّل علامة أو نطاق أرقام</p></div></div>
+      <div class="row" style="margin-top:24px">
+        <form class="card" id="lookup-form">
+          <h2>البحث عن علامة</h2>
+          <label class="field">رقم العلامة أو رابطها<input name="q" required placeholder="GK2610-000123" class="ltr"></label>
+          <button class="btn btn-primary" type="submit">بحث</button>
+          <div id="lookup-result"></div>
+        </form>
+        <form class="card" id="status-form">
+          <h2>إيقاف أو تفعيل</h2>
+          <p class="small muted" style="margin:0">إيقاف الإدارة ما يقدر التاجر يلغيه. إعادة التفعيل تصفّر عدّاد الفحوصات.</p>
+          <div class="form-grid">
+            <label class="field">رمز الدفعة<input name="batch_code" required placeholder="GK2610" class="ltr"></label>
+            <label class="field">من رقم<input name="from" type="number" min="1" required class="ltr"></label>
+            <label class="field">إلى رقم (اختياري)<input name="to" type="number" min="1" class="ltr"></label>
+          </div>
+          <div class="actions">
+            <button class="btn btn-danger" type="submit" name="action" value="block">إيقاف</button>
+            <button class="btn btn-primary" type="submit" name="action" value="activate">تفعيل</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="reports" hidden>
+      <div class="page-head"><div><h1>التقليد والبلاغات</h1><p>الأكواد اللي انمسحت وهي مو موجودة عندنا، وبلاغات العملاء</p></div></div>
+      <div class="row" style="margin-top:24px">
+        <div class="card"><h2>آخر الأكواد المزيّفة</h2><div class="table-wrap" id="unknown-table"></div></div>
+        <div class="card"><h2>بلاغات العملاء</h2><div class="table-wrap" id="reports-table"></div></div>
+      </div>
+    </section>
+
+    <section id="users" hidden>
+      <div class="page-head"><div><h1>الحسابات</h1><p>حسابات المدراء والتجار</p></div><button class="btn btn-primary" type="button" data-open="dlg-user">حساب جديد</button></div>
+      <div class="card" style="margin-top:24px"><div class="table-wrap" id="users-table"></div></div>
+    </section>
+
+    <section id="audit" hidden>
+      <div class="page-head"><div><h1>سجل العمليات</h1><p>آخر 200 عملية: مين سوّى وش ومتى</p></div></div>
+      <div class="card" style="margin-top:24px"><div class="table-wrap" id="audit-table"></div></div>
+    </section>
+  </main>
+</div>
+
+<dialog id="dlg-merchant">
+  <form method="dialog" id="merchant-form">
+    <h2 id="merchant-form-title">تاجر جديد</h2>
+    <input type="hidden" name="id">
+    <div class="form-grid">
+      <label class="field">اسم التاجر<input name="name" required></label>
+      <label class="field">الاسم المختصر (إنجليزي)<input name="slug" required pattern="[a-z0-9-]+" placeholder="green-kif" class="ltr"></label>
+      <label class="field">لون الهوية<input name="brand_color" type="color" value="#0E6B4E"></label>
+      <label class="field">رابط الشعار (https)<input name="logo_url" type="url" class="ltr"></label>
+      <label class="field">رابط المتجر (https)<input name="store_url" type="url" class="ltr"></label>
+      <label class="field">واتساب<input name="whatsapp" class="ltr" placeholder="9665XXXXXXXX"></label>
+      <label class="field">حد تنبيه المخزون<input name="low_stock_threshold" type="number" min="0" value="5000" class="ltr"></label>
+      <label class="field">حد الفحوصات لكل علامة<input name="max_checks" type="number" min="0" max="100" value="5" class="ltr"></label>
+      <label class="field" id="merchant-status-field" hidden>الحالة<select name="status"><option value="active">نشط</option><option value="suspended">موقوف</option></select></label>
+    </div>
+    <div class="actions"><button class="btn btn-primary" type="submit">حفظ</button><button class="btn" type="button" data-close>إلغاء</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-batch">
+  <form method="dialog" id="batch-form">
+    <h2>إنشاء دفعة</h2>
+    <div class="form-grid">
+      <label class="field">التاجر<select name="merchant_id" required id="batch-merchant"></select></label>
+      <label class="field">رمز الدفعة<input name="code" required pattern="[A-Za-z0-9]{2,16}" placeholder="GK2611" class="ltr"></label>
+      <label class="field">عدد العلامات<input name="size" type="number" min="1" max="1000000" required class="ltr"></label>
+      <label class="field">اسم المنتج<input name="product_name"></label>
+      <label class="field">تاريخ الإنتاج<input name="produced_on" type="month" class="ltr"></label>
+    </div>
+    <label class="check"><input type="checkbox" name="is_test"> دفعة تجريبية (ما تدخل في المخزون ولا الإحصائيات)</label>
+    <p class="small muted" style="margin:0">الدفعة تنضاف موقوفة. نزّل ملف المصنع، وفعّلها لما تُشحن.</p>
+    <div class="actions"><button class="btn btn-primary" type="submit">إنشاء</button><button class="btn" type="button" data-close>إلغاء</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlg-user">
+  <form method="dialog" id="user-form">
+    <h2>حساب جديد</h2>
+    <div class="form-grid">
+      <label class="field">النوع<select name="role" id="user-role"><option value="merchant">تاجر</option><option value="admin">مدير عام</option></select></label>
+      <label class="field" id="user-merchant-field">التاجر<select name="merchant_id" id="user-merchant"></select></label>
+      <label class="field">الاسم<input name="name" required></label>
+      <label class="field">البريد<input name="email" type="email" required class="ltr"></label>
+      <label class="field">كلمة مرور مؤقتة<input name="password" type="text" minlength="10" required class="ltr"></label>
+    </div>
+    <div class="actions"><button class="btn btn-primary" type="submit">إنشاء</button><button class="btn" type="button" data-close>إلغاء</button></div>
+  </form>
+</dialog>
+
+<script type="module" src="/admin/admin.js"></script>
+</body>
+</html>

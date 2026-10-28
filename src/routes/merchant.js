@@ -13,7 +13,7 @@ export async function handleMerchant(req, env, path) {
     const [ov, merchant, alerts] = await Promise.all([
       overviewFor(db, mid),
       db.prepare('SELECT id,name,slug,logo_url,brand_color,store_url,low_stock_threshold,max_checks,contest_enabled,contest_title,contest_ends_at,contest_terms_url FROM merchants WHERE id=?').bind(mid).first(),
-      db.prepare('SELECT id,kind,message,created_at,read_at FROM alerts WHERE merchant_id=? ORDER BY id DESC LIMIT 10').bind(mid).all(),
+      db.prepare('SELECT id,kind,message,created_at,read_at FROM alerts WHERE merchant_id=? AND kind<>'tag_request' ORDER BY id DESC LIMIT 10').bind(mid).all(),
     ]);
     const entries = await db.prepare('SELECT COUNT(*) AS n FROM entries WHERE merchant_id=?').bind(mid).first();
     return json({ ok: true, merchant, overview: ov, alerts: alerts.results, entries: entries.n });
@@ -76,6 +76,20 @@ export async function handleMerchant(req, env, path) {
   if (path === '/api/m/reports' && m === 'GET') {
     const r = await db.prepare('SELECT id,reason,city,point_of_sale,note,created_at FROM reports WHERE merchant_id=? ORDER BY id DESC LIMIT 200').bind(mid).all();
     return json({ ok: true, reports: r.results });
+  }
+
+  // طلب دفعة جديدة يوصل للمدير العام كتنبيه في اللوحة الأم
+  if (path === '/api/m/request-tags' && m === 'POST') {
+    const b = await readJson(req);
+    const count = int(b.count, 'عدد العلامات', { min: 100, max: 1000000 });
+    const note = str(b.note, 'الملاحظة', { max: 300, optional: true });
+    const name = (await db.prepare('SELECT name FROM merchants WHERE id=?').bind(mid).first()).name;
+    await db
+      .prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(?,'tag_request',?,?)")
+      .bind(mid, `طلب ${count.toLocaleString('en-US')} علامة جديدة من ${name}${note ? ': ' + note : ''}`, now())
+      .run();
+    await audit(db, user, 'tags_requested', { count, note });
+    return json({ ok: true, message: 'وصل طلبك لإدارة أصالة' });
   }
 
   if (path === '/api/m/alerts/read' && m === 'POST') {

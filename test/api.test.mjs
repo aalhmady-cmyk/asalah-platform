@@ -188,11 +188,11 @@ test('المخزون وتنبيه قرب الخلوص', async () => {
   assert.equal(ov.data.overview.stock.sold, 3); // العلامات 1 و 2 و 5
   assert.equal(ov.data.overview.stock.remaining, 47);
   assert.ok(ov.data.overview.scans_today > 0);
-  await fetch(BASE + '/__scheduled?cron=0+*+*+*+*');
+  await fetch(BASE + '/cdn-cgi/local/scheduled?cron=0+*+*+*+*');
   await new Promise((r) => setTimeout(r, 500));
   const after1 = await call('/api/m/overview', { cookie: S.merchant });
   assert.equal(after1.data.alerts.filter((a) => a.kind === 'low_stock').length, 1);
-  await fetch(BASE + '/__scheduled?cron=0+*+*+*+*');
+  await fetch(BASE + '/cdn-cgi/local/scheduled?cron=0+*+*+*+*');
   await new Promise((r) => setTimeout(r, 500));
   const after2 = await call('/api/m/overview', { cookie: S.merchant });
   assert.equal(after2.data.alerts.filter((a) => a.kind === 'low_stock').length, 1); // ما يتكرر خلال 24 ساعة

@@ -1,6 +1,6 @@
 // روابط العلامات وأرقامها والمخزون.
 //
-// رابط العلامة: <origin>/v?t=<batch36>.<serial36>.<sig>
+// رابط العلامة: <origin>/v/?t=<batch36>.<serial36>.<sig>
 //   sig = أول 16 حرف base64url من HMAC-SHA256(TAG_SECRET, "batch:serial:salt")
 // يعني الرابط ما يتخمّن (96 بت)، ونقدر نعيد توليد ملف المصنع في أي وقت بدون ما نخزّن الأكواد.
 import { b64url, enc, fail, safeEqual } from './util.js';

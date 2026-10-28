@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>لوحة التاجر - أصالة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="brand">
+      <div id="logo" aria-hidden="true" style="width:44px;height:44px;border-radius:12px;background:var(--green-tint);color:var(--green-ink);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;overflow:hidden"></div>
+      <div><b id="merchant-name">لوحة التاجر</b><small>بحماية أصالة المنتجات الأصلية</small></div>
+    </div>
+    <nav id="nav" aria-label="أقسام اللوحة">
+      <button type="button" data-tab="home">الرئيسية</button>
+      <button type="button" data-tab="tags">العلامات</button>
+      <button type="button" data-tab="contest">المسابقة</button>
+      <button type="button" data-tab="reports">البلاغات</button>
+      <button type="button" data-tab="account">الحساب</button>
+    </nav>
+    <div class="foot"><span id="me"></span><button type="button" id="logout">تسجيل الخروج</button></div>
+  </aside>
+
+  <main class="main">
+    <section id="home">
+      <div style="display:flex;flex-direction:column;gap:24px">
+        <div id="alerts" style="display:flex;flex-direction:column;gap:12px"></div>
+        <div class="row">
+          <div class="hero wide" id="stock"></div>
+          <div class="card" id="contest-card"></div>
+        </div>
+        <div class="kpis" id="kpis"></div>
+        <div class="row">
+          <div class="card"><div class="card-head"><h2>المسحات حسب المدينة</h2><span class="small muted">آخر 7 أيام</span></div><div id="cities" style="display:flex;flex-direction:column;gap:12px"></div></div>
+          <div class="card wide"><div class="card-head"><h2>المسحات، آخر 14 يوم</h2></div><div id="daily"></div></div>
+        </div>
+        <div class="card"><h2>آخر عمليات التحقق</h2><div class="table-wrap" id="recent"></div></div>
+      </div>
+    </section>
+
+    <section id="tags" hidden>
+      <div class="page-head"><div><h1>العلامات</h1><p>دفعاتك، والبحث عن أي علامة، وإيقافها أو تفعيلها</p></div></div>
+      <div style="display:flex;flex-direction:column;gap:24px;margin-top:24px">
+        <div class="card"><h2>دفعاتك</h2><div class="table-wrap" id="batches"></div></div>
+        <div class="row">
+          <form class="card" id="lookup-form">
+            <h2>البحث عن علامة</h2>
+            <label class="field">رقم العلامة أو رابطها<input name="q" required placeholder="GK2610-000123" class="ltr"></label>
+            <button class="btn btn-primary" type="submit">بحث</button>
+            <div id="lookup-result"></div>
+          </form>
+          <form class="card" id="status-form">
+            <h2>إيقاف أو تفعيل علامة</h2>
+            <p class="small muted" style="margin:0">اكتب رقم علامة أو نطاق أرقام. العلامات اللي أوقفتها إدارة أصالة ما تقدر تفعّلها من هنا.</p>
+            <div class="form-grid">
+              <label class="field">رمز الدفعة<input name="batch_code" required class="ltr"></label>
+              <label class="field">من رقم<input name="from" type="number" min="1" required class="ltr"></label>
+              <label class="field">إلى رقم (اختياري)<input name="to" type="number" min="1" class="ltr"></label>
+            </div>
+            <div class="actions">
+              <button class="btn btn-danger" type="submit" name="action" value="block">إيقاف</button>
+              <button class="btn btn-primary" type="submit" name="action" value="activate">تفعيل</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="contest" hidden>
+      <div class="page-head"><div><h1>المسابقة</h1><p>العميل يشوف نموذج المشاركة بعد ما يتحقق من منتجك</p></div><a class="btn" href="/api/m/entries.csv">تصدير المشاركات</a></div>
+      <form class="card" id="contest-form" style="margin-top:24px;max-width:720px">
+        <label class="check"><input type="checkbox" name="contest_enabled"> المسابقة شغّالة</label>
+        <div class="form-grid">
+          <label class="field">اسم المسابقة<input name="contest_title" placeholder="مسابقة الشتاء"></label>
+          <label class="field">تنتهي في<input name="contest_ends_at" type="date" class="ltr"></label>
+          <label class="field">رابط الشروط (https)<input name="contest_terms_url" type="url" class="ltr"></label>
+          <label class="field">رابط متجرك (https)<input name="store_url" type="url" class="ltr"></label>
+        </div>
+        <p class="small muted" style="margin:0">تأكد من ترخيص وزارة التجارة للمسابقة قبل تشغيلها. السحب يجي في المرحلة الثالثة.</p>
+        <div><button class="btn btn-primary" type="submit">حفظ</button></div>
+      </form>
+    </section>
+
+    <section id="reports" hidden>
+      <div class="page-head"><div><h1>بلاغات التقليد</h1><p>اللي أرسلها العملاء لما طلعت لهم علامة مقلّدة أو موقوفة</p></div></div>
+      <div class="card" style="margin-top:24px"><div class="table-wrap" id="reports-table"></div></div>
+    </section>
+
+    <section id="account" hidden>
+      <div class="page-head"><div><h1>الحساب</h1></div></div>
+      <form class="card" id="password-form" style="margin-top:24px;max-width:480px">
+        <h2>تغيير كلمة المرور</h2>
+        <label class="field">كلمة المرور الحالية<input name="current" type="password" autocomplete="current-password" required class="ltr"></label>
+        <label class="field">كلمة المرور الجديدة (10 أحرف أو أكثر)<input name="new_password" type="password" minlength="10" autocomplete="new-password" required class="ltr"></label>
+        <div><button class="btn btn-primary" type="submit">تغيير</button></div>
+      </form>
+    </section>
+  </main>
+</div>
+<script type="module" src="/merchant/merchant.js"></script>
+</body>
+</html>

@@ -169,7 +169,7 @@ export async function handleAdmin(req, env, path) {
     if (to - from + 1 > FACTORY_CHUNK) fail(400, `أقصى ${FACTORY_CHUNK} علامة في الملف الواحد`);
     const origin = env.VERIFY_ORIGIN || new URL(req.url).origin;
     const rows = [];
-    for (let s = from; s <= to; s++) rows.push({ serial: s, public_id: publicId(batch, s), url: `${origin}/v?t=${await tokenFor(env, batch, s)}` });
+    for (let s = from; s <= to; s++) rows.push({ serial: s, public_id: publicId(batch, s), url: `${origin}/v/?t=${await tokenFor(env, batch, s)}` });
     await audit(db, user, 'factory_file_downloaded', { code: batch.code, from, to }, batch.merchant_id);
     return csvResponse(rows, ['serial', 'public_id', 'url'], `${batch.code}-${from}-${to}.csv`);
   }

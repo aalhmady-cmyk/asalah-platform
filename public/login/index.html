@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تسجيل الدخول - أصالة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+<main style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px">
+  <div class="card" style="width:100%;max-width:420px;gap:20px">
+    <div class="brand" style="color:var(--ink)">
+      <svg width="44" height="44" viewBox="0 0 40 40" aria-hidden="true"><rect x="2" y="2" width="36" height="36" rx="10" fill="var(--forest)"/><path d="M12 21l5 5 11-12" fill="none" stroke="#D9B45A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><b>أصالة</b><small class="muted">المنتجات الأصلية</small></div>
+    </div>
+
+    <form id="login" style="display:flex;flex-direction:column;gap:14px">
+      <h1 style="font-size:22px">تسجيل الدخول</h1>
+      <label class="field">البريد الإلكتروني<input name="email" type="email" autocomplete="username" required class="ltr"></label>
+      <label class="field">كلمة المرور<input name="password" type="password" autocomplete="current-password" required class="ltr"></label>
+      <button class="btn btn-primary" type="submit">دخول</button>
+    </form>
+
+    <form id="setup" hidden style="display:flex;flex-direction:column;gap:14px">
+      <h1 style="font-size:22px">إعداد أول مدير عام</h1>
+      <p class="muted small" style="margin:0">هذي الصفحة تشتغل مرة وحدة فقط، بمفتاح الإعداد SETUP_TOKEN.</p>
+      <label class="field">مفتاح الإعداد<input name="token" type="password" required class="ltr"></label>
+      <label class="field">الاسم<input name="name" required></label>
+      <label class="field">البريد الإلكتروني<input name="email" type="email" required class="ltr"></label>
+      <label class="field">كلمة المرور (10 أحرف أو أكثر)<input name="password" type="password" minlength="10" autocomplete="new-password" required class="ltr"></label>
+      <button class="btn btn-primary" type="submit">إنشاء الحساب</button>
+    </form>
+  </div>
+</main>
+<script type="module" src="/login/login.js"></script>
+</body>
+</html>
