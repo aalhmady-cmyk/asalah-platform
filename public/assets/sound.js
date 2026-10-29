@@ -48,7 +48,8 @@ export async function buzz() {
 const clips = new Map();
 // نحمّل الملف ونفكّه مرة وحدة، ونحتفظ فيه
 function clip(name) {
-  if (!clips.has(name)) clips.set(name, fetch(`/assets/voice/${name}.mp3`).then((r) => r.arrayBuffer()).then((b) => audio().decodeAudioData(b)));
+  const url = name.startsWith('/') ? name : `/assets/voice/${name}.mp3`;
+  if (!clips.has(name)) clips.set(name, fetch(url).then((r) => r.arrayBuffer()).then((b) => audio().decodeAudioData(b)));
   return clips.get(name);
 }
 export function preload(en = false) {
@@ -65,16 +66,17 @@ async function speak(name) {
 }
 
 // يرجع 'blocked' إذا المتصفح منع الصوت (لازم لمسة من العميل)، وإلا 'ok'
-export async function playResult(kind, en = false) {
-  const l = en ? 'en' : 'ar';
+// custom: تسجيلات المدير العربية {hi, thanks, warn} تبدّل الافتراضي
+export async function playResult(kind, en = false, custom = {}) {
+  const line = (k) => (!en && custom?.[k]) || `${en ? 'en' : 'ar'}-${k}`;
   try {
     if (kind === 'original') {
-      await speak(`${l}-hi`);
+      await speak(line('hi'));
       await chime();
-      await speak(`${l}-thanks`);
+      await speak(line('thanks'));
     } else {
       await buzz();
-      await speak(`${l}-warn`);
+      await speak(line('warn'));
     }
     return 'ok';
   } catch (e) {

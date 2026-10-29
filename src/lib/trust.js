@@ -153,6 +153,15 @@ export const voiceUrl = (key) => (key ? '/media/' + key : null);
 // مفتاح المدير العام لصوت نتيجة التحقق (شغّال إذا ما انحفظ شي)
 export const soundOn = async (db) => (await db.prepare("SELECT value FROM settings WHERE key='verify_sound'").first())?.value !== '0';
 
+// تسجيلات المدير اللي تبدّل الكلام الافتراضي (عربي): hi / thanks / warn
+export const CLIP_NAMES = ['hi', 'thanks', 'warn'];
+export async function soundClips(db) {
+  const rows = (await db.prepare("SELECT key,value FROM settings WHERE key IN ('sound_clip_hi','sound_clip_thanks','sound_clip_warn')").all()).results;
+  const out = {};
+  for (const r of rows) if (r.value) out[r.key.slice(11)] = voiceUrl(r.value);
+  return out;
+}
+
 // ---------- الملخص الأسبوعي للتاجر ----------
 export async function weeklyStats(db, merchantId, t = now()) {
   const end = riyadhDayStart(t), start = end - 7 * 86400, prev = start - 7 * 86400;

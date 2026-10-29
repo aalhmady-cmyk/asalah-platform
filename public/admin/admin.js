@@ -133,10 +133,79 @@ async function loadHome() {
 $('sound-global').addEventListener('change', async (e) => {
   try { await api('/api/admin/sound', { method: 'PATCH', body: { enabled: e.target.checked } }); toast(e.target.checked ? 'صوت النتيجة شغّال لكل المنصة 🔔' : 'وقّفنا الصوت لكل المنصة'); } catch (err) { toast(err.message, true); }
 });
-$('sound-try-ok').addEventListener('click', () => playResult('original').catch(() => {}));
-$('sound-try-bad').addEventListener('click', () => playResult('fake').catch(() => {}));
+const CLIPS = [
+  ['hi', 'الترحيب (قبل الجرس)', 'هلا والله، المنتج أصلي'],
+  ['thanks', 'الشكر (بعد الجرس)', 'شكراً إنك اخترت المنتج الأصلي، وصحتين وعافية!'],
+  ['warn', 'التحذير (المقلّد)', 'احذر! المنتج يُشتبه إنه مزوّر أو مقلّد. بلّغ عنه على الفور.'],
+];
+function drawClips(clips) {
+  render($('sound-clips'), html`${CLIPS.map(([k, label, text]) => html`<div class="sound-clip">
+    <div><b>${label}</b><div class="small muted">«${text}»</div></div>
+    ${clips[k] ? html`<audio controls preload="none" src="${clips[k]}"></audio>` : html`<span class="pill">الصوت الافتراضي</span>`}
+    <div class="actions">
+      <button class="btn btn-sm btn-primary" type="button" data-clip-rec="${k}">🎙️ سجّل</button>
+      <label class="btn btn-sm">📁 ارفع<input type="file" accept="audio/*" data-clip-file="${k}" hidden></label>
+      ${clips[k] ? html`<button class="btn btn-sm" type="button" data-clip-reset="${k}">↩️ الافتراضي</button>` : ''}
+    </div>
+  </div>`)}`);
+}
+async function loadSound() {
+  const d = await api('/api/admin/sound');
+  $('sound-global').checked = d.enabled;
+  soundCustom = d.clips || {};
+  drawClips(soundCustom);
+}
+async function uploadClip(k, blob) {
+  if (blob.size > 1.5 * 1024 * 1024) return toast('التسجيل طويل، خلّه أقل من 30 ثانية', true);
+  $('clip-status').textContent = 'نرفع التسجيل…';
+  try {
+    await api('/api/admin/sound/clip/' + k, { method: 'POST', body: blob });
+    toast('تم، صار العملاء يسمعون تسجيلك 🔊');
+    await loadSound();
+  } catch (err) { toast(err.message, true); }
+  $('clip-status').textContent = '';
+}
+let clipRec = null;
+$('sound-clips').addEventListener('click', async (e) => {
+  const reset = e.target.closest('[data-clip-reset]');
+  if (reset) {
+    if (!confirm('ترجع للصوت الافتراضي؟')) return;
+    try { await api('/api/admin/sound/clip/' + reset.dataset.clipReset, { method: 'DELETE' }); await loadSound(); } catch (err) { toast(err.message, true); }
+    return;
+  }
+  const b = e.target.closest('[data-clip-rec]');
+  if (!b) return;
+  if (clipRec) return clipRec.stop();
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') return toast('جهازك ما يدعم التسجيل هنا، ارفع ملف صوت بدال', true);
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast('اسمح للمتصفح يستخدم المايك', true); }
+  const type = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((t) => MediaRecorder.isTypeSupported(t)) || '';
+  const rec = (clipRec = new MediaRecorder(stream, type ? { mimeType: type } : {}));
+  const parts = [];
+  let left = 30;
+  const tick = setInterval(() => { left--; $('clip-status').textContent = `جاري التسجيل… باقي ${left} ثانية، اضغط «وقّف» لما تخلص`; if (left <= 0) rec.stop(); }, 1000);
+  rec.ondataavailable = (ev) => ev.data.size && parts.push(ev.data);
+  rec.onstop = () => {
+    clearInterval(tick);
+    stream.getTracks().forEach((t) => t.stop());
+    clipRec = null;
+    b.textContent = '🎙️ سجّل';
+    uploadClip(b.dataset.clipRec, new Blob(parts, { type: (rec.mimeType || 'audio/webm').split(';')[0] }));
+  };
+  rec.start();
+  b.textContent = '⏹️ وقّف';
+  $('clip-status').textContent = 'جاري التسجيل… تكلّم الحين';
+});
+$('sound-clips').addEventListener('change', (e) => {
+  const f = e.target.closest('[data-clip-file]');
+  if (f?.files[0]) uploadClip(f.dataset.clipFile, f.files[0]);
+  if (f) f.value = '';
+});
+let soundCustom = {};
+$('sound-try-ok').addEventListener('click', () => playResult('original', false, soundCustom).catch(() => {}));
+$('sound-try-bad').addEventListener('click', () => playResult('fake', false, soundCustom).catch(() => {}));
 async function loadMerchants() {
-  api('/api/admin/sound').then((d) => ($('sound-global').checked = d.enabled)).catch(() => {});
+  loadSound().catch(() => {});
   merchants = (await api('/api/admin/merchants')).merchants;
   render($('merchants-table'), merchantRows(merchants, true));
 }

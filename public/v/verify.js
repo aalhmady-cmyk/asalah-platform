@@ -91,13 +91,13 @@ let lastResult = 'unknown', lastData = null, replay = false;
 // صوت النتيجة: يشتغل لحاله إذا المتصفح سمح، وإلا يطلع زر "اسمع النتيجة"
 function resultSound(kind) {
   if (replay || !lastData?.sound) return;
-  playResult(kind, EN).then((r) => r === 'blocked' && soundChip(kind)).catch(() => {});
+  playResult(kind, EN, lastData.sound_clips).then((r) => r === 'blocked' && soundChip(kind)).catch(() => {});
 }
 function soundChip(kind) {
   const b = $('sound-chip');
   b.textContent = kind === 'original' ? tx('🔊 اسمع النتيجة', '🔊 Hear the result') : tx('🔊 اسمع التحذير', '🔊 Hear the warning');
   b.classList.toggle('warn', kind !== 'original');
-  b.onclick = () => { show('sound-chip', false); playResult(kind, EN).catch(() => {}); };
+  b.onclick = () => { show('sound-chip', false); playResult(kind, EN, lastData?.sound_clips).catch(() => {}); };
   show('sound-chip');
   setTimeout(() => show('sound-chip', false), 20000);
 }

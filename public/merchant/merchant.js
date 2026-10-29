@@ -218,6 +218,7 @@ async function loadTrust() {
   $('weekly-on').checked = d.weekly_summary;
   $('sound-on').checked = d.verify_sound;
   $('sound-global-off').hidden = d.sound_global;
+  soundCustom = d.sound_clips || {};
   drawVoice(d.voice_url);
 }
 function drawVoice(url) {
@@ -233,8 +234,9 @@ $('weekly-on').addEventListener('change', async (e) => {
 $('sound-on').addEventListener('change', async (e) => {
   try { await api('/api/m/trust', { method: 'PATCH', body: { verify_sound: e.target.checked } }); toast(e.target.checked ? 'صار عملاؤك يسمعون صوت النتيجة 🔔' : 'وقّفنا الصوت'); } catch (err) { toast(err.message, true); }
 });
-$('sound-try-ok').addEventListener('click', () => playResult('original').catch(() => {}));
-$('sound-try-bad').addEventListener('click', () => playResult('fake').catch(() => {}));
+let soundCustom = {};
+$('sound-try-ok').addEventListener('click', () => playResult('original', false, soundCustom).catch(() => {}));
+$('sound-try-bad').addEventListener('click', () => playResult('fake', false, soundCustom).catch(() => {}));
 $('weekly-btn').addEventListener('click', async (e) => {
   e.target.disabled = true;
   e.target.textContent = 'نجهّز ملخصك…';

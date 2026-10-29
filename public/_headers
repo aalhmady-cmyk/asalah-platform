@@ -7,6 +7,8 @@
 
 /admin/*
   Cache-Control: no-store
+  ! Permissions-Policy
+  Permissions-Policy: camera=(), microphone=(self), geolocation=()
 /merchant/*
   Cache-Control: no-store
   ! Permissions-Policy

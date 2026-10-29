@@ -973,4 +973,20 @@ test('صوت نتيجة التحقق: التاجر يوقفه لمنتجاته،
   assert.equal((await patch(`/api/admin/merchants/${S.mid}`, { verify_sound: false }, S.admin)).status, 200);
   assert.equal((await post('/api/verify', { t: tokenOf(S.urls[44]), sid: sid('6') })).data.sound, false);
   await patch(`/api/admin/merchants/${S.mid}`, { verify_sound: true }, S.admin);
+
+  // المدير يسجّل الترحيب بصوته
+  const m4a = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypM4A '), Buffer.alloc(300)]);
+  const up = await fetch(BASE + '/api/admin/sound/clip/hi', { method: 'POST', headers: { Cookie: S.admin, Origin: BASE, 'Content-Type': 'audio/mp4' }, body: m4a });
+  assert.equal(up.status, 200);
+  const url = (await up.json()).url;
+  assert.match(url, /^\/media\/voice\/0\/[a-f0-9]{24}\.m4a$/);
+  assert.equal((await (await fetch(BASE + url)).arrayBuffer()).byteLength, m4a.length);
+  assert.equal((await fetch(BASE + '/api/admin/sound/clip/hi', { method: 'POST', headers: { Cookie: S.merchant, Origin: BASE }, body: m4a })).status, 403);
+  assert.equal((await fetch(BASE + '/api/admin/sound/clip/xx', { method: 'POST', headers: { Cookie: S.admin, Origin: BASE }, body: m4a })).status, 404);
+  const vv = (await post('/api/verify', { t: 'zz.2.BBBBBBBBBBBBBBBB', sid: sid('6') })).data;
+  assert.deepEqual(vv.sound_clips, { hi: url });
+  assert.equal((await call('/api/m/trust', { cookie: S.merchant })).data.sound_clips.hi, url);
+  assert.equal((await call('/api/admin/sound/clip/hi', { method: 'DELETE', cookie: S.admin })).status, 200);
+  assert.deepEqual((await call('/api/admin/sound', { cookie: S.admin })).data.clips, {});
+  assert.equal((await fetch(BASE + url)).status, 404);
 });

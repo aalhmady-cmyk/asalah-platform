@@ -1,6 +1,6 @@
 // المسارات العامة: التحقق من العلامة، المشاركة في المسابقة، بلاغ التقليد.
 import { pushAlert } from '../lib/push.js';
-import { compareWithOriginal, evidencePhoto, levelFor, passportFor, soundOn, voiceUrl } from '../lib/trust.js';
+import { compareWithOriginal, evidencePhoto, levelFor, passportFor, soundClips, soundOn, voiceUrl } from '../lib/trust.js';
 import { guaranteeClaim, saveEvidence } from './trust.js';
 import { assistantEnabled } from '../lib/assistant.js';
 import { guide } from '../lib/guide.js';
@@ -201,6 +201,12 @@ function contestOpen(b) {
   return Boolean(b.contest_enabled) && (!b.contest_ends_at || b.contest_ends_at > now());
 }
 
+// الصوت شغّال؟ ومعه تسجيلات المدير إذا فيه
+async function soundInfo(db, merchantOn) {
+  const sound = merchantOn && (await soundOn(db));
+  return sound ? { sound, sound_clips: await soundClips(db) } : { sound };
+}
+
 export async function verify(req, env) {
   const db = env.DB;
   await rateLimit(db, 'verify:' + (await ipHash(req)), 60, 3600);
@@ -209,13 +215,13 @@ export async function verify(req, env) {
   const r = await resolve(env, db, body.t);
   if (r.state === 'unknown') {
     await logUnknown(db, req, body.t, r.merchantId ?? null);
-    return json({ ok: false, result: 'unknown', message: MESSAGES.unknown, brand: null, sound: await soundOn(db) });
+    return json({ ok: false, result: 'unknown', message: MESSAGES.unknown, brand: null, ...(await soundInfo(db, true)) });
   }
   const b = r.batch;
-  const sound = Boolean(b.verify_sound) && (await soundOn(db));
+  const snd = await soundInfo(db, Boolean(b.verify_sound));
   const reject = async (result, tagId = null, checkNo = null) => {
     await logScan(db, req, tagId, b.merchant_id, result, checkNo);
-    return json({ ok: false, result, message: MESSAGES[result], brand: brand(b), report_allowed: true, sound });
+    return json({ ok: false, result, message: MESSAGES[result], brand: brand(b), report_allowed: true, ...snd });
   };
   if (b.merchant_status !== 'active' || b.status === 'blocked') return reject('blocked');
   if (b.status === 'pending') return reject('not_activated');
@@ -292,7 +298,7 @@ export async function verify(req, env) {
     level,
     guarantee: b.guarantee_enabled ? { terms: b.guarantee_terms, claimed: claim?.status || null } : null,
     voice_url: voiceUrl(b.voice_key),
-    sound,
+    ...snd,
   });
 }
 

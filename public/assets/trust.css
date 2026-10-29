@@ -8,3 +8,11 @@
 .voice-now { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .voice-now audio { max-width: 100%; }
 .weekly-out { white-space: pre-wrap; font-family: inherit; background: var(--ground); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 0; line-height: 1.9; font-size: 14px; }
+
+/* تسجيلات صوت التحقق في اللوحة الأم */
+.sound-clips { display: flex; flex-direction: column; gap: 10px; }
+.sound-clip { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--line, #E6E1D6); border-radius: 14px; }
+.sound-clip audio { height: 36px; max-width: 240px; }
+.sound-clip .actions { margin: 0; }
+.sound-clip > .pill { justify-self: start; }
+@media (max-width: 760px) { .sound-clip { grid-template-columns: 1fr; } .sound-clip audio { max-width: 100%; width: 100%; } }

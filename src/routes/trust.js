@@ -1,7 +1,7 @@
 // مسارات مزايا الثقة: خريطة التقليد، ضمان أصالة، البائع المعتمد، الرسالة الصوتية، الملخص الأسبوعي، وصور الأدلة.
 import { pushAlert } from '../lib/push.js';
 import { imageUrl, saveImageBytes } from '../lib/images.js';
-import { audioType, evidencePhoto, fakesMap, parseSellerToken, sellerToken, soundOn, voiceUrl, weeklySummary } from '../lib/trust.js';
+import { audioType, evidencePhoto, fakesMap, parseSellerToken, sellerToken, CLIP_NAMES, soundClips, soundOn, voiceUrl, weeklySummary } from '../lib/trust.js';
 import { audit, fail, ipHash, json, now, randomHex, rateLimit, readJson, saPhone, str } from '../lib/util.js';
 
 const HOURS = { 24: 24, 168: 168, 720: 720 };
@@ -145,7 +145,7 @@ export async function handleMerchantTrust(req, env, path, user, mid) {
   if (path === '/api/m/trust' && m === 'GET') {
     const r = await db.prepare('SELECT guarantee_enabled,guarantee_terms,voice_key,weekly_summary,verify_sound FROM merchants WHERE id=?').bind(mid).first();
     const open = await db.prepare("SELECT COUNT(*) AS n FROM guarantee_claims WHERE merchant_id=? AND status='new'").bind(mid).first();
-    return json({ ok: true, guarantee_enabled: Boolean(r.guarantee_enabled), guarantee_terms: r.guarantee_terms, voice_url: voiceUrl(r.voice_key), weekly_summary: Boolean(r.weekly_summary), verify_sound: Boolean(r.verify_sound), sound_global: await soundOn(db), open_claims: open.n });
+    return json({ ok: true, guarantee_enabled: Boolean(r.guarantee_enabled), guarantee_terms: r.guarantee_terms, voice_url: voiceUrl(r.voice_key), weekly_summary: Boolean(r.weekly_summary), verify_sound: Boolean(r.verify_sound), sound_global: await soundOn(db), sound_clips: await soundClips(db), open_claims: open.n });
   }
   if (path === '/api/m/trust' && m === 'PATCH') {
     if (user.merchant_role === 'staff') fail(403, 'هذي لصاحب الحساب بس', 'owner_only');
@@ -168,7 +168,29 @@ export async function handleMerchantTrust(req, env, path, user, mid) {
 export async function handleAdminTrust(req, env, path, user) {
   const db = env.DB, m = req.method;
   // صوت نتيجة التحقق لكل المنصة
-  if (path === '/api/admin/sound' && m === 'GET') return json({ ok: true, enabled: await soundOn(db) });
+  if (path === '/api/admin/sound' && m === 'GET') return json({ ok: true, enabled: await soundOn(db), clips: await soundClips(db) });
+  const cm = path.match(/^\/api\/admin\/sound\/clip\/([a-z]+)$/);
+  if (cm && CLIP_NAMES.includes(cm[1]) && (m === 'POST' || m === 'DELETE')) {
+    const k = 'sound_clip_' + cm[1];
+    const old = (await db.prepare('SELECT value FROM settings WHERE key=?').bind(k).first())?.value;
+    let key = null;
+    if (m === 'POST') {
+      if (!env.MEDIA) fail(503, 'خدمة الملفات غير مفعّلة');
+      const buf = new Uint8Array(await req.arrayBuffer());
+      if (!buf.length) fail(400, 'التسجيل فاضي');
+      if (buf.length > VOICE_MAX) fail(413, 'التسجيل طويل، خلّه أقل من 30 ثانية');
+      const t = audioType(buf);
+      if (!t) fail(415, 'صيغة الصوت غير مدعومة');
+      key = `voice/0/${randomHex(12)}.${t.ext}`;
+      await env.MEDIA.put(key, buf, { httpMetadata: { contentType: t.type } });
+      await db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(k, key).run();
+    } else {
+      await db.prepare('DELETE FROM settings WHERE key=?').bind(k).run();
+    }
+    if (old && env.MEDIA) await env.MEDIA.delete(old).catch(() => {});
+    await audit(db, user, 'sound_clip_' + (key ? 'set' : 'reset'), { clip: cm[1] });
+    return json({ ok: true, url: voiceUrl(key) });
+  }
   if (path === '/api/admin/sound' && m === 'PATCH') {
     const enabled = Boolean((await readJson(req)).enabled);
     await db.prepare("INSERT INTO settings(key,value) VALUES('verify_sound',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(enabled ? '1' : '0').run();
