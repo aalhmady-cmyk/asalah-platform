@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>طباعة ملصقات QR - أصالة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/print/print.css">
+</head>
+<body class="pr">
+<header class="pr-bar no-print">
+  <div class="pr-head"><a href="javascript:history.back()" class="btn btn-sm">→ رجوع</a><div><h1 id="pr-title">ملصقات QR</h1><p class="small muted" id="pr-sub">جاري التحميل…</p></div></div>
+  <form class="pr-opts" id="pr-form">
+    <label class="field">المقاس<select name="size"><option value="25">صغير 2.5 سم</option><option value="35" selected>وسط 3.5 سم</option><option value="50">كبير 5 سم</option></select></label>
+    <label class="field">من<input name="from" type="number" min="1" class="ltr"></label>
+    <label class="field">إلى<input name="to" type="number" min="1" class="ltr"></label>
+    <label class="check"><input type="checkbox" name="brand" checked> اسم العلامة فوق</label>
+    <button class="btn" type="submit">عرض</button>
+    <button class="btn btn-gold" type="button" id="pr-print">🖨️ اطبع</button>
+  </form>
+  <p class="small muted pr-tip">اطبع على ورق ملصقات A4 (أو ورق عادي وألصقه بشريط لاصق شفاف). الخطوط المنقّطة للقص. كل ملصق له رابط خاص ما يتكرر، مثل الشريحة بالضبط.</p>
+</header>
+<main id="sheet" class="pr-sheet"></main>
+<script type="module" src="/print/print.js"></script>
+</body>
+</html>

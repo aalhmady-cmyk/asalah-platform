@@ -5,7 +5,7 @@ import { adminPush } from './push.js';
 import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
 import { hotspots, monthlyReport } from '../lib/insights.js';
 import { lookupTag, overviewFor, setTagStatus } from '../lib/ops.js';
-import { publicId, stockFor, tokenFor } from '../lib/tags.js';
+import { printLinks, publicId, stockFor, tokenFor } from '../lib/tags.js';
 import { audit, csvResponse, fail, int, json, now, randomHex, readJson, str, url } from '../lib/util.js';
 
 const COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
@@ -176,7 +176,7 @@ export async function handleAdmin(req, env, path) {
 
   // ---------- الدفعات ----------
   if (path === '/api/admin/batches' && m === 'GET') {
-    const r = await db.prepare('SELECT b.id,b.code,b.size,b.status,b.is_test,b.product_name,b.produced_on,b.created_at,b.activated_at,b.merchant_id,b.image_key,m.name AS merchant_name FROM batches b JOIN merchants m ON m.id=b.merchant_id ORDER BY b.id DESC').all();
+    const r = await db.prepare('SELECT b.id,b.code,b.size,b.status,b.is_test,b.kind,b.product_name,b.produced_on,b.created_at,b.activated_at,b.merchant_id,b.image_key,m.name AS merchant_name FROM batches b JOIN merchants m ON m.id=b.merchant_id ORDER BY b.id DESC').all();
     return json({ ok: true, batches: r.results.map(({ image_key, ...b }) => ({ ...b, image_url: imageUrl(image_key) })) });
   }
   if (path === '/api/admin/batches' && m === 'POST') {
@@ -186,12 +186,13 @@ export async function handleAdmin(req, env, path) {
     const code = str(b.code, 'رمز الدفعة', { min: 2, max: 16 }).toUpperCase();
     if (!/^[A-Z0-9]+$/.test(code)) fail(400, 'رمز الدفعة: أحرف إنجليزية وأرقام فقط، مثل GK2610');
     if (await db.prepare('SELECT id FROM batches WHERE code=?').bind(code).first()) fail(409, 'رمز الدفعة مستخدم مسبقاً');
-    const size = int(b.size, 'عدد العلامات', { min: 1, max: 1000000 });
+    const kind = b.kind === 'qr' ? 'qr' : 'nfc';
+    const size = int(b.size, 'عدد العلامات', { min: 1, max: kind === 'qr' ? 20000 : 1000000 });
     const produced = str(b.produced_on, 'تاريخ الإنتاج', { max: 20, optional: true });
     if (produced && !/^\d{4}-\d{2}(-\d{2})?$/.test(produced)) fail(400, 'تاريخ الإنتاج بصيغة 2026-10 أو 2026-10-15');
     const row = await db
-      .prepare('INSERT INTO batches(merchant_id,code,size,salt,status,is_test,product_name,produced_on,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?) RETURNING id,code,size,status,is_test,merchant_id')
-      .bind(merchantId, code, size, randomHex(8), 'pending', b.is_test ? 1 : 0, str(b.product_name, 'اسم المنتج', { max: 100, optional: true }), produced, user.id, now())
+      .prepare('INSERT INTO batches(merchant_id,code,size,salt,status,is_test,product_name,produced_on,created_by,created_at,kind) VALUES(?,?,?,?,?,?,?,?,?,?,?) RETURNING id,code,size,status,is_test,merchant_id,kind')
+      .bind(merchantId, code, size, randomHex(8), 'pending', b.is_test ? 1 : 0, str(b.product_name, 'اسم المنتج', { max: 100, optional: true }), produced, user.id, now(), kind)
       .first();
     await audit(db, user, 'batch_created', { code, size }, merchantId);
     return json({ ok: true, batch: row }, 201);
@@ -230,6 +231,15 @@ export async function handleAdmin(req, env, path) {
     for (let s = from; s <= to; s++) rows.push({ serial: s, public_id: publicId(batch, s), url: `${origin}/v/?t=${await tokenFor(env, batch, s)}` });
     await audit(db, user, 'factory_file_downloaded', { code: batch.code, from, to }, batch.merchant_id);
     return csvResponse(rows, ['serial', 'public_id', 'url'], `${batch.code}-${from}-${to}.csv`);
+  }
+
+  // روابط جاهزة للطباعة كـ QR (أي دفعة، للمدير)
+  if ((match = path.match(/^\/api\/admin\/batches\/(\d+)\/links$/)) && m === 'GET') {
+    const batch = await db.prepare('SELECT * FROM batches WHERE id=?').bind(Number(match[1])).first();
+    if (!batch) fail(404, 'ما لقينا الدفعة');
+    const out = await printLinks(env, req, batch);
+    await audit(db, user, 'qr_printed', { code: batch.code, from: out.from, to: out.to }, batch.merchant_id);
+    return json(out);
   }
 
   // ---------- العلامات ----------

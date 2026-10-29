@@ -1,0 +1,24 @@
+/* صفحة طباعة ملصقات QR */
+body.pr { background: #E9E7E1; margin: 0; }
+.pr-bar { position: sticky; top: 0; z-index: 5; background: #fff; border-bottom: 1px solid var(--line); padding: 14px 20px; display: flex; flex-direction: column; gap: 10px; }
+.pr-head { display: flex; align-items: center; gap: 14px; }
+.pr-head h1 { font-size: 20px; margin: 0; }
+.pr-head p { margin: 2px 0 0; }
+.pr-opts { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.pr-opts .field { min-width: 110px; flex: 0 1 140px; }
+.pr-tip { margin: 0; }
+.pr-sheet { width: 210mm; margin: 20px auto; background: #fff; padding: 8mm; display: flex; flex-wrap: wrap; align-content: flex-start; box-shadow: 0 10px 30px rgba(0,0,0,.12); }
+.pr-label { width: var(--w); height: calc(var(--w) * 1.32); border: 0.3mm dashed #B9B5AA; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.6mm; padding: 1.4mm; box-sizing: border-box; break-inside: avoid; overflow: hidden; color: #0F2A21; font-family: 'IBM Plex Sans Arabic', sans-serif; }
+.pr-label .b { font-weight: 700; font-size: calc(var(--w) * 0.085); line-height: 1.1; text-align: center; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-label svg { width: calc(var(--w) * 0.78); height: calc(var(--w) * 0.78); display: block; }
+.pr-label .c { font-size: calc(var(--w) * 0.075); font-weight: 600; display: flex; align-items: center; gap: 0.6mm; white-space: nowrap; }
+.pr-label .c i { font-style: normal; width: calc(var(--w) * 0.11); height: calc(var(--w) * 0.11); border-radius: 30%; background: #D9B45A; display: inline-flex; align-items: center; justify-content: center; font-size: calc(var(--w) * 0.075); }
+.pr-label .n { font-size: calc(var(--w) * 0.055); color: #5B6660; direction: ltr; font-family: ui-monospace, monospace; }
+.pr-empty { padding: 40px; text-align: center; width: 100%; }
+@media (max-width: 860px) { .pr-sheet { width: auto; margin: 12px; padding: 4mm; } }
+@media print {
+  @page { size: A4; margin: 6mm; }
+  body.pr { background: #fff; }
+  .no-print { display: none !important; }
+  .pr-sheet { width: auto; margin: 0; padding: 0; box-shadow: none; }
+}

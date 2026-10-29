@@ -4,6 +4,7 @@ import { ask, assistantEnabled, merchantContext, tips } from '../lib/assistant.j
 import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
 import { entriesWithFlags, FLAGS, hotspots, listDraws, monthlyReport, runDraw } from '../lib/insights.js';
 import { lookupTag, overviewFor, setTagStatus } from '../lib/ops.js';
+import { printLinks } from '../lib/tags.js';
 import { handleMerchantStore } from './store.js';
 import { deliver, whatsappEnabled } from '../lib/notify.js';
 import { audit, csvResponse, fail, int, json, now, rateLimit, readJson, saPhone, str, url } from '../lib/util.js';
@@ -92,10 +93,20 @@ export async function handleMerchant(req, env, path) {
     return json({ ok: true, merchant, overview: ov, alerts: alerts.results, entries: entries.n });
   }
 
+  // ملصقات QR: التاجر يطبع دفعاته اللي نوعها QR بنفسه
+  const qm = path.match(/^\/api\/m\/batches\/([A-Z0-9]{2,16})\/links$/);
+  if (qm && m === 'GET') {
+    const batch = await db.prepare('SELECT * FROM batches WHERE code=? AND merchant_id=?').bind(qm[1], mid).first();
+    if (!batch) fail(404, 'ما لقينا الدفعة');
+    if (batch.kind !== 'qr') fail(403, 'هذي دفعة شرائح NFC، ملفها يروح للمصنع من إدارة أصالة');
+    const out = await printLinks(env, req, batch);
+    await audit(db, user, 'qr_printed', { code: batch.code, from: out.from, to: out.to }, mid);
+    return json(out);
+  }
   if (path === '/api/m/batches' && m === 'GET') {
     const r = await db
       .prepare(
-        `SELECT b.code,b.size,b.status,b.product_name,b.produced_on,b.activated_at,b.image_key,b.expires_on,b.details,b.store_product_id,
+        `SELECT b.code,b.size,b.status,b.kind,b.product_name,b.produced_on,b.activated_at,b.image_key,b.expires_on,b.details,b.store_product_id,
                 (SELECT COUNT(*) FROM tags t WHERE t.batch_id=b.id AND t.first_checked_at IS NOT NULL) AS sold,
                 (SELECT COUNT(*) FROM tags t WHERE t.batch_id=b.id AND t.status<>'active') AS blocked
          FROM batches b WHERE b.merchant_id=? AND b.is_test=0 ORDER BY b.id DESC`
@@ -391,14 +402,15 @@ export async function handleMerchant(req, env, path) {
   // طلب دفعة جديدة يوصل للمدير العام كتنبيه في اللوحة الأم
   if (path === '/api/m/request-tags' && m === 'POST') {
     const b = await readJson(req);
-    const count = int(b.count, 'عدد العلامات', { min: 100, max: 1000000 });
+    const qr = b.kind === 'qr';
+    const count = int(b.count, 'عدد العلامات', { min: qr ? 10 : 100, max: qr ? 20000 : 1000000 });
     const note = str(b.note, 'الملاحظة', { max: 300, optional: true });
     const name = (await db.prepare('SELECT name FROM merchants WHERE id=?').bind(mid).first()).name;
     await db
       .prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(?,'tag_request',?,?)")
-      .bind(mid, `طلب ${count.toLocaleString('en-US')} علامة جديدة من ${name}${note ? ': ' + note : ''}`, now())
+      .bind(mid, `طلب ${count.toLocaleString('en-US')} ${qr ? 'ملصق QR جديد' : 'علامة NFC جديدة'} من ${name}${note ? ': ' + note : ''}`, now())
       .run();
-    await audit(db, user, 'tags_requested', { count, note });
+    await audit(db, user, 'tags_requested', { count, note, kind: qr ? 'qr' : 'nfc' });
     return json({ ok: true, message: 'وصل طلبك لإدارة أصالة' });
   }
 

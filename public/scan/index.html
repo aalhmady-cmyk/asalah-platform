@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A21">
+<title>تحقق بالكاميرا - أصالة</title>
+<meta name="description" content="وجّه كاميرا جوالك على ملصق أصالة وتعرف خلال ثانية إن المنتج أصلي.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/scan/scan.css">
+</head>
+<body>
+<main class="sc">
+  <header class="sc-top"><a href="/" class="sc-logo" aria-label="أصالة"><i>✓</i>أصالة</a><a href="javascript:history.back()" class="sc-x" aria-label="رجوع">×</a></header>
+  <div class="sc-cam" id="cam">
+    <video id="video" playsinline muted autoplay></video>
+    <div class="sc-frame" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+  </div>
+  <section class="sc-panel" id="panel">
+    <h1 id="msg">وجّه الكاميرا على ملصق أصالة</h1>
+    <p id="sub">نقرأ الرمز تلقائياً ونفتح لك صفحة التحقق</p>
+    <button type="button" class="sc-btn" id="start">📷 شغّل الكاميرا</button>
+    <label class="sc-btn ghost" id="pick-l"><input type="file" accept="image/*" capture="environment" id="pick" hidden>🖼️ أو صوّر الرمز</label>
+    <p class="sc-note">عندك شريحة NFC؟ قرّب جوالك منها مباشرة بدون كاميرا.</p>
+  </section>
+</main>
+<script type="module" src="/scan/scan.js"></script>
+</body>
+</html>

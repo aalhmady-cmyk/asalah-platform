@@ -3,7 +3,8 @@
 // رابط العلامة: <origin>/v/?t=<batch36>.<serial36>.<sig>
 //   sig = أول 16 حرف base64url من HMAC-SHA256(TAG_SECRET, "batch:serial:salt")
 // يعني الرابط ما يتخمّن (96 بت)، ونقدر نعيد توليد ملف المصنع في أي وقت بدون ما نخزّن الأكواد.
-import { b64url, enc, fail, safeEqual } from './util.js';
+import { imageUrl } from './images.js';
+import { b64url, enc, fail, int, safeEqual } from './util.js';
 
 export const TOKEN_RE = /^([0-9a-z]{1,7})\.([0-9a-z]{1,5})\.([A-Za-z0-9_-]{16})$/;
 const keyCache = new Map();
@@ -90,5 +91,26 @@ export async function stockFor(db, merchantId) {
     remaining,
     per_day: Math.round(perDay),
     days_left: perDay > 0 ? Math.floor(remaining / perDay) : null,
+  };
+}
+
+// روابط نطاق من الدفعة لصفحة طباعة ملصقات QR (حتى 1000 بالمرة)
+export const PRINT_CHUNK = 1000;
+export async function printLinks(env, req, batch) {
+  const q = new URL(req.url).searchParams;
+  const from = int(q.get('from') ?? '1', 'بداية النطاق', { min: 1, max: batch.size });
+  const to = int(q.get('to') ?? String(Math.min(batch.size, from + PRINT_CHUNK - 1)), 'نهاية النطاق', { min: from, max: batch.size });
+  if (to - from + 1 > PRINT_CHUNK) fail(400, `أقصى ${PRINT_CHUNK} ملصق في الطباعة الواحدة`);
+  const origin = env.VERIFY_ORIGIN || new URL(req.url).origin;
+  const m = await env.DB.prepare('SELECT name,logo_key,logo_url,brand_color FROM merchants WHERE id=?').bind(batch.merchant_id).first();
+  const links = [];
+  for (let s = from; s <= to; s++) links.push({ serial: s, id: publicId(batch, s), url: `${origin}/v/?t=${await tokenFor(env, batch, s)}` });
+  return {
+    ok: true,
+    from,
+    to,
+    batch: { code: batch.code, size: batch.size, kind: batch.kind, status: batch.status, product_name: batch.product_name },
+    merchant: { name: m?.name, logo_url: imageUrl(m?.logo_key) || m?.logo_url || null, brand_color: m?.brand_color || null },
+    links,
   };
 }

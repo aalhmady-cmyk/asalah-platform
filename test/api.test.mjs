@@ -802,3 +802,35 @@ test('الإشعارات: الاشتراك والحملات من اللوحة ا
   assert.equal((await post('/api/public/push/unsubscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/t1' })).status, 200);
   assert.equal((await call('/api/admin/push', { cookie: S.admin })).data.stats.total, 0);
 });
+
+test('ملصقات QR: دفعة وطباعة وتحقق مثل الشريحة', async () => {
+  let r = await post('/api/admin/batches', { merchant_id: S.mid, code: 'QR2610', size: 30, kind: 'qr', product_name: 'شاي تجربة' }, S.admin);
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  assert.equal(r.data.batch.kind, 'qr');
+  const qr = r.data.batch;
+  assert.equal((await post('/api/admin/batches', { merchant_id: S.mid, code: 'QRBIG', size: 20001, kind: 'qr' }, S.admin)).status, 400);
+  r = await call(`/api/admin/batches/${qr.id}/links?from=1&to=30`, { cookie: S.admin });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.links.length, 30);
+  assert.equal(r.data.links[0].id, 'QR2610-000001');
+  assert.equal(r.data.merchant.name, 'الكيف الأخضر');
+  // التاجر يطبع ملصقاته بس، ودفعة الشرائح ما تطلع له
+  const mine = await call('/api/m/batches/QR2610/links?from=1&to=5', { cookie: S.merchant });
+  assert.equal(mine.status, 200);
+  assert.equal(mine.data.links[0].url, r.data.links[0].url);
+  assert.equal((await call('/api/m/batches/GK2610/links', { cookie: S.merchant })).status, 403);
+  assert.equal((await call('/api/m/batches/SD2610/links', { cookie: S.merchant })).status, 404);
+  assert.equal((await call('/api/m/batches/QR2610/links')).status, 401);
+  assert.equal((await call(`/api/admin/batches/${qr.id}/links?from=1&to=1001`, { cookie: S.admin })).status, 400);
+  const list = await call('/api/m/batches', { cookie: S.merchant });
+  assert.equal(list.data.batches.find((b) => b.code === 'QR2610').kind, 'qr');
+  // نفس طريقة الشريحة: يتفعّل ويتحقق
+  await patch(`/api/admin/batches/${qr.id}`, { status: 'active' }, S.admin);
+  const v = await post('/api/verify', { t: tokenOf(r.data.links[2].url), sid: sid('e') });
+  assert.equal(v.data.result, 'original', JSON.stringify(v.data));
+  assert.equal(v.data.tag.public_id, 'QR2610-000003');
+  assert.equal((await post('/api/m/request-tags', { kind: 'qr', count: 200 }, S.merchant)).status, 200);
+  assert.match((await call('/robots.txt')).data, /Disallow: \/print\//);
+  assert.equal((await call('/scan/')).status, 200);
+  assert.equal((await call('/print/')).status, 200);
+});

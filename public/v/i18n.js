@@ -57,6 +57,7 @@ const STATIC = {
   'وصلنا بلاغك': 'Report received',
   'شكراً لمساعدتك في وقف التقليد.': 'Thank you for helping stop counterfeits.',
   'محمي بواسطة': 'Protected by',
+  '📷 تحقق من منتج ثاني بالكاميرا': '📷 Verify another product with the camera',
   'أصالة المنتجات الأصلية': 'Asalah Original Products',
   'التقييم': 'Rating',
   'تحذير': 'Warning',

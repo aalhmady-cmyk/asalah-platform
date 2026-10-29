@@ -41,9 +41,10 @@ async function loadHome() {
       <button class="btn btn-gold" type="button" id="request-tags">اطلب علامات جديدة</button>
     </div>`);
   $('request-tags').addEventListener('click', async () => {
-    const count = Number(prompt('كم علامة تحتاج؟', '20000'));
+    const qr = confirm('تبيها ملصقات QR تطبعها بنفسك؟ (أرخص وأسرع، مناسبة للبداية)\n\nموافق = ملصقات QR\nإلغاء = شرائح NFC');
+    const count = Number(prompt(qr ? 'كم ملصق QR تحتاج؟' : 'كم شريحة NFC تحتاج؟', qr ? '500' : '20000'));
     if (!count) return;
-    try { toast((await api('/api/m/request-tags', { method: 'POST', body: { count } })).message); } catch (e) { toast(e.message, true); }
+    try { toast((await api('/api/m/request-tags', { method: 'POST', body: { count, kind: qr ? 'qr' : 'nfc' } })).message); } catch (e) { toast(e.message, true); }
   });
   renderContestCard(d.entries);
   render($('kpis'), html`
@@ -86,7 +87,7 @@ async function loadTags() {
     <td><div style="display:flex;align-items:center;gap:8px">${b.image_url ? html`<img src="${b.image_url}" alt="" class="thumb">` : html`<span class="thumb thumb-empty" aria-hidden="true">+</span>`}
       <button class="btn btn-sm" type="button" data-image="${b.code}">${b.image_url ? 'تغيير' : 'رفع صورة'}</button>
       ${b.image_url ? html`<button class="btn btn-sm" type="button" data-image-del="${b.code}">حذف</button>` : ''}</div></td>
-    <td class="mono"><b>${b.code}</b></td><td>${b.product_name || '-'}</td><td>${num(b.size)}</td><td>${num(b.sold)}</td><td>${num(b.blocked)}</td><td>${pill(BATCH_STATUS, b.status)}</td></tr>`)}</tbody></table>
+    <td class="mono"><b>${b.code}</b>${b.kind === 'qr' ? html`<div><span class="pill warn">ملصقات QR</span> <a class="btn btn-sm btn-gold" href="/print/?code=${b.code}">🖨️ اطبع الملصقات</a></div>` : ''}</td><td>${b.product_name || '-'}</td><td>${num(b.size)}</td><td>${num(b.sold)}</td><td>${num(b.blocked)}</td><td>${pill(BATCH_STATUS, b.status)}</td></tr>`)}</tbody></table>
     <p class="small muted" style="margin:12px 0 0">صورة المنتج تظهر للعميل بعد ما يتأكد إن المنتج أصلي. لو الدفعة ما لها صورة، يظهر شعارك.</p>`);
   if (batches[0] && !$('status-form').batch_code.value) $('status-form').batch_code.value = batches[0].code;
   batchList = batches;

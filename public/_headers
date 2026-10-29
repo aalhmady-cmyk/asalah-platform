@@ -17,3 +17,10 @@
   Cache-Control: no-cache
   ! Permissions-Policy
   Permissions-Policy: camera=(), microphone=(self), geolocation=()
+
+/scan/*
+  Cache-Control: no-cache
+  ! Permissions-Policy
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()
+/print/*
+  Cache-Control: no-store

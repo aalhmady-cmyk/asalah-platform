@@ -51,7 +51,7 @@ onSubmit($('merchant-form'), async (f, form) => {
 onSubmit($('batch-form'), async (f, form) => {
   const d = await api('/api/admin/batches', {
     method: 'POST',
-    body: { merchant_id: Number(f.merchant_id), code: f.code, size: Number(f.size), product_name: optional(f.product_name), produced_on: optional(f.produced_on), is_test: f.is_test === 'on' },
+    body: { merchant_id: Number(f.merchant_id), code: f.code, kind: f.kind, size: Number(f.size), product_name: optional(f.product_name), produced_on: optional(f.produced_on), is_test: f.is_test === 'on' },
   });
   form.closest('dialog').close();
   toast(`تم إنشاء الدفعة ${d.batch.code}. نزّل ملف المصنع من قائمة الدفعات.`);
@@ -136,13 +136,13 @@ async function loadBatches() {
   render($('batches-table'), !batches.length ? html`<div class="empty">ما فيه دفعات للحين.</div>` : html`<table style="min-width:860px"><thead><tr>
     <th>الدفعة</th><th>التاجر</th><th>العدد</th><th>المنتج</th><th>الحالة</th><th>أُنشئت</th><th><span class="sr-only">إجراءات</span></th>
   </tr></thead><tbody>${batches.map((b) => html`<tr>
-    <td><b class="ltr">${b.code}</b>${b.is_test ? html` <span class="pill warn">تجريبية</span>` : ''}</td>
+    <td><b class="ltr">${b.code}</b>${b.is_test ? html` <span class="pill warn">تجريبية</span>` : ''}${b.kind === 'qr' ? html` <span class="pill ok">QR</span>` : ''}</td>
     <td>${b.merchant_name}</td><td>${num(b.size)}</td><td>${b.product_name || '-'}</td>
     <td>${pill(BATCH_STATUS, b.status)}</td><td>${when(b.created_at)}</td>
     <td><div class="actions">
       ${b.image_url ? html`<img src="${b.image_url}" alt="" class="thumb" style="width:36px;height:36px">` : ''}
       <button class="btn btn-sm" type="button" data-batch-image="${b.id}">${b.image_url ? 'تغيير الصورة' : 'صورة المنتج'}</button>
-      <button class="btn" type="button" data-factory="${b.id}" data-code="${b.code}" data-size="${b.size}">ملف المصنع</button>
+      ${b.kind === 'qr' ? html`<a class="btn btn-gold" href="/print/?b=${b.id}" target="_blank" rel="noopener">🖨️ اطبع QR</a>` : html`<button class="btn" type="button" data-factory="${b.id}" data-code="${b.code}" data-size="${b.size}">ملف المصنع</button>`}
       ${b.status === 'active' ? html`<button class="btn btn-danger" type="button" data-batch-status="blocked" data-id="${b.id}">إيقاف</button>` : html`<button class="btn btn-primary" type="button" data-batch-status="active" data-id="${b.id}">تفعيل</button>`}
     </div></td>
   </tr>`)}</tbody></table>`);
@@ -349,7 +349,7 @@ document.addEventListener('click', async (e) => {
 
 const ACTIONS = {
   login: 'دخول', merchant_created: 'إنشاء تاجر', merchant_updated: 'تعديل تاجر', user_created: 'إنشاء حساب', user_updated: 'تعديل حساب',
-  batch_created: 'إنشاء دفعة', batch_active: 'تفعيل دفعة', batch_blocked: 'إيقاف دفعة', factory_file_downloaded: 'تنزيل ملف المصنع',
+  batch_created: 'إنشاء دفعة', batch_active: 'تفعيل دفعة', batch_blocked: 'إيقاف دفعة', factory_file_downloaded: 'تنزيل ملف المصنع', qr_printed: 'طباعة ملصقات QR',
   tags_block: 'إيقاف علامات', tags_activate: 'تفعيل علامات', settings_updated: 'تعديل إعدادات التاجر', entries_exported: 'تصدير المشاركات',
   password_changed: 'تغيير كلمة المرور', tags_requested: 'طلب علامات', setup_admin_created: 'إعداد النظام',
   reset_link_created: 'رابط تغيير كلمة المرور', password_reset_done: 'تغيير كلمة المرور بالرابط', staff_created: 'إضافة موظف', staff_updated: 'تعديل موظف',

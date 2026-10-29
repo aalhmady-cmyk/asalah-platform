@@ -176,12 +176,13 @@
     <div class="form-grid">
       <label class="field">التاجر<select name="merchant_id" required id="batch-merchant"></select></label>
       <label class="field">رمز الدفعة<input name="code" required pattern="[A-Za-z0-9]{2,16}" placeholder="GK2611" class="ltr"></label>
+      <label class="field">النوع<select name="kind"><option value="nfc">شرائح NFC (ملف للمصنع)</option><option value="qr">ملصقات QR (يطبعها التاجر)</option></select></label>
       <label class="field">عدد العلامات<input name="size" type="number" min="1" max="1000000" required class="ltr"></label>
       <label class="field">اسم المنتج<input name="product_name"></label>
       <label class="field">تاريخ الإنتاج<input name="produced_on" type="month" class="ltr"></label>
     </div>
     <label class="check"><input type="checkbox" name="is_test"> دفعة تجريبية (ما تدخل في المخزون ولا الإحصائيات)</label>
-    <p class="small muted" style="margin:0">الدفعة تنضاف موقوفة. نزّل ملف المصنع، وفعّلها لما تُشحن.</p>
+    <p class="small muted" style="margin:0">الدفعة تنضاف موقوفة. نزّل ملف المصنع (أو اطبع ملصقات QR)، وفعّلها لما تُشحن. ملصقات QR حدها 20,000 بالدفعة، والتاجر يقدر يطبعها من لوحته.</p>
     <div class="actions"><button class="btn btn-primary" type="submit">إنشاء</button><button class="btn" type="button" data-close>إلغاء</button></div>
   </form>
 </dialog>
