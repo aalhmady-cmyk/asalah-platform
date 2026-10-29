@@ -1,5 +1,5 @@
 // صوت نتيجة التحقق: جرس + صوت يقول النتيجة للأصلي، وطوط + تحذير للمقلّد.
-// الجرس والطوط نولّدهم بالمتصفح (بدون ملفات)، والكلام بصوت الجوال (speechSynthesis).
+// الجرس والطوط نولّدهم بالمتصفح، والكلام ملفات صوت ثابتة في /assets/voice (تشتغل على أي جوال).
 let ctx;
 const audio = () => (ctx ||= new (window.AudioContext || window.webkitAudioContext)());
 
@@ -45,47 +45,36 @@ export async function buzz() {
   await wait(900);
 }
 
-function voiceFor(lang) {
-  const all = speechSynthesis.getVoices();
-  const base = lang.slice(0, 2);
-  return all.find((v) => v.lang.replace('_', '-') === lang) || all.find((v) => v.lang.toLowerCase().startsWith(base));
+const clips = new Map();
+// نحمّل الملف ونفكّه مرة وحدة، ونحتفظ فيه
+function clip(name) {
+  if (!clips.has(name)) clips.set(name, fetch(`/assets/voice/${name}.mp3`).then((r) => r.arrayBuffer()).then((b) => audio().decodeAudioData(b)));
+  return clips.get(name);
 }
-async function voices() {
-  if (speechSynthesis.getVoices().length) return;
-  await Promise.race([new Promise((r) => speechSynthesis.addEventListener('voiceschanged', r, { once: true })), wait(1200)]);
-}
-
-// يقول الجملة إذا الجوال فيه صوت بنفس اللغة، وإلا يسكت (ما نقرأ عربي بصوت إنجليزي)
-export async function say(text, lang = 'ar-SA') {
-  if (!('speechSynthesis' in window)) return;
-  await voices();
-  const v = voiceFor(lang);
-  if (!v) return;
-  const u = new SpeechSynthesisUtterance(text);
-  u.voice = v;
-  u.lang = v.lang;
-  u.rate = 0.95;
-  const res = await Promise.race([new Promise((r) => { u.onend = () => r('ok'); u.onerror = (e) => r(e.error); speechSynthesis.speak(u); }), wait(9000)]);
-  if (res === 'not-allowed') throw new Error('blocked');
+export function preload(en = false) {
+  try { for (const k of ['hi', 'thanks', 'warn']) clip(`${en ? 'en' : 'ar'}-${k}`).catch(() => clips.clear()); } catch { /* متصفح قديم بدون صوت */ }
 }
 
-const LINES = {
-  ar: { hi: 'هلا والله، المنتج أصلي', thanks: 'شكراً إنك اخترت المنتج الأصلي، وصحتين وعافية!', warn: 'احذر! المنتج يُشتبه إنه مزوّر أو مقلّد. بلّغ عنه على الفور.', lang: 'ar-SA' },
-  en: { hi: 'Welcome! This product is original.', thanks: 'Thank you for choosing the original. Enjoy!', warn: 'Warning! This product is suspected to be fake. Please report it right away.', lang: 'en-US' },
-};
+async function speak(name) {
+  const c = await ready();
+  const buf = await clip(name);
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  src.connect(c.destination);
+  await new Promise((r) => { src.onended = r; src.start(); });
+}
 
 // يرجع 'blocked' إذا المتصفح منع الصوت (لازم لمسة من العميل)، وإلا 'ok'
 export async function playResult(kind, en = false) {
-  const l = LINES[en ? 'en' : 'ar'];
+  const l = en ? 'en' : 'ar';
   try {
-    window.speechSynthesis?.cancel();
     if (kind === 'original') {
-      await say(l.hi, l.lang);
+      await speak(`${l}-hi`);
       await chime();
-      await say(l.thanks, l.lang);
+      await speak(`${l}-thanks`);
     } else {
       await buzz();
-      await say(l.warn, l.lang);
+      await speak(`${l}-warn`);
     }
     return 'ok';
   } catch (e) {

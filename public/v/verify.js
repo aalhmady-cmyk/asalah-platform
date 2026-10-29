@@ -1,6 +1,6 @@
 // صفحة التحقق: تقرأ رمز العلامة من الرابط، تشيله من شريط العنوان، وتسأل الخادم.
 import { EN, onLangToggle, takeCachedResult, translatePage, tx } from '/v/i18n.js';
-import { playResult } from '/assets/sound.js';
+import { playResult, preload } from '/assets/sound.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => ($(id).hidden = !on);
@@ -106,6 +106,7 @@ onLangToggle(() => lastData);
 async function run() {
   const cached = takeCachedResult();
   replay = Boolean(cached);
+  if (!cached) preload(EN);
   const steps = cached ? Promise.resolve() : scanSteps();
   if (!token && !cached) { await steps; return bad('unknown', tx('ما لقينا رمز العلامة في الرابط. امسح العلامة مرة ثانية.', 'We could not find the tag code in the link. Scan the tag again.')); }
   let d;
