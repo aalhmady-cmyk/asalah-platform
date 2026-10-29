@@ -134,6 +134,8 @@ async function sitemap(env, origin) {
   const urls = [
     `<url><loc>${origin}/</loc></url>`,
     `<url><loc>${origin}/stores/</loc><changefreq>daily</changefreq></url>`,
+    `<url><loc>${origin}/privacy/</loc></url>`,
+    `<url><loc>${origin}/terms/</loc></url>`,
     ...ms.results.map((m) => `<url><loc>${origin}/stores/m/${e(m.slug)}</loc><changefreq>daily</changefreq></url>`),
     ...ps.results.map((p) => `<url><loc>${origin}/stores/p/${p.id}</loc><lastmod>${day(p.updated_at)}</lastmod></url>`),
   ];

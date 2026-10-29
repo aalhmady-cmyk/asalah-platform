@@ -169,3 +169,11 @@ body.site { background: var(--ground); }
   .shop-copy h2 { font-size: 26px; }
   .site-nav nav a.nav-shop { display: inline; }
 }
+/* صفحات الخصوصية والشروط */
+.legal { max-width: 780px; margin: 0 auto; padding: 40px 20px 16px; display: flex; flex-direction: column; gap: 14px; line-height: 1.9; }
+.legal h1 { font-size: 32px; }
+.legal h2 { font-size: 20px; margin-top: 14px; }
+.legal p, .legal li { color: var(--ink); font-size: 16px; margin: 0; }
+.legal ul { margin: 0; padding-inline-start: 22px; display: flex; flex-direction: column; gap: 6px; }
+.legal .upd { color: var(--muted); font-size: 14px; }
+.site-foot a { color: inherit; }
