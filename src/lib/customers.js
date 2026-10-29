@@ -1,6 +1,7 @@
 // دخول العملاء بحساب Google (OAuth بالتحويل، بدون سكربت خارجي في الصفحة).
 // يحتاج GOOGLE_CLIENT_ID و GOOGLE_CLIENT_SECRET في إعدادات Cloudflare. بدونهم التعليق يكون بالاسم فقط.
 import { imageUrl } from './images.js';
+import { pushToCustomers } from './push.js';
 import { fail, int, json, now, randomHex, readJson, sha256 } from './util.js';
 
 const COOKIE = '__Host-asalah_c';
@@ -27,8 +28,10 @@ export async function currentCustomer(db, req) {
 }
 
 // تنبيه داخل حساب الزبون (جرس في المتاجر)
+// ويوصله إشعار على جواله لو مفعّل الإشعارات
 export async function addNote(db, customerId, message, link, productId = null) {
   await db.prepare('INSERT INTO customer_notes(customer_id,product_id,link,message,created_at) VALUES(?,?,?,?,?)').bind(customerId, productId, link, message.slice(0, 200), now()).run();
+  await pushToCustomers(db, [customerId], { title: 'متاجر أصالة', body: message.slice(0, 180), url: link || '/stores/?v=account', tag: 'note' });
 }
 
 const sarText = (h) => (h / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -43,6 +46,7 @@ export async function notifyPriceDrop(db, product, oldPrice) {
     ...watchers.map((w) => db.prepare('INSERT INTO customer_notes(customer_id,product_id,link,message,created_at) VALUES(?,?,?,?,?)').bind(w.customer_id, product.id, '/stores/?p=' + product.id, msg, t)),
     db.prepare('UPDATE price_watch SET price_at=? WHERE product_id=?').bind(product.price, product.id),
   ]);
+  await pushToCustomers(db, watchers.map((w) => w.customer_id), { title: '🔔 نزل السعر', body: msg.replace('🔔 ', ''), url: '/stores/?p=' + product.id, tag: 'price' + product.id });
   return watchers.length;
 }
 

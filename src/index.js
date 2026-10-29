@@ -9,6 +9,8 @@ import { handleAdmin } from './routes/admin.js';
 import { changePassword, forgotPassword, login, logout, me, resetPassword, setup } from './routes/auth.js';
 import { handleMerchant } from './routes/merchant.js';
 import { handleSeo } from './routes/seo.js';
+import { handlePublicPush } from './routes/push.js';
+import { runCampaigns } from './lib/push.js';
 import { handlePublicStore } from './routes/store.js';
 import { handleCustomer } from './lib/customers.js';
 import { serveMedia } from './lib/store.js';
@@ -33,6 +35,7 @@ async function route(req, env) {
   }
   if (path === '/api/public/store' || path.startsWith('/api/public/store/')) return handlePublicStore(req, env, path);
   if (path.startsWith('/api/c/')) return handleCustomer(req, env, path);
+  if (path.startsWith('/api/public/push/')) return handlePublicPush(req, env, path);
   if (path === '/api/verify' && m === 'POST') return verify(req, env);
   if (path === '/api/loyalty/claim' && m === 'POST') return loyaltyClaim(req, env);
   if (path === '/api/loyalty/wallet' && m === 'POST') return loyaltyWallet(req, env);
@@ -82,6 +85,7 @@ export default {
         await runAlerts(e);
         await notifyMerchants(e).catch((err) => console.error('ASALAH_NOTIFY', err?.stack || err));
         await runStoreSync(e).catch((err) => console.error('ASALAH_SYNC', err?.stack || err));
+        await runCampaigns(e.DB).catch((err) => console.error('ASALAH_PUSH', err?.stack || err));
       })
     );
   },

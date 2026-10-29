@@ -361,7 +361,69 @@ async function loadAudit() {
 }
 
 $('hot-days').addEventListener('change', () => loadReports().catch((e) => toast(e.message, true)));
-const loaders = { home: loadHome, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, reports: loadReports, users: loadUsers, audit: loadAudit };
+// ---------- الإشعارات ----------
+const AUD = { all: 'كل المشتركين', accounts: 'المسجلين', ar: 'العربي', en: 'الإنجليزي' };
+const PST = { sending: ['يرسل…', 'warn'], done: ['انرسل', 'ok'], stopped: ['موقوف', 'err'] };
+let pushProducts = null;
+async function loadPush() {
+  const d = await api('/api/admin/push');
+  const s = d.stats;
+  render($('push-kpis'), html`
+    <div class="kpi"><span class="label">أجهزة مشتركة</span><span class="value">${num(s.total)}</span><span class="note">+${num(s.week)} هالأسبوع</span></div>
+    <div class="kpi"><span class="label">مسجلين بحساب</span><span class="value">${num(s.accounts)}</span></div>
+    <div class="kpi"><span class="label">عربي / إنجليزي</span><span class="value">${num(s.ar)} / ${num(s.en)}</span></div>
+    <div class="kpi"><span class="label">إشعارات مرسلة</span><span class="value">${num(d.campaigns.length)}</span></div>`);
+  render($('push-list'), !d.campaigns.length ? html`<div class="empty">ما أرسلت إشعارات للحين</div>` : html`<table><thead><tr><th>الإشعار</th><th>لمين</th><th>وصل</th><th>ضغطات</th><th>الحالة</th><th>متى</th><th></th></tr></thead><tbody>
+    ${d.campaigns.map((c) => html`<tr><td><b>${c.title}</b><div class="small muted">${c.body}</div></td><td>${AUD[c.audience] || c.audience}</td>
+      <td>${num(c.sent)} / ${num(c.total)}${c.failed ? html`<div class="small muted">${num(c.failed)} ما وصل</div>` : ''}</td>
+      <td>${num(c.clicks)}${c.sent ? html` <span class="small muted">(${Math.round((c.clicks / c.sent) * 100)}%)</span>` : ''}</td>
+      <td>${pill(PST, c.status)}</td><td class="small">${when(c.created_at)}</td>
+      <td>${c.status === 'sending' ? html`<button type="button" class="btn btn-sm" data-push-go="${c.id}">كمّل</button> <button type="button" class="btn btn-sm" data-push-stop="${c.id}">أوقف</button>` : ''}</td></tr>`)}</tbody></table>`);
+  if (!pushProducts) {
+    const r = await fetch('/api/public/store/products?limit=200').then((x) => x.json()).catch(() => ({ products: [] }));
+    pushProducts = r.products || [];
+    render($('push-form').product_id, html`${pushProducts.map((p) => html`<option value="${p.id}">${p.title} · ${p.merchant_name}</option>`)}`);
+  }
+  pushPreview();
+}
+function pushPreview() {
+  const f = $('push-form');
+  for (const k of ['title', 'body']) f.querySelector(`[data-count="${k}"]`).textContent = f[k].value.length;
+  $('push-product').hidden = f.target.value !== 'product';
+  $('push-url').hidden = f.target.value !== 'url';
+  const p = f.target.value === 'product' && pushProducts?.find((x) => String(x.id) === f.product_id.value);
+  render($('push-preview'), html`<div class="ad-notif-h"><img src="/stores/icons/icon-192.png" alt="" width="20" height="20"><span>متاجر أصالة · الآن</span></div>
+    <b>${f.title.value || 'عنوان الإشعار'}</b><p>${f.body.value || 'نص الإشعار يطلع هنا'}</p>${p?.image_url ? html`<img class="ad-notif-img" src="${p.image_url}" alt="">` : ''}`);
+}
+$('push-form').addEventListener('input', pushPreview);
+// الإرسال يمشي دفعات: الصفحة تكمل لين يخلص، ولو قفلتها يكمّل تلقائياً كل ساعة
+async function drivePush(c) {
+  const bar = $('push-progress');
+  while (c && c.status === 'sending') {
+    render(bar, html`<div class="ad-prog"><i style="width:${Math.round(((c.sent + c.failed) / Math.max(1, c.total)) * 100)}%"></i></div><p class="small muted">يرسل… ${num(c.sent + c.failed)} من ${num(c.total)}</p>`);
+    c = (await api(`/api/admin/push/${c.id}/continue`, { method: 'POST', body: {} })).campaign;
+  }
+  render(bar, c ? html`<p class="small">✅ وصل لـ ${num(c.sent)} جهاز${c.failed ? ` · ${num(c.failed)} ما وصل (أجهزة ألغت الاشتراك)` : ''}</p>` : '');
+  loadPush();
+}
+onSubmit($('push-form'), async (data, form) => {
+  if (!confirm(`نرسل الإشعار «${data.title}» لـ ${AUD[data.audience]}؟ ما يمديك ترجعه بعد الإرسال.`)) return;
+  const body = { title: data.title, body: data.body, audience: data.audience };
+  if (data.target === 'product') body.product_id = Number(data.product_id);
+  else if (data.target === 'reels') body.url = '/stores/?v=reels';
+  else if (data.target === 'url') body.url = data.url.trim();
+  const { campaign } = await api('/api/admin/push', { method: 'POST', body });
+  form.reset();
+  pushPreview();
+  await drivePush(campaign);
+});
+document.addEventListener('click', async (e) => {
+  const go = e.target.closest('[data-push-go]'), stop = e.target.closest('[data-push-stop]');
+  if (go) await drivePush((await api(`/api/admin/push/${go.dataset.pushGo}/continue`, { method: 'POST', body: {} })).campaign).catch((x) => toast(x.message, true));
+  if (stop && confirm('نوقف إرسال هذا الإشعار؟')) { await api(`/api/admin/push/${stop.dataset.pushStop}/stop`, { method: 'POST', body: {} }).catch((x) => toast(x.message, true)); loadPush(); }
+});
+
+const loaders = { home: loadHome, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, push: loadPush, reports: loadReports, users: loadUsers, audit: loadAudit };
 let current = 'home';
 const refresh = () => loaders[current]().catch((e) => toast(e.message, true));
 tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => { current = id; refresh(); });

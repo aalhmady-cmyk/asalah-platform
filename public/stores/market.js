@@ -33,7 +33,9 @@ const T = {
     comments: 'التعليقات', loginToComment: 'سجّل دخولك بحساب Google عشان تقيّم وتعلّق. نعرض اسمك بس، وما ننشر إيميلك.', googleBtn: 'الدخول بحساب Google', asName: (n) => `باسم ${n}`, reviews: 'التقييمات والتعليقات', reviewsN: (n) => `${n} تعليق`, rateFirst: 'كن أول من يقيّم ⭐', loginOk: 'سجّلت دخولك ✅', loginFail: 'ما تم الدخول، حاول مرة ثانية', shareShort: 'شارك', ratingsN: (n) => `${n} تقييم`, noComments: 'ما فيه تعليقات للحين. كن أول واحد 👋', rateIt: 'قيّم', yourName: 'اسمك', addComment: 'اكتب تعليقك…', needComment: 'اكتب تعليق أو اختر النجوم', thanksComment: 'شكراً على رأيك 🌟', ago: (n, u) => `قبل ${n} ${{ m: 'د', h: 'س', d: 'يوم' }[u]}`,
     sound_on: 'تشغيل الصوت', sound_off: 'كتم الصوت', like: 'أعجبني', saveReel: 'حفظ الريل',
     savedTitle: 'المفضلة', savedEmpty: 'ما حفظت شي للحين', savedEmptyP: 'اضغط ♡ على أي منتج أو ريل وتلقاه هنا.', savedProducts: 'منتجات', savedReels: 'ريلز',
-    hello: 'هلا 👋 أنا مساعد متاجر أصالة. قول لي وش تبي (نوع المنتج، المناسبة، الميزانية) وأطلع لك الأصلي من المتاجر الموثّقة.',
+    hello: 'هلا 👋 أنا مساعد أصالة. قول لي وش تبي (المنتج، المناسبة، الميزانية، لمين)، أو صوّر لي منتج 📷، وأطلع لك الأصلي من المتاجر الموثّقة.',
+    aiName: 'مساعد أصالة', aiSub: 'يختار لك من منتجات أصلية موثّقة فقط', newChat: 'محادثة جديدة', thinking: 'أدوّر لك…', photoAsk: 'دوّر بالصورة', photoReady: 'بدوّر على منتج يشبه هذي الصورة', photoQ: 'دوّر لي على منتج يشبه هذي الصورة', imgErr: 'ما قدرت أقرأ الصورة', remove: 'شيل', voice: 'تكلّم بدل الكتابة', voiceErr: 'ما سمعتك زين، جرّب مرة ثانية',
+    moreChips: ['أرخص شوي', 'الأعلى تقييماً', 'فكرة هدية', 'وش عليه خصم؟'], theme: 'الوضع الليلي', themeL: 'الوضع النهاري',
     suggest: ['عطر فخم للمناسبات', 'هدية أقل من 200', 'قهوة مختصة', 'وش الجديد؟'], chatPh: 'قول لي وش تدوّر عليه…', send: 'إرسال',
     found: 'هذي اللي لقيتها لك 👇', notFound: 'ما لقيت شي يطابق طلبك. جرّب تكتب نوع المنتج، مثل: عطر أو قهوة أو تمر.', offline: 'تعذر الاتصال، حاول مرة ثانية.',
     err: 'صار خطأ', back: 'رجوع للرئيسية', loadErr: 'تعذر التحميل، حاول مرة ثانية', unavailable: 'المتجر غير متاح', close: 'إغلاق', reelOf: 'ريل', productsN: (n) => `${n} منتج`,
@@ -59,7 +61,9 @@ const T = {
     comments: 'Comments', loginToComment: 'Sign in with Google to rate and comment. We only show your name, never your email.', googleBtn: 'Sign in with Google', asName: (n) => `as ${n}`, reviews: 'Ratings & comments', reviewsN: (n) => `${n} comments`, rateFirst: 'Be the first to rate ⭐', loginOk: 'Signed in ✅', loginFail: 'Sign-in failed, please try again', shareShort: 'Share', ratingsN: (n) => `${n} ratings`, noComments: 'No comments yet. Be the first 👋', rateIt: 'Rate', yourName: 'Your name', addComment: 'Add a comment…', needComment: 'Write a comment or pick stars', thanksComment: 'Thanks for your feedback 🌟', ago: (n, u) => `${n}${u} ago`,
     sound_on: 'Unmute', sound_off: 'Mute', like: 'Like', saveReel: 'Save reel',
     savedTitle: 'Saved', savedEmpty: 'Nothing saved yet', savedEmptyP: 'Tap ♡ on any product or reel to find it here.', savedProducts: 'Products', savedReels: 'Reels',
-    hello: 'Hi 👋 I’m the Asalah Stores assistant. Tell me what you need (product type, occasion, budget) and I’ll find genuine options from verified stores.',
+    hello: 'Hi 👋 I’m the Asalah assistant. Tell me what you need (product, occasion, budget, who it’s for), or send me a photo 📷, and I’ll find genuine options from verified stores.',
+    aiName: 'Asalah assistant', aiSub: 'Picks only from verified genuine products', newChat: 'New chat', thinking: 'Looking…', photoAsk: 'Search by photo', photoReady: 'I’ll look for products like this photo', photoQ: 'Find me a product like this photo', imgErr: 'Couldn’t read that image', remove: 'Remove', voice: 'Speak instead of typing', voiceErr: 'Didn’t catch that, try again',
+    moreChips: ['Something cheaper', 'Top rated', 'Gift idea', 'What’s on sale?'], theme: 'Dark mode', themeL: 'Light mode',
     suggest: ['A luxury perfume', 'A gift under 200 SAR', 'Specialty coffee', 'What’s new?'], chatPh: 'Tell me what you’re looking for…', send: 'Send',
     found: 'Here’s what I found 👇', notFound: 'I couldn’t find a match. Try a product type, like perfume, coffee or dates.', offline: 'Connection failed, please try again.',
     err: 'Something went wrong', back: 'Back to home', loadErr: 'Couldn’t load, please try again', unavailable: 'Store unavailable', close: 'Close', reelOf: 'Reel', productsN: (n) => `${n} products`,
@@ -97,8 +101,22 @@ function applyLang() {
   $('#ai-fab').setAttribute('aria-label', t('chat'));
   $('#ai-fab small').textContent = t('fabT');
   $('#lang').setAttribute('aria-label', lang === 'en' ? 'العربية' : 'English');
+  drawTheme();
   drawMe();
 }
+
+function drawTheme() {
+  const dark = document.documentElement.dataset.theme !== 'light';
+  $('#theme').innerHTML = `<span aria-hidden="true">${dark ? '☀️' : '🌙'}</span>`;
+  $('#theme').setAttribute('aria-label', t(dark ? 'themeL' : 'theme'));
+  document.querySelector('meta[name="theme-color"]').content = dark ? '#0C1F18' : '#0F2A21';
+}
+$('#theme').addEventListener('click', () => {
+  const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem('asalah_theme', next); } catch {}
+  drawTheme();
+});
 
 let D = null; // بيانات الصفحة الرئيسية
 const cache = new Map(); // المنتجات اللي شفناها
@@ -297,6 +315,7 @@ async function openProduct(id, fromRoute) {
     p.set('p', id);
     history.pushState(null, '', '/stores/?' + p);
   }
+  noteView(id);
   const quick = cache.get(id);
   sheet.hidden = false;
   document.body.classList.add('mk-lock');
@@ -582,37 +601,101 @@ function toggleLike(id, btn) {
 }
 
 // ---------- المساعد ----------
+// شاشة محادثة كاملة: الرسائل تتمرر، والاقتراحات والكتابة ثابتة تحت فوق شريط التبويبات
+const recent = load('asalah_recent', []);
+const noteView = (id) => { const i = recent.indexOf(id); if (i >= 0) recent.splice(i, 1); recent.unshift(id); recent.length = Math.min(recent.length, 12); keep('asalah_recent', recent); };
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let chatChips = null, chatImg = null;
 function showChat() {
   render(view, html`<section class="mk-chat">
+    <header class="mk-chat-head">
+      <span class="mk-ai-av" aria-hidden="true">✨</span>
+      <div><b>${t('aiName')}</b><small><i class="mk-live"></i>${t('aiSub')}</small></div>
+      <button type="button" class="mk-link" data-chat-new ${chatLog.length ? '' : 'hidden'}>${t('newChat')}</button>
+    </header>
     <div class="mk-chat-log" id="chat-log" aria-live="polite"></div>
-    <div class="mk-chat-sug" id="chat-sug">${t('suggest').map((s) => html`<button type="button" class="mk-chip" data-ask="${s}">${s}</button>`)}</div>
-    <form class="mk-chat-form" id="chat-form"><input name="q" autocomplete="off" maxlength="500" placeholder="${t('chatPh')}" aria-label="${t('chatPh')}"><button type="submit" class="mk-btn gold" aria-label="${t('send')}">${lang === 'en' ? '➤' : '➤'}</button></form>
+    <div class="mk-chat-dock">
+      <div class="mk-chat-sug" id="chat-sug"></div>
+      <div class="mk-chat-pic" id="chat-pic" hidden></div>
+      <form class="mk-chat-form" id="chat-form">
+        <label class="mk-chat-ic" title="${t('photoAsk')}"><input type="file" accept="image/*" id="chat-file" hidden><span aria-hidden="true">📷</span><span class="mk-sr">${t('photoAsk')}</span></label>
+        <input name="q" autocomplete="off" maxlength="500" placeholder="${t('chatPh')}" aria-label="${t('chatPh')}" enterkeyhint="send">
+        ${SR ? html`<button type="button" class="mk-chat-ic" id="chat-mic" aria-label="${t('voice')}"><span aria-hidden="true">🎙️</span></button>` : ''}
+        <button type="submit" class="mk-btn gold" aria-label="${t('send')}">➤</button>
+      </form>
+    </div>
   </section>`);
   drawChat();
-  setTimeout(() => $('#chat-form')?.q.focus({ preventScroll: true }), 50);
+}
+const chatScroll = () => requestAnimationFrame(() => scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
+function aiCards(m) {
+  return html`<div class="mk-ai-cards">${m.products.map((p) => html`<div class="mk-ai-card">${card(p)}${m.why?.[p.id] ? html`<span class="mk-why">✨ ${m.why[p.id]}</span>` : ''}</div>`)}</div>`;
 }
 function drawChat(typing) {
   const el = $('#chat-log');
   if (!el) return;
   const hello = { role: 'assistant', content: t('hello') };
-  render(el, html`${[hello, ...chatLog].map((m) => html`<div class="mk-msg ${m.role === 'user' ? 'me' : 'bot'}">${m.content}${m.products?.length ? html`<div class="mk-row cards">${m.products.map(card)}</div>` : ''}</div>`)}${typing ? raw('<div class="mk-msg bot typing"><i></i><i></i><i></i></div>') : ''}`);
-  el.scrollTop = el.scrollHeight;
-  $('#chat-sug').hidden = chatLog.length > 0;
+  render(el, html`${[hello, ...chatLog].map((m) => html`<div class="mk-msg ${m.role === 'user' ? 'me' : 'bot'}">${m.thumb ? html`<img class="mk-msg-img" src="${m.thumb}" alt="">` : ''}${m.content}${m.products?.length ? aiCards(m) : ''}</div>`)}${typing ? raw(`<div class="mk-msg bot typing" aria-label="${t('thinking')}"><i></i><i></i><i></i><small>${t('thinking')}</small></div>`) : ''}`);
+  const chips = chatLog.length ? chatChips || t('moreChips') : t('suggest');
+  render($('#chat-sug'), html`${chips.map((c) => html`<button type="button" class="mk-chip" data-ask="${c}">${c}</button>`)}`);
+  const nb = $('[data-chat-new]');
+  if (nb) nb.hidden = !chatLog.length;
+  chatScroll();
+}
+// الصورة تتصغر في الجهاز قبل الإرسال (أقصى ضلع 768)
+async function pickChatImage(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const bmp = await createImageBitmap(file).catch(() => null);
+  if (!bmp) return toast(t('imgErr'));
+  const k = Math.min(1, 768 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  const url = c.toDataURL('image/jpeg', 0.82);
+  const tc = document.createElement('canvas');
+  const tk = 160 / Math.max(c.width, c.height);
+  tc.width = Math.round(c.width * tk); tc.height = Math.round(c.height * tk);
+  tc.getContext('2d').drawImage(c, 0, 0, tc.width, tc.height);
+  chatImg = { data: url.split(',')[1], thumb: tc.toDataURL('image/jpeg', 0.7) };
+  const box = $('#chat-pic');
+  render(box, html`<img src="${chatImg.thumb}" alt=""><span>${t('photoReady')}</span><button type="button" class="mk-link" data-chat-pic-x aria-label="${t('remove')}">✕</button>`);
+  box.hidden = false;
+  $('#chat-form')?.q.focus();
+}
+function clearChatImg() { chatImg = null; const b = $('#chat-pic'); if (b) { b.hidden = true; b.textContent = ''; } }
+let mic = null;
+function toggleMic() {
+  if (mic) return mic.stop();
+  mic = new SR();
+  mic.lang = lang === 'en' ? 'en-US' : 'ar-SA';
+  mic.interimResults = true;
+  const input = $('#chat-form').q, btn = $('#chat-mic');
+  btn.classList.add('on');
+  mic.onresult = (e) => { input.value = [...e.results].map((r) => r[0].transcript).join(' '); };
+  mic.onerror = () => toast(t('voiceErr'));
+  mic.onend = () => { btn?.classList.remove('on'); const q = input.value.trim(); mic = null; if (q) { input.value = ''; ask(q); } };
+  mic.start();
 }
 let asking = false;
 async function ask(text) {
   text = String(text || '').trim();
+  const img = chatImg;
+  if (!text && img) text = t('photoQ');
   if (!text || asking) return;
   if (params().get('v') !== 'chat') go('v=chat');
   asking = true;
-  chatLog.push({ role: 'user', content: text });
+  clearChatImg();
+  chatLog.push({ role: 'user', content: text, ...(img ? { thumb: img.thumb } : {}) });
+  chatChips = null;
   drawChat(true);
-  let reply, products = [];
+  let reply, products = [], why = {};
   try {
     if (D?.ai !== false) {
-      const r = await fetch('/api/public/store/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang, messages: chatLog.map(({ role, content }) => ({ role, content })) }) });
+      const body = { lang, messages: chatLog.map(({ role, content }) => ({ role, content })), ctx: { saved: [...favs].slice(-8), viewed: recent.slice(0, 8) } };
+      if (img) body.image = img.data;
+      const r = await fetch('/api/public/store/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const d = await r.json().catch(() => ({}));
-      if (r.ok) { reply = d.reply; products = d.products; }
+      if (r.ok) { reply = d.reply; products = d.products; why = d.why || {}; chatChips = d.chips?.length ? d.chips : null; }
       else if (r.status !== 503) reply = d.message;
     }
     if (reply == null) {
@@ -630,7 +713,7 @@ async function ask(text) {
     reply = t('offline');
   }
   products.forEach((p) => cache.set(p.id, p));
-  chatLog.push({ role: 'assistant', content: reply, products });
+  chatLog.push({ role: 'assistant', content: reply, products, why });
   saveChat();
   asking = false;
   drawChat();
@@ -742,6 +825,12 @@ document.addEventListener('submit', (e) => {
     e.target.q.value = '';
     ask(q);
   }
+});
+document.addEventListener('change', (e) => { if (e.target.id === 'chat-file') { pickChatImage(e.target.files[0]); e.target.value = ''; } });
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#chat-mic')) return toggleMic();
+  if (e.target.closest('[data-chat-pic-x]')) return clearChatImg();
+  if (e.target.closest('[data-chat-new]')) { chatLog.length = 0; chatChips = null; saveChat(); drawChat(); }
 });
 
 // ---------- تصفّح: حالات المتاجر، اكتشف، الميزانية، كل المنتجات ----------
@@ -1163,6 +1252,7 @@ const A = {
     was: (p) => `كان ${p}`, dropped: 'نزل السعر 🎉', stop: 'إلغاء', favs: '♡ المفضلة', favsN: (n) => `${n} منتج في المفضلة`, openFavs: 'افتح المفضلة',
     myComments: '💬 تعليقاتي', noMine: 'ما علّقت على شي للحين.', onP: 'على منتج', onR: 'على ريل', logout: 'تسجيل الخروج', unavailable: 'غير متاح حالياً',
     app: '📲 تطبيق متاجر أصالة', appP: 'ثبّت المتاجر على شاشة جوالك الرئيسية، وتفتح بضغطة مثل أي تطبيق.', installBtn: 'ثبّت التطبيق', installed: 'التطبيق مثبّت على جهازك ✅',
+    pushT: '🔔 فعّل الإشعارات', pushP: 'يوصلك تنبيه إذا نزل سعر منتج تتابعه، أو رد عليك التاجر، وعروض أصالة الحصرية.', pushBtn: 'فعّل', pushOn: 'الإشعارات مفعّلة ✅', pushOff: 'أوقف الإشعارات', pushBlocked: 'الإشعارات موقفة من إعدادات جوالك. فعّلها من الإعدادات ثم التطبيقات ثم متاجر أصالة.', pushDone: 'تم، بيوصلك كل جديد 🔔', pushWatch: 'عشان يوصلك تنبيه نزول السعر على جوالك 👇', pushNeedApp: 'ثبّت التطبيق أول عشان توصلك الإشعارات على جوالك.', pushErr: 'ما قدرنا نفعّل الإشعارات، جرّب بعدين',
     iosHow: 'في سفاري: اضغط زر المشاركة ⬆️ تحت، بعدها «إضافة إلى الشاشة الرئيسية».', barT: 'ثبّت متاجر أصالة على جوالك', later: 'لاحقاً',
   },
   en: {
@@ -1173,6 +1263,7 @@ const A = {
     was: (p) => `was ${p}`, dropped: 'Price dropped 🎉', stop: 'Stop', favs: '♡ Favourites', favsN: (n) => `${n} saved products`, openFavs: 'Open favourites',
     myComments: '💬 My comments', noMine: 'No comments yet.', onP: 'on a product', onR: 'on a reel', logout: 'Sign out', unavailable: 'Not available now',
     app: '📲 Asalah Stores app', appP: 'Add the stores to your home screen and open them in one tap like any app.', installBtn: 'Install app', installed: 'The app is installed ✅',
+    pushT: '🔔 Turn on notifications', pushP: 'Get alerted when a product you watch drops in price, when a merchant replies, and for exclusive Asalah offers.', pushBtn: 'Turn on', pushOn: 'Notifications are on ✅', pushOff: 'Turn off', pushBlocked: 'Notifications are blocked in your phone settings. Enable them from Settings, Apps, Asalah Stores.', pushDone: 'Done, you’ll get every update 🔔', pushWatch: 'To get the price-drop alert on your phone 👇', pushNeedApp: 'Install the app first to get notifications on your phone.', pushErr: 'Couldn’t turn on notifications, try later',
     iosHow: 'In Safari: tap Share ⬆️ then “Add to Home Screen”.', barT: 'Install Asalah Stores on your phone', later: 'Later',
   },
 };
@@ -1207,6 +1298,7 @@ async function toggleWatch(id) {
     ME.watching = on ? ME.watching.filter((x) => x !== id) : [...ME.watching, id];
     document.querySelectorAll(`[data-watch="${id}"]`).forEach((b) => { b.classList.toggle('on', !on); b.setAttribute('aria-pressed', String(!on)); b.textContent = on ? at('watch') : at('watching'); });
     toast(on ? at('watchOff') : at('watchOn'));
+    if (!on) setTimeout(() => pushBar('watch'), 1200);
     if (document.body.dataset.view === 'account' && on) showAccount();
   } catch (e) { toast(e.message); }
 }
@@ -1253,7 +1345,7 @@ let installEvt = null;
 const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 function appCard() {
-  if (standalone()) return html`<div class="mk-acc-box"><h2>${at('app')}</h2><p class="mk-muted">${at('installed')}</p></div>`;
+  if (standalone()) return html`<div class="mk-acc-box"><h2>${at('app')}</h2><p class="mk-muted">${at('installed')}</p>${pushRow()}</div>`;
   return html`<div class="mk-acc-box"><h2>${at('app')}</h2><p class="mk-muted">${at('appP')}</p>${installEvt ? html`<button type="button" class="mk-btn gold" data-install>${at('installBtn')}</button>` : isIOS ? html`<p class="mk-ios">${at('iosHow')}</p>` : ''}</div>`;
 }
 async function install() {
@@ -1278,6 +1370,72 @@ addEventListener('beforeinstallprompt', (e) => {
 });
 if (isIOS) setTimeout(installBar, 8000);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/stores/sw.js', { scope: '/stores/' }).catch(() => {});
+
+// ---------- الإشعارات ----------
+// ما نطلب الإذن إلا داخل التطبيق المثبّت، وبعد ما يستخدمه العميل شوي أو يتابع سعر منتج
+const pushOk = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const pushState = () => (!pushOk ? 'na' : Notification.permission);
+const b64ToBytes = (s) => { const t = s.replace(/-/g, '+').replace(/_/g, '/'); return Uint8Array.from(atob(t + '='.repeat((4 - (t.length % 4)) % 4)), (c) => c.charCodeAt(0)); };
+async function syncPush(create) {
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub && create) {
+    const { key } = await get('/api/public/push/key');
+    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+  }
+  if (!sub) return false;
+  const j = sub.toJSON();
+  await cpost('/api/public/push/subscribe', 'POST', { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, lang });
+  return true;
+}
+async function enablePush() {
+  $('#push-bar')?.remove();
+  if (!standalone()) return toast(at('pushNeedApp'));
+  try {
+    const p = await Notification.requestPermission();
+    if (p !== 'granted') { keep('asalah_push_x', Date.now()); if (document.body.dataset.view === 'account') showAccount(); return; }
+    pushOnNow = await syncPush(true);
+    toast(at('pushDone'));
+  } catch { toast(at('pushErr')); }
+  if (document.body.dataset.view === 'account') showAccount();
+}
+async function disablePush() {
+  try {
+    const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    if (sub) { await cpost('/api/public/push/unsubscribe', 'POST', { endpoint: sub.endpoint }).catch(() => {}); await sub.unsubscribe(); }
+  } catch {}
+  pushOnNow = false;
+  keep('asalah_push_x', Date.now());
+  showAccount();
+}
+let pushOnNow = false;
+function pushRow() {
+  const st = pushState();
+  if (st === 'na') return '';
+  if (st === 'denied') return html`<p class="mk-ios">${at('pushBlocked')}</p>`;
+  if (st === 'granted' && pushOnNow) return html`<div class="mk-push-row"><span>${at('pushOn')}</span><button type="button" class="mk-link" data-push-off>${at('pushOff')}</button></div>`;
+  return html`<div class="mk-push-row"><span>${at('pushP')}</span><button type="button" class="mk-btn gold sm" data-push>${at('pushBtn')}</button></div>`;
+}
+function pushBar(why) {
+  if (!standalone() || pushState() !== 'default' || $('#push-bar') || $('#install-bar')) return;
+  if (why !== 'watch' && Date.now() - load('asalah_push_x', 0) < 7 * 86400e3) return;
+  const bar = Object.assign(document.createElement('div'), { id: 'push-bar', className: 'mk-install' });
+  render(bar, html`<span class="mk-push-ic" aria-hidden="true">🔔</span><div><b>${at('pushT')}</b><small>${why === 'watch' ? at('pushWatch') : at('pushP')}</small></div>
+    <button type="button" class="mk-btn gold sm" data-push>${at('pushBtn')}</button><button type="button" class="mk-round" data-push-x aria-label="${at('later')}">×</button>`);
+  document.body.append(bar);
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest('[data-push]')) return enablePush();
+  if (e.target.closest('[data-push-off]')) return disablePush();
+  if (e.target.closest('[data-push-x]')) { keep('asalah_push_x', Date.now()); $('#push-bar')?.remove(); }
+});
+if (pushOk && standalone()) {
+  // كل فتحة: نحدّث الاشتراك (يربطه بالحساب بعد الدخول)، وإذا ما قرر للحين نعرض الطلب بعد 25 ثانية استخدام
+  if (Notification.permission === 'granted') syncPush(false).then((ok) => { pushOnNow = ok; }).catch(() => {});
+  else setTimeout(() => pushBar(), 25000);
+} else if (pushOk && Notification.permission === 'granted') {
+  navigator.serviceWorker.ready.then((r) => r.pushManager.getSubscription()).then((s) => { pushOnNow = !!s; if (s) syncPush(false).catch(() => {}); }).catch(() => {});
+}
 
 applyLang();
 route();

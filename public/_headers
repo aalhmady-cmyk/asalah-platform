@@ -15,3 +15,5 @@
   Cache-Control: no-cache
 /stores/*
   Cache-Control: no-cache
+  ! Permissions-Policy
+  Permissions-Policy: camera=(), microphone=(self), geolocation=()

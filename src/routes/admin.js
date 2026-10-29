@@ -1,6 +1,7 @@
 // اللوحة الأم: المدير العام يدير التجار والحسابات والدفعات وكل العلامات.
 import { hashPassword, requireUser, validPassword } from '../lib/auth.js';
 import { createResetLink } from './auth.js';
+import { adminPush } from './push.js';
 import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
 import { hotspots, monthlyReport } from '../lib/insights.js';
 import { lookupTag, overviewFor, setTagStatus } from '../lib/ops.js';
@@ -50,6 +51,10 @@ export async function handleAdmin(req, env, path) {
   const user = await requireUser(db, req, 'admin');
   const m = req.method;
   let match;
+  if (path.startsWith('/api/admin/push')) {
+    const r = await adminPush(req, db, path, user);
+    if (r) return r;
+  }
 
   if (path === '/api/admin/overview' && m === 'GET') {
     const [ov, merchants, alerts, unknown] = await Promise.all([

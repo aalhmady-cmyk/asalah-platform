@@ -21,6 +21,7 @@
       <button type="button" data-tab="batches">الدفعات</button>
       <button type="button" data-tab="tags">العلامات</button>
       <button type="button" data-tab="store">المتاجر 🛍️</button>
+      <button type="button" data-tab="push">الإشعارات 🔔</button>
       <button type="button" data-tab="reports">التقليد والبلاغات <span class="badge" id="unknown-badge"></span></button>
       <button type="button" data-tab="users">الحسابات</button>
       <button type="button" data-tab="audit">سجل العمليات</button>
@@ -101,6 +102,29 @@
         </form>
         <div id="store-list"></div>
       </div>
+    </section>
+
+    <section id="push" hidden>
+      <div class="page-head"><div><h1>الإشعارات 🔔</h1><p>أرسل إشعار يوصل جوالات عملاء تطبيق متاجر أصالة، مثل عرض جديد أو منتج وصل. العميل يفعّل الإشعارات بعد ما يثبّت التطبيق.</p></div></div>
+      <div class="kpis" id="push-kpis" style="margin-top:24px"></div>
+      <div class="row ad-push" style="margin-top:24px">
+        <form class="card stack" id="push-form">
+          <h2>إشعار جديد</h2>
+          <label class="field">العنوان<input name="title" maxlength="60" required placeholder="مثال: عرض نهاية الأسبوع 🔥"><small class="muted"><span data-count="title">0</span>/60</small></label>
+          <label class="field">النص<textarea name="body" maxlength="180" rows="3" required placeholder="مثال: خصم 20% على القهوة المختصة من الكيف الأخضر، لين الأحد بس"></textarea><small class="muted"><span data-count="body">0</span>/180</small></label>
+          <label class="field">لما يضغط العميل يفتح
+            <select name="target"><option value="home">الصفحة الرئيسية للمتاجر</option><option value="product">منتج معيّن (مع صورته)</option><option value="reels">الريلز</option><option value="url">رابط داخل الموقع</option></select></label>
+          <label class="field" id="push-product" hidden>المنتج<select name="product_id"></select></label>
+          <label class="field" id="push-url" hidden>الرابط<input name="url" dir="ltr" placeholder="/stores/?m=kif"></label>
+          <label class="field">يوصل لـ
+            <select name="audience"><option value="all">كل المشتركين</option><option value="accounts">اللي مسجلين دخول بس</option><option value="ar">واجهة عربية</option><option value="en">واجهة إنجليزية</option></select></label>
+          <button class="btn btn-primary" type="submit">أرسل الإشعار</button>
+          <div id="push-progress"></div>
+        </form>
+        <div class="card"><h2>شكله على الجوال</h2><div class="ad-phone"><div class="ad-notif" id="push-preview"></div></div>
+          <p class="small muted">الشكل يختلف شوي بين الآيفون والأندرويد. صورة المنتج تطلع في الأندرويد.</p></div>
+      </div>
+      <div class="card" style="margin-top:24px"><h2>الإشعارات المرسلة</h2><div class="table-wrap" id="push-list"></div></div>
     </section>
 
     <section id="reports" hidden>

@@ -12,6 +12,7 @@ import m0009 from '../../migrations/0009_reel_clip_family.sql';
 import m0010 from '../../migrations/0010_reel_comments.sql';
 import m0011 from '../../migrations/0011_customers_reviews.sql';
 import m0012 from '../../migrations/0012_admin_staff_stats.sql';
+import m0013 from '../../migrations/0013_push.sql';
 import { randomHex } from './util.js';
 
 const MIGRATIONS = [
@@ -27,6 +28,7 @@ const MIGRATIONS = [
   ['0010_reel_comments.sql', m0010],
   ['0011_customers_reviews.sql', m0011],
   ['0012_admin_staff_stats.sql', m0012],
+  ['0013_push.sql', m0013],
 ];
 
 // يقسم الملف لجمل: نشيل التعليقات ونقسم على ; في آخر السطر

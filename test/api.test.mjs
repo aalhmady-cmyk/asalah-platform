@@ -771,3 +771,34 @@ test('حساب الزبون: متابعة السعر وتنبيه النزول',
   assert.equal((await call('/api/c/watch', { method: 'DELETE', body: { product_id: p.id }, cookie: ck })).status, 200);
   assert.deepEqual((await call('/api/c/me', { cookie: ck })).data.watching, []);
 });
+
+test('الإشعارات: الاشتراك والحملات من اللوحة الأم', async () => {
+  const key = await call('/api/public/push/key');
+  assert.equal(key.status, 200);
+  assert.equal(Buffer.from(key.data.key, 'base64url').length, 65);
+  assert.equal((await call('/api/public/push/key')).data.key, key.data.key);
+  const p256dh = Buffer.from(new Uint8Array(65).fill(4)).toString('base64url');
+  const auth = Buffer.from(new Uint8Array(16).fill(1)).toString('base64url');
+  // رابط مو من خدمات الإشعارات مرفوض، وبدون Origin مرفوض
+  assert.equal((await post('/api/public/push/subscribe', { endpoint: 'https://evil.test/x', p256dh, auth })).status, 400);
+  assert.equal((await call('/api/public/push/subscribe', { method: 'POST', body: { endpoint: 'https://fcm.googleapis.com/fcm/send/t1', p256dh, auth }, origin: null })).status, 403);
+  assert.equal((await post('/api/public/push/subscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/t1', p256dh, auth, lang: 'ar' })).status, 200);
+  assert.equal((await post('/api/public/push/subscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/t1', p256dh, auth, lang: 'en' })).status, 200);
+  assert.equal((await call('/api/admin/push', { cookie: S.merchant })).status, 403);
+  let st = await call('/api/admin/push', { cookie: S.admin });
+  assert.equal(st.data.stats.total, 1);
+  assert.equal(st.data.stats.en, 1);
+  assert.equal((await post('/api/admin/push', { title: 'عرض', body: 'خصم', url: 'https://evil.test' }, S.admin)).status, 400);
+  assert.equal((await post('/api/admin/push', { title: 'عرض', body: 'خصم', audience: 'accounts' }, S.admin)).status, 400);
+  const c = await post('/api/admin/push', { title: 'عرض نهاية الأسبوع', body: 'خصم 20%', url: '/stores/?v=reels' }, S.admin);
+  assert.equal(c.status, 200);
+  assert.equal(c.data.campaign.total, 1);
+  assert.equal(c.data.campaign.status, 'done');
+  assert.equal(c.data.campaign.sent + c.data.campaign.failed, 1);
+  assert.equal((await post('/api/public/push/click', { c: c.data.campaign.id })).status, 200);
+  await post('/api/public/push/click', { c: c.data.campaign.id });
+  st = await call('/api/admin/push', { cookie: S.admin });
+  assert.equal(st.data.campaigns[0].clicks, 1);
+  assert.equal((await post('/api/public/push/unsubscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/t1' })).status, 200);
+  assert.equal((await call('/api/admin/push', { cookie: S.admin })).data.stats.total, 0);
+});

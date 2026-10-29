@@ -573,19 +573,19 @@ export async function handlePublicStore(req, env, path) {
   }
   if (path === '/api/public/store/chat' && m === 'POST') {
     await rateLimit(db, 'storechat:' + (await ipHash(req)), 40, 3600);
-    const b = await readJson(req, 20000);
+    const b = await readJson(req, 1_500_000);
     const catalog = (
       await db
-        .prepare(`SELECT p.id,p.title,p.category,p.price,m.name AS merchant_name FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE ${LIVE} AND p.status='active' AND p.admin_blocked=0 ORDER BY p.clicks DESC, p.id DESC LIMIT 250`)
+        .prepare(`SELECT p.id,p.title,p.category,p.price,p.old_price,p.rating_sum,p.rating_n,p.description,m.name AS merchant_name FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE ${LIVE} AND p.status='active' AND p.admin_blocked=0 ORDER BY p.clicks DESC, p.id DESC LIMIT 250`)
         .all()
     ).results;
-    const r = await storeChat(env, b.messages, catalog, b.lang === 'en' ? 'en' : 'ar');
+    const r = await storeChat(env, b.messages, catalog, b.lang === 'en' ? 'en' : 'ar', b.ctx || {}, b.image ?? null);
     let products = [];
     if (r.ids.length) {
       const rows = await db.prepare(`SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE p.id IN (${r.ids.map(() => '?').join(',')})`).bind(...r.ids).all();
       products = r.ids.map((id) => rows.results.find((x) => x.id === id)).filter(Boolean).map(publicProduct);
     }
-    return json({ ok: true, reply: r.reply, products });
+    return json({ ok: true, reply: r.reply, products, why: r.why, chips: r.chips });
   }
   fail(404, 'المسار غير موجود');
 }
