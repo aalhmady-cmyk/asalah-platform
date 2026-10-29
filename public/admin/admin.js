@@ -362,7 +362,7 @@ async function loadAudit() {
 
 $('hot-days').addEventListener('change', () => loadReports().catch((e) => toast(e.message, true)));
 // ---------- الإشعارات ----------
-const AUD = { all: 'كل المشتركين', accounts: 'المسجلين', ar: 'العربي', en: 'الإنجليزي' };
+const AUD = { all: 'الكل (مسجل وبدون تسجيل)', accounts: 'المسجلين', ar: 'العربي', en: 'الإنجليزي' };
 const PST = { sending: ['يرسل…', 'warn'], done: ['انرسل', 'ok'], stopped: ['موقوف', 'err'] };
 let pushProducts = null;
 async function loadPush() {
