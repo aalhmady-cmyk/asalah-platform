@@ -97,7 +97,7 @@ export async function fakesMap(db, merchantId, hours) {
     points: [...pts.values()].sort((a, b) => b.fakes + b.reports - (a.fakes + a.reports)),
     unplaced,
     recent: recent.results.map((r) => { const c = cityOf(r.city); return { city: c ? c[1] : r.city || null, result: r.result, at: r.created_at }; }),
-    totals: { original: totals.results[0]?.original || 0, fake: totals.results[0]?.fake || 0 },
+    totals: { original: totals.results[0]?.original || 0, fake: totals.results[0]?.fake || 0, reports: reports.results.reduce((n, r) => n + r.n, 0) },
   };
 }
 

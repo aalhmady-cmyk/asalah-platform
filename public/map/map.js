@@ -76,7 +76,7 @@ async function load() {
     return;
   }
   count($('s-ok'), d.totals.original);
-  count($('s-bad'), d.totals.fake);
+  count($('s-bad'), d.totals.fake + (d.totals.reports || 0));
   count($('s-cities'), d.points.filter((p) => p.fakes + p.reports > 0).length);
   const max = Math.max(1, ...d.points.map((p) => p.fakes + p.reports));
   const nowS = Date.now() / 1000;
