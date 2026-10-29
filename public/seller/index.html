@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0F2A21">
+<title>بائع معتمد - أصالة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/seller/seller.css">
+</head>
+<body>
+<main class="sl">
+  <section id="loading" class="sl-card center"><div class="sl-spin" aria-hidden="true"></div><p>نتحقق من شهادة المحل…</p></section>
+  <section id="ok" class="sl-card ok center" hidden>
+    <div class="sl-badge" aria-hidden="true"><svg viewBox="0 0 88 88" width="96" height="96"><circle cx="44" cy="44" r="40" fill="none" stroke="#D9B45A" stroke-width="3"/><circle cx="44" cy="44" r="31" fill="#D9B45A"/><path d="M30 45l10 10 19-21" fill="none" stroke="#0F2A21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <p class="sl-kicker">بائع معتمد ✅</p>
+    <h1 id="s-name"></h1>
+    <p id="s-place" class="sl-place"></p>
+    <div class="sl-brand"><span id="b-logo" class="sl-logo"></span><div><small>معتمد لبيع منتجات</small><b id="b-name"></b></div></div>
+    <p class="sl-soft">هذا المحل مسجّل عند صاحب العلامة كنقطة بيع رسمية للمنتجات الأصلية. ومع ذلك، تحقق من علامة أصالة على كل منتج قبل ما تشتري.</p>
+    <div class="sl-actions"><a id="s-map" class="btn ghost-gold" hidden target="_blank" rel="noopener">📍 موقع المحل</a><a id="b-page" class="btn ghost-gold">كل نقاط البيع المعتمدة</a></div>
+  </section>
+  <section id="bad" class="sl-card bad center" hidden>
+    <svg width="80" height="80" viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="34" fill="#FDECEA" stroke="#B42318" stroke-width="3"/><path d="M40 24v22M40 55v1" stroke="#B42318" stroke-width="6" stroke-linecap="round"/></svg>
+    <h1>شهادة غير صالحة</h1>
+    <p id="bad-msg">هذي الشهادة غير صالحة أو انلغت. انتبه، واشترِ من نقطة بيع معتمدة.</p>
+  </section>
+  <p class="sl-foot"><a href="/scan/">📷 تحقق من منتج بالكاميرا</a> · محمي بواسطة <b>أصالة</b></p>
+</main>
+<script type="module" src="/seller/seller.js"></script>
+</body>
+</html>

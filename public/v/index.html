@@ -38,6 +38,9 @@
     <div id="seal">    <svg width="88" height="88" viewBox="0 0 88 88" role="img" aria-label="منتج أصلي"><circle cx="44" cy="44" r="40" fill="none" stroke="#D9B45A" stroke-width="3"/><circle cx="44" cy="44" r="31" fill="#D9B45A"/><path d="M30 45l10 10 19-21" fill="none" stroke="#0F2A21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     <h1>منتج أصلي</h1>
     <p id="ok-sub" class="soft"></p>
+    <div id="level" class="level" hidden><span id="lv-icon" aria-hidden="true"></span><div><b id="lv-title"></b><small id="lv-sub"></small><div class="lv-bar"><i id="lv-bar"></i></div></div></div>
+    <button id="voice-btn" class="voice-btn" type="button" hidden><span class="v-ic" aria-hidden="true">🔊</span><span><b>رسالة من صاحب العلامة</b><small>اضغط واسمع</small></span><span class="v-wave" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
+    <audio id="voice" preload="none" hidden></audio>
     <div id="reward" class="reward" hidden><span class="r-coin" aria-hidden="true">🪙</span><div><b id="reward-title"></b><small id="reward-sub"></small></div></div>
     <div class="facts">
       <div><span>رقم العلامة</span><b id="f-id" class="ltr"></b></div>
@@ -53,6 +56,29 @@
       <button id="share" class="btn ghost-gold" type="button">شارك: اشتريت أصلي</button>
       <a id="store-link" class="btn ghost-gold" hidden rel="noopener">زيارة المتجر</a>
     </div>
+  </section>
+
+  <!-- جواز سفر المنتج: رحلته من المصنع لين وصل يدك -->
+  <section id="passport" class="vcard passport" hidden>
+    <div class="pp-h"><span aria-hidden="true">🛂</span><div><h2>جواز سفر المنتج</h2><p class="muted small" id="pp-sub">رحلة منتجك من صاحب العلامة لين وصل لك</p></div></div>
+    <ol class="pp-steps" id="pp-steps"></ol>
+  </section>
+
+  <!-- ضمان أصالة: إذا طلع المنتج مقلّد بعد ما تحقق أصلي -->
+  <section id="guarantee" class="vcard guarantee" hidden>
+    <div class="g-h"><span class="g-ic" aria-hidden="true">🛡️</span><div><h2>مضمون بضمان أصالة</h2><p class="muted small" id="g-terms">صاحب العلامة يضمن إن هذا المنتج أصلي. إذا اكتشفت إنه مقلّد، يرجع لك حقك.</p></div></div>
+    <button id="g-open" class="btn ghost-gold" type="button">اكتشفت إنه مقلّد؟ اطلب الضمان</button>
+    <p id="g-done" class="g-done" hidden></p>
+    <form id="g-form" class="l-form" hidden>
+      <label class="field">الاسم<input name="name" autocomplete="name" required minlength="2"></label>
+      <label class="field">رقم الجوال<input name="phone" type="tel" inputmode="numeric" placeholder="05xxxxxxxx" autocomplete="tel" required class="ltr"></label>
+      <label class="field">المدينة<input name="city" required minlength="2"></label>
+      <label class="field">من وين اشتريته<input name="point_of_sale" required minlength="2"></label>
+      <label class="field">وش لاحظت<textarea name="note" required minlength="5" maxlength="800" rows="3" placeholder="مثال: الريحة مختلفة، والعلبة طباعتها باهتة"></textarea></label>
+      <label class="field">صورة المنتج (اختياري)<input name="photo" type="file" accept="image/*"></label>
+      <label class="check"><input type="checkbox" name="consent" required><span>أوافق على مشاركة بياناتي مع صاحب العلامة عشان يراجع طلبي</span></label>
+      <button class="btn btn-primary big-btn" type="submit">أرسل طلب الضمان</button>
+    </form>
   </section>
 
   <!-- متاجر أصالة: اطلبه مرة ثانية وريلز المنتج -->
@@ -132,11 +158,12 @@
       <label class="field">اسم المحل<input name="point_of_sale" required minlength="2"></label>
       <label class="field">رقم جوالك (اختياري)<input name="phone" type="tel" inputmode="numeric" class="ltr"></label>
       <label class="field">ملاحظة (اختياري)<textarea name="note" maxlength="500"></textarea></label>
+      <label class="field photo-field"><span>📷 صوّر المنتج (اختياري)</span><small class="muted">نقارنه بالذكاء الصناعي مع صورة المنتج الأصلي</small><input name="photo" type="file" accept="image/*" capture="environment"></label>
       <button class="btn big-btn" style="background:var(--red);border-color:var(--red);color:#fff" type="submit">أرسل البلاغ</button>
     </form>
     <a id="wa" class="btn" hidden rel="noopener" target="_blank">تواصل عبر واتساب</a>
   </section>
-  <section id="reported" class="vcard center" hidden><h2>وصلنا بلاغك</h2><p class="muted">شكراً لمساعدتك في وقف التقليد.</p></section>
+  <section id="reported" class="vcard center" hidden><h2>وصلنا بلاغك</h2><p class="muted">شكراً لمساعدتك في وقف التقليد.</p><div id="ai-box" class="ai-box" hidden><b>🤖 رأي الذكاء الصناعي في الصورة</b><div class="ai-meter"><i id="ai-bar"></i></div><small id="ai-score"></small><p id="ai-verdict"></p></div><a class="linkish" href="/map/">🗺️ شوف خريطة التقليد الحية</a></section>
 
   <p class="vscan"><a href="/scan/">📷 تحقق من منتج ثاني بالكاميرا</a></p>
   <footer class="vfoot">

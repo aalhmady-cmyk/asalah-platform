@@ -164,7 +164,7 @@ export function videoType(buf) {
   return null;
 }
 
-const MEDIA_RE = /^reels\/[0-9]+\/[a-f0-9]{24}\.(mp4|webm)$/;
+const MEDIA_RE = /^(reels\/[0-9]+\/[a-f0-9]{24}\.(mp4|webm)|voice\/[0-9]+\/[a-f0-9]{24}\.(m4a|webm|ogg|mp3))$/;
 
 // يقدّم الفيديو من R2 مع دعم Range (سفاري ما يشغّل الفيديو بدونه)
 export async function serveMedia(req, env, path) {

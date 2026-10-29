@@ -9,6 +9,8 @@
   Cache-Control: no-store
 /merchant/*
   Cache-Control: no-store
+  ! Permissions-Policy
+  Permissions-Policy: camera=(), microphone=(self), geolocation=()
 /report/*
   Cache-Control: no-store
 /v/*
@@ -24,3 +26,7 @@
   Permissions-Policy: camera=(self), microphone=(), geolocation=()
 /print/*
   Cache-Control: no-store
+/map/*
+  Cache-Control: no-cache
+/seller/*
+  Cache-Control: no-cache

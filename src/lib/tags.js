@@ -25,6 +25,11 @@ export async function signTag(env, batch, serial) {
   return b64url(sig).slice(0, 16);
 }
 
+// توقيع عام لروابط ثانية (شهادة البائع المعتمد) بنفس سر العلامات
+export async function signText(env, text, len = 16) {
+  return b64url(await crypto.subtle.sign('HMAC', await hmacKey(env), enc.encode(text))).slice(0, len);
+}
+
 export async function tokenFor(env, batch, serial) {
   return `${batch.id.toString(36)}.${serial.toString(36)}.${await signTag(env, batch, serial)}`;
 }

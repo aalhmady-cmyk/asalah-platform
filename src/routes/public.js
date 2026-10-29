@@ -1,5 +1,7 @@
 // المسارات العامة: التحقق من العلامة، المشاركة في المسابقة، بلاغ التقليد.
 import { pushAlert } from '../lib/push.js';
+import { compareWithOriginal, evidencePhoto, levelFor, passportFor, voiceUrl } from '../lib/trust.js';
+import { guaranteeClaim, saveEvidence } from './trust.js';
 import { assistantEnabled } from '../lib/assistant.js';
 import { guide } from '../lib/guide.js';
 import { shopForVerify } from './store.js';
@@ -55,7 +57,7 @@ async function resolve(env, db, raw) {
               m.name,m.logo_url,m.logo_key,m.brand_color,m.store_url,m.whatsapp,m.status AS merchant_status,m.max_checks,
               m.contest_enabled,m.contest_title,m.contest_ends_at,m.contest_terms_url,b.expires_on,b.details,
               m.loyalty_enabled,m.loyalty_mode,m.loyalty_per_tag,m.loyalty_min_redeem,m.loyalty_reward,m.ratings_enabled,
-              m.slug,m.store_enabled,m.store_coupon,m.store_coupon_note,b.store_product_id
+              m.slug,m.store_enabled,m.store_coupon,m.store_coupon_note,b.store_product_id,m.guarantee_enabled,m.guarantee_terms,m.voice_key
        FROM batches b JOIN merchants m ON m.id=b.merchant_id WHERE b.id=?`
     )
     .bind(p.batchId)
@@ -256,7 +258,12 @@ export async function verify(req, env) {
 
   await logScan(db, req, tag.id, b.merchant_id, 'original', tag.check_count);
   const open = contestOpen(b);
-  const rated = b.ratings_enabled ? await db.prepare('SELECT stars FROM ratings WHERE tag_id=?').bind(tag.id).first() : null;
+  const [rated, passport, level, claim] = await Promise.all([
+    b.ratings_enabled ? db.prepare('SELECT stars FROM ratings WHERE tag_id=?').bind(tag.id).first() : null,
+    passportFor(db, b, tag),
+    levelFor(db, device),
+    b.guarantee_enabled ? db.prepare('SELECT status FROM guarantee_claims WHERE tag_id=?').bind(tag.id).first() : null,
+  ]);
   return json({
     ok: true,
     result: 'original',
@@ -280,6 +287,10 @@ export async function verify(req, env) {
     loyalty: b.loyalty_enabled ? { ...loyaltyInfo(b), claimed: Boolean(tag.loyalty_claimed) } : null,
     rating: b.ratings_enabled ? { done: Boolean(rated), stars: rated?.stars ?? null } : null,
     shop: b.store_enabled && b.merchant_status === 'active' ? await shopForVerify(db, b) : null,
+    passport,
+    level,
+    guarantee: b.guarantee_enabled ? { terms: b.guarantee_terms, claimed: claim?.status || null } : null,
+    voice_url: voiceUrl(b.voice_key),
   });
 }
 
@@ -321,23 +332,29 @@ export async function report(req, env) {
   const db = env.DB;
   const ih = await ipHash(req);
   await rateLimit(db, 'report:' + ih, 5, 3600);
-  const body = await readJson(req);
+  const body = await readJson(req, 1_500_000);
   const city = str(body.city, 'المدينة', { min: 2, max: 100 });
+  const photo = evidencePhoto(body.photo);
   const pos = str(body.point_of_sale, 'اسم المحل', { min: 2, max: 150 });
   const phone = saPhone(body.phone, { optional: true });
   const note = str(body.note, 'الملاحظة', { max: 500, optional: true });
   const reason = ['unknown', 'blocked', 'not_activated', 'locked', 'other_device'].includes(body.reason) ? body.reason : 'unknown';
   const r = await resolve(env, db, body.t);
-  let merchantId = r.merchantId ?? null, tagId = null;
+  let merchantId = r.merchantId ?? null, tagId = null, refKey = null;
   if (r.state === 'found') {
     merchantId = r.batch.merchant_id;
+    refKey = r.batch.image_key;
     tagId = (await db.prepare('SELECT id FROM tags WHERE batch_id=? AND serial=?').bind(r.batch.id, r.serial).first())?.id ?? null;
   }
+  // صورة المنتج المشكوك فيه: الذكاء يقارنها بصورة الأصلي (إذا الدفعة لها صورة)
+  const photoKey = photo ? await saveEvidence(env, photo, merchantId) : null;
+  const ai = photo ? await compareWithOriginal(env, refKey, photo) : null;
   await db
-    .prepare('INSERT INTO reports(merchant_id,tag_id,reason,city,point_of_sale,phone,note,ip_hash,created_at) VALUES(?,?,?,?,?,?,?,?,?)')
-    .bind(merchantId, tagId, reason, city, pos, phone, note, ih, now())
+    .prepare('INSERT INTO reports(merchant_id,tag_id,reason,city,point_of_sale,phone,note,ip_hash,created_at,photo_key,ai_verdict,ai_score) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(merchantId, tagId, reason, city, pos, phone, note, ih, now(), photoKey, ai?.verdict ?? null, ai?.score ?? null)
     .run();
-  return json({ ok: true, message: 'وصلنا بلاغك، شكراً لمساعدتك في وقف التقليد' });
+  if (merchantId) await pushAlert(db, merchantId, 'report', `🚩 بلاغ تقليد جديد من ${city} (${pos})${ai?.score != null ? ` · احتمال التقليد ${ai.score}٪` : ''}`);
+  return json({ ok: true, message: 'وصلنا بلاغك، شكراً لمساعدتك في وقف التقليد', ai: ai?.verdict ? ai : null });
 }
 
 // ---------- الموقع العام ----------
@@ -431,3 +448,5 @@ export async function shopAiRoute(req, env) {
   const b = await readJson(req, 2_000_000);
   return json({ ok: true, result: await shopAI(env, b) });
 }
+
+export const guarantee = (req, env) => guaranteeClaim(req, env, boundTag);

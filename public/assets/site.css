@@ -177,3 +177,12 @@ body.site { background: var(--ground); }
 .legal ul { margin: 0; padding-inline-start: 22px; display: flex; flex-direction: column; gap: 6px; }
 .legal .upd { color: var(--muted); font-size: 14px; }
 .site-foot a { color: inherit; }
+
+/* شريط خريطة التقليد */
+.map-band { display: flex; align-items: center; gap: 18px; padding: 22px 24px; border-radius: 24px; background: radial-gradient(500px 200px at 15% 50%, rgba(255,77,79,.25), transparent 70%), #0F2A21; color: #fff; text-decoration: none; flex-wrap: wrap; }
+.map-band div { flex: 1; min-width: 220px; }
+.map-band b { font-size: 20px; }
+.map-band p { margin: 6px 0 0; color: #B9C9C1; }
+.mb-dot { width: 14px; height: 14px; border-radius: 50%; background: #FF4D4F; box-shadow: 0 0 0 0 rgba(255,77,79,.7); animation: mbp 1.6s infinite; flex: none; }
+@keyframes mbp { 70% { box-shadow: 0 0 0 14px rgba(255,77,79,0); } 100% { box-shadow: 0 0 0 0 rgba(255,77,79,0); } }
+@media (prefers-reduced-motion: reduce) { .mb-dot { animation: none; } }

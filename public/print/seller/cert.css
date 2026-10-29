@@ -1,0 +1,14 @@
+.cert-sheet { display: flex; justify-content: center; padding: 24px; }
+.cert { width: 14.8cm; min-height: 21cm; background: #0F2A21; color: #fff; border-radius: 18px; padding: 1.2cm 1cm; display: flex; flex-direction: column; align-items: center; text-align: center; gap: .45cm; border: 6px solid #D9B45A; box-shadow: 0 10px 40px rgba(0,0,0,.2); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.cert .k { color: #D9B45A; font-weight: 700; font-size: 20px; }
+.cert h2 { margin: 0; font-size: 34px; line-height: 1.3; }
+.cert .pl { color: #B9C9C1; font-size: 16px; }
+.cert .qr { background: #fff; border-radius: 16px; padding: .35cm; width: 7cm; height: 7cm; }
+.cert .qr svg { width: 100%; height: 100%; display: block; }
+.cert .scan { font-size: 18px; font-weight: 700; }
+.cert .brand { display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,.07); border-radius: 14px; padding: 10px 16px; }
+.cert .brand img { width: 46px; height: 46px; border-radius: 10px; object-fit: cover; background: #fff; }
+.cert .brand small { display: block; color: #B9C9C1; font-size: 12px; }
+.cert .brand b { font-size: 18px; }
+.cert .foot { margin-top: auto; color: #B9C9C1; font-size: 13px; }
+@media print { @page { size: A5; margin: 0; } .cert-sheet { padding: 0; } .cert { box-shadow: none; border-radius: 0; width: 100%; min-height: 100vh; } }

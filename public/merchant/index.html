@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/merchant/store.css">
 <link rel="stylesheet" href="/assets/panel-app.css">
+<link rel="stylesheet" href="/assets/trust.css">
 </head>
 <body>
 <div class="shell">
@@ -32,6 +33,7 @@
       <button type="button" data-tab="loyalty">النقاط والكاش باك 🪙</button>
       <button type="button" data-tab="contest">المسابقة</button>
       <button type="button" data-tab="reports">التقليد والبلاغات</button>
+      <button type="button" data-tab="trust">الضمان والثقة 🛡️</button>
       <button type="button" data-tab="monthly">التقارير</button>
       <button type="button" data-tab="sellers">نقاط البيع</button>
       <button type="button" data-tab="account">الحساب</button>
@@ -184,8 +186,41 @@
     <section id="reports" hidden>
       <div class="page-head"><div><h1>التقليد والبلاغات</h1><p>وين يظهر التقليد، واللي أرسله العملاء لما طلعت لهم علامة مقلّدة أو موقوفة</p></div>
         <label class="field" style="min-width:160px">المدة<select id="hot-days"><option value="7">آخر 7 أيام</option><option value="30" selected>آخر 30 يوم</option><option value="90">آخر 90 يوم</option></select></label></div>
+      <a class="card map-cta" href="/map/?mine=1" style="margin-top:24px"><span aria-hidden="true">🗺️</span><div><b>خريطة تقليد منتجاتك الحية</b><small class="muted">نقاط حمراء تنبض وين ينكشف التقليد، وتتحدث كل 30 ثانية</small></div><span class="btn btn-sm">افتح ←</span></a>
+      <div class="card" id="claims-card" style="margin-top:24px" hidden><div class="card-head"><h2>طلبات ضمان أصالة 🛡️</h2><span class="small muted" id="claims-count"></span></div><div class="table-wrap" id="claims-table"></div></div>
       <div class="card" style="margin-top:24px"><div class="card-head"><h2>بؤر التقليد حسب المدينة</h2><span class="small muted">أكواد مزيّفة، علامات موقوفة، أجهزة أخرى، وبلاغات</span></div><div id="hotspots"></div></div>
       <div class="card" style="margin-top:24px"><h2>البلاغات</h2><div class="table-wrap" id="reports-table"></div></div>
+    </section>
+
+    <section id="trust" hidden>
+      <div class="page-head"><div><h1>الضمان والثقة 🛡️</h1><p>مزايا تخلي عميلك يثق فيك أكثر من أي منافس</p></div></div>
+      <div class="row" style="margin-top:24px">
+        <form class="card owner-only" id="guarantee-form">
+          <h2>ضمان أصالة 🛡️</h2>
+          <p class="small muted" style="margin:0">يطلع للعميل بعد التحقق: «مضمون بضمان أصالة». إذا اكتشف إن المنتج مقلّد، يرسل لك طلب ضمان فيه بياناته وصورة، وأنت تراجعه وترد. فعّله بس إذا أنت مستعد ترجع حق العميل.</p>
+          <label class="check"><input type="checkbox" name="guarantee_enabled"> فعّل ضمان أصالة على منتجاتي</label>
+          <label class="field">نص الضمان للعميل (اختياري)<textarea name="guarantee_terms" maxlength="400" rows="3" placeholder="مثال: نضمن لك إن المنتج أصلي 100٪. إذا طلع مقلّد نرجع لك المبلغ كامل خلال 7 أيام."></textarea></label>
+          <div><button class="btn btn-primary" type="submit">حفظ</button></div>
+        </form>
+        <div class="card owner-only" id="voice-card">
+          <h2>رسالتك الصوتية 🔊</h2>
+          <p class="small muted" style="margin:0">العميل بعد ما يتحقق إن منتجك أصلي، يسمع رسالة شكر بصوتك. سجّلها من جوالك (أقل من 30 ثانية).</p>
+          <div id="voice-now"></div>
+          <div class="actions"><button class="btn btn-primary" type="button" id="rec-btn">🎙️ سجّل الحين</button><label class="btn">📁 ارفع ملف صوت<input type="file" accept="audio/*" id="voice-file" hidden></label></div>
+          <p class="small muted" id="rec-status" style="margin:0"></p>
+          <p class="tip info" style="margin:0">فكرة: «هلا والله، معك فلان من الكيف الأخضر. شكراً إنك اخترت الأصلي، وصحتين وعافية!»</p>
+        </div>
+      </div>
+      <div class="card" style="margin-top:24px">
+        <div class="card-head"><h2>الملخص الأسبوعي الذكي 📊</h2><label class="check owner-only" style="margin:0"><input type="checkbox" id="weekly-on"> يوصلني كل أحد</label></div>
+        <p class="small muted" style="margin:0">كل أحد الصبح يوصلك ملخص أسبوعك: المبيعات، التقليد، أكثر المدن، و3 نصائح من الذكاء الصناعي. يوصلك في التنبيهات وإشعار على جوالك.</p>
+        <div><button class="btn" type="button" id="weekly-btn">اعرض ملخص هالأسبوع</button></div>
+        <pre id="weekly-out" class="weekly-out" hidden></pre>
+      </div>
+      <div class="card" style="margin-top:24px">
+        <h2>شهادة البائع المعتمد 🏅</h2>
+        <p class="small muted" style="margin:0">لكل محل يبيع منتجك شهادة فيها QR. العميل يمسحها ويتأكد إن المحل نقطة بيع رسمية. اطبعها من تبويب <a href="#sellers" data-goto="sellers">نقاط البيع</a> (زر «🏅 شهادة» جنب كل محل).</p>
+      </div>
     </section>
 
     <section id="monthly" hidden>

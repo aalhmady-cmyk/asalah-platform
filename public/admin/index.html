@@ -15,6 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/panel-app.css">
+<link rel="stylesheet" href="/assets/trust.css">
 </head>
 <body>
 <div class="shell">
@@ -140,7 +141,9 @@
     <section id="reports" hidden>
       <div class="page-head"><div><h1>التقليد والبلاغات</h1><p>بؤر التقليد في كل المنصة، والأكواد اللي انمسحت وهي مو موجودة عندنا، وبلاغات العملاء</p></div>
         <label class="field" style="min-width:160px">المدة<select id="hot-days"><option value="7">آخر 7 أيام</option><option value="30" selected>آخر 30 يوم</option><option value="90">آخر 90 يوم</option></select></label></div>
+      <a class="card map-cta" href="/map/?admin=1" style="margin-top:24px"><span aria-hidden="true">🗺️</span><div><b>خريطة التقليد الحية لكل التجار</b><small class="muted">تفتح على شاشة كبيرة وتتحدث كل 30 ثانية. الخريطة العامة للزوار على alsalah-sa.com/map</small></div><span class="btn btn-sm">افتح ←</span></a>
       <div class="card" style="margin-top:24px"><h2>بؤر التقليد حسب المدينة</h2><div id="hotspots"></div></div>
+      <div class="card" style="margin-top:24px" id="claims-card" hidden><h2>طلبات ضمان أصالة 🛡️</h2><p class="small muted" style="margin:0">التاجر يراجع الطلب ويرد على العميل. هنا تتابع بس.</p><div class="table-wrap" id="claims-table"></div></div>
       <div class="row" style="margin-top:24px">
         <div class="card"><h2>آخر الأكواد المزيّفة</h2><div class="table-wrap" id="unknown-table"></div></div>
         <div class="card"><h2>بلاغات العملاء</h2><div class="table-wrap" id="reports-table"></div></div>

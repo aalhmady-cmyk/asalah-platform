@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#08160F">
+<title>خريطة التقليد الحية - أصالة</title>
+<meta name="description" content="وين ينكشف التقليد في السعودية لحظة بلحظة: كل نقطة حمراء كود مزيّف أو بلاغ اكتشفه عميل بجواله عن طريق أصالة.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/map/map.css">
+</head>
+<body>
+<header class="mp-top">
+  <a class="mp-logo" href="/" id="home-link"><svg width="30" height="30" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="11" fill="#D9B45A"/><path d="M12 21l5 5 11-12" fill="none" stroke="#0F2A21" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg><b>أصالة</b></a>
+  <div class="mp-live"><span class="dot"></span><b>مباشر</b></div>
+</header>
+<main class="mp">
+  <div class="mp-head">
+    <h1 id="mp-title">خريطة التقليد الحية</h1>
+    <p id="mp-sub">كل نقطة حمراء كود مزيّف أو علامة موقوفة أو بلاغ، اكتشفه عميل بجواله عن طريق أصالة.</p>
+    <div class="mp-range" role="tablist" aria-label="المدة">
+      <button type="button" data-h="24">آخر 24 ساعة</button><button type="button" data-h="168" aria-selected="true">آخر 7 أيام</button><button type="button" data-h="720">آخر 30 يوم</button>
+    </div>
+  </div>
+  <div class="mp-stats">
+    <div class="ok"><b id="s-ok">0</b><span>منتج أصلي اتحقق منه</span></div>
+    <div class="bad"><b id="s-bad">0</b><span>محاولة تقليد انكشفت</span></div>
+    <div><b id="s-cities">0</b><span>مدينة فيها تقليد</span></div>
+  </div>
+  <div class="mp-grid">
+    <figure class="mp-map"><svg id="map" viewBox="0 0 600 470" role="img" aria-label="خريطة السعودية ونقاط التقليد"></svg><figcaption class="mp-legend"><span><i class="lg-fake"></i>تقليد</span><span><i class="lg-rep"></i>بلاغ من عميل</span><small id="updated"></small></figcaption></figure>
+    <aside class="mp-side">
+      <h2>أكثر المدن</h2>
+      <ol id="top" class="mp-top-list"></ol>
+      <h2>آخر ما انكشف</h2>
+      <ul id="feed" class="mp-feed"></ul>
+    </aside>
+  </div>
+  <p class="mp-note">الأرقام مجمّعة حسب المدينة، بدون أي بيانات شخصية أو أسماء محلات.</p>
+</main>
+<script type="module" src="/map/map.js"></script>
+</body>
+</html>

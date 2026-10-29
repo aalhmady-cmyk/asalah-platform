@@ -178,8 +178,106 @@ async function loadReports() {
   const days = $('hot-days').value;
   const [{ reports }, { hotspots }] = await Promise.all([api('/api/m/reports'), api('/api/m/hotspots?days=' + days)]);
   render($('hotspots'), hotspotsTable(hotspots));
-  render($('reports-table'), !reports.length ? html`<div class="empty">ما فيه بلاغات</div>` : html`<table style="min-width:560px"><thead><tr><th>المدينة</th><th>المحل</th><th>السبب</th><th>ملاحظة</th><th>الوقت</th></tr></thead><tbody>${reports.map((r) => html`<tr><td>${r.city}</td><td><b>${r.point_of_sale}</b></td><td>${pill(RESULT, r.reason)}</td><td>${r.note || '-'}</td><td>${when(r.created_at)}</td></tr>`)}</tbody></table>`);
+  render($('reports-table'), !reports.length ? html`<div class="empty">ما فيه بلاغات</div>` : html`<table style="min-width:640px"><thead><tr><th>المدينة</th><th>المحل</th><th>السبب</th><th>ملاحظة</th><th>الصورة ورأي الذكاء</th><th>الوقت</th></tr></thead><tbody>${reports.map((r) => html`<tr><td>${r.city}</td><td><b>${r.point_of_sale}</b></td><td>${pill(RESULT, r.reason)}</td><td>${r.note || '-'}</td>
+    <td>${r.photo_key ? html`<div class="ev"><a href="/api/m/evidence/${r.photo_key}" target="_blank" rel="noopener"><img src="/api/m/evidence/${r.photo_key}" alt="صورة البلاغ" loading="lazy"></a><div>${r.ai_score != null ? html`<span class="pill ${r.ai_score >= 60 ? 'err' : r.ai_score >= 30 ? 'warn' : 'ok'}">احتمال التقليد ${r.ai_score}٪</span>` : ''}${r.ai_verdict ? html`<div class="small">${r.ai_verdict}</div>` : ''}</div></div>` : '-'}</td><td>${when(r.created_at)}</td></tr>`)}</tbody></table>`);
+  loadClaims().catch(() => {});
 }
+const CLAIM = { new: ['جديد', 'warn'], approved: ['مقبول', 'ok'], rejected: ['مرفوض', 'err'] };
+async function loadClaims() {
+  const { claims } = await api('/api/m/guarantee');
+  $('claims-card').hidden = !claims.length;
+  $('claims-count').textContent = `${claims.filter((c) => c.status === 'new').length} ينتظر ردك`;
+  render($('claims-table'), html`<table style="min-width:720px"><thead><tr><th>العميل</th><th>المدينة والمحل</th><th>وش لاحظ</th><th>العلامة</th><th>الحالة</th><th></th></tr></thead><tbody>${claims.map((c) => html`<tr>
+    <td><b>${c.name}</b>${c.phone ? html`<div class="small ltr"><a href="https://wa.me/966${String(c.phone).replace(/^0/, '')}" target="_blank" rel="noopener">${c.phone}</a></div>` : ''}</td>
+    <td>${c.city}<div class="small muted">${c.point_of_sale}</div></td>
+    <td>${c.note}${c.photo_key ? html`<div class="ev"><a href="/api/m/evidence/${c.photo_key}" target="_blank" rel="noopener"><img src="/api/m/evidence/${c.photo_key}" alt="صورة" loading="lazy"></a></div>` : ''}</td>
+    <td class="ltr small">${c.batch}-${String(c.serial).padStart(Math.max(6, String(c.size).length), '0')}<div class="muted">${when(c.created_at)}</div></td>
+    <td>${pill(CLAIM, c.status)}${c.decision_note ? html`<div class="small muted">${c.decision_note}</div>` : ''}</td>
+    <td>${c.status === 'new' && !STAFF ? html`<div class="actions"><button class="btn btn-sm btn-primary" type="button" data-claim="${c.id}" data-st="approved">قبول</button><button class="btn btn-sm" type="button" data-claim="${c.id}" data-st="rejected">رفض</button></div>` : ''}</td></tr>`)}</tbody></table>`);
+}
+$('claims-table').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-claim]');
+  if (!b) return;
+  const ok = b.dataset.st === 'approved';
+  const note = prompt(ok ? 'ملاحظة للسجل (مثال: رجّعنا المبلغ بتحويل)' : 'سبب الرفض (يشوفه العميل)') ;
+  if (note === null) return;
+  try {
+    await api('/api/m/guarantee/' + b.dataset.claim, { method: 'POST', body: { status: b.dataset.st, note: note || null } });
+    toast(ok ? 'تم قبول الطلب ✅' : 'تم رفض الطلب');
+    loadClaims();
+  } catch (err) { toast(err.message, true); }
+});
+
+// ---------- الضمان والثقة ----------
+async function loadTrust() {
+  const d = await api('/api/m/trust');
+  const f = $('guarantee-form');
+  f.guarantee_enabled.checked = d.guarantee_enabled;
+  f.guarantee_terms.value = d.guarantee_terms || '';
+  $('weekly-on').checked = d.weekly_summary;
+  drawVoice(d.voice_url);
+}
+function drawVoice(url) {
+  render($('voice-now'), url ? html`<div class="voice-now"><audio controls preload="none" src="${url}"></audio><button class="btn btn-sm btn-danger" type="button" id="voice-del">حذف</button></div>` : html`<div class="empty" style="padding:12px">ما سجّلت رسالة للحين</div>`);
+}
+onSubmit($('guarantee-form'), async (f) => {
+  await api('/api/m/trust', { method: 'PATCH', body: { guarantee_enabled: f.guarantee_enabled === 'on', guarantee_terms: f.guarantee_terms || null } });
+  toast(f.guarantee_enabled === 'on' ? 'ضمان أصالة صار يظهر لعملائك 🛡️' : 'تم الحفظ');
+});
+$('weekly-on').addEventListener('change', async (e) => {
+  try { await api('/api/m/trust', { method: 'PATCH', body: { weekly_summary: e.target.checked } }); toast('تم الحفظ'); } catch (err) { toast(err.message, true); }
+});
+$('weekly-btn').addEventListener('click', async (e) => {
+  e.target.disabled = true;
+  e.target.textContent = 'نجهّز ملخصك…';
+  try {
+    const d = await api('/api/m/weekly');
+    $('weekly-out').textContent = d.message;
+    $('weekly-out').hidden = false;
+  } catch (err) { toast(err.message, true); }
+  e.target.disabled = false;
+  e.target.textContent = 'اعرض ملخص هالأسبوع';
+});
+async function uploadVoice(blob) {
+  if (blob.size > 1.5 * 1024 * 1024) return toast('التسجيل طويل، خلّه أقل من 30 ثانية', true);
+  $('rec-status').textContent = 'نرفع التسجيل…';
+  try {
+    const d = await api('/api/m/voice', { method: 'POST', body: blob });
+    drawVoice(d.voice_url);
+    $('rec-status').textContent = '';
+    toast('رسالتك الصوتية صارت تطلع لعملائك 🔊');
+  } catch (err) { $('rec-status').textContent = ''; toast(err.message, true); }
+}
+let rec = null, recTimer = null;
+$('rec-btn').addEventListener('click', async () => {
+  if (rec) return rec.stop();
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') return toast('جوالك ما يدعم التسجيل هنا، ارفع ملف صوت بدال', true);
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { return toast('اسمح للمتصفح يستخدم المايك', true); }
+  const type = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((t) => MediaRecorder.isTypeSupported(t)) || '';
+  rec = new MediaRecorder(stream, type ? { mimeType: type } : {});
+  const parts = [];
+  let left = 30;
+  rec.ondataavailable = (e) => e.data.size && parts.push(e.data);
+  rec.onstop = () => {
+    clearInterval(recTimer);
+    stream.getTracks().forEach((t) => t.stop());
+    $('rec-btn').textContent = '🎙️ سجّل الحين';
+    const blob = new Blob(parts, { type: (rec.mimeType || 'audio/webm').split(';')[0] });
+    rec = null;
+    uploadVoice(blob);
+  };
+  rec.start();
+  $('rec-btn').textContent = '⏹️ وقّف وارفع';
+  $('rec-status').textContent = `جاري التسجيل… باقي ${left} ثانية`;
+  recTimer = setInterval(() => { left--; $('rec-status').textContent = `جاري التسجيل… باقي ${left} ثانية`; if (left <= 0) rec?.stop(); }, 1000);
+});
+$('voice-file').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) uploadVoice(f); e.target.value = ''; });
+$('voice-now').addEventListener('click', async (e) => {
+  if (!e.target.closest('#voice-del') || !confirm('تحذف رسالتك الصوتية؟')) return;
+  try { await api('/api/m/voice', { method: 'DELETE' }); drawVoice(null); } catch (err) { toast(err.message, true); }
+});
+document.addEventListener('click', (e) => { const g = e.target.closest('[data-goto]'); if (g) { e.preventDefault(); showTab(g.dataset.goto); } });
 $('hot-days').addEventListener('change', () => loadReports().catch((e) => toast(e.message, true)));
 
 // ---------- النقاط والكاش باك ----------
@@ -312,7 +410,7 @@ async function loadSellers() {
   sellers = (await api('/api/m/sellers')).sellers;
   render($('sellers-table'), !sellers.length ? html`<div class="empty">ما أضفت نقاط بيع للحين</div>` : html`<table style="min-width:560px"><thead><tr><th>المحل</th><th>المدينة</th><th>العنوان</th><th>الخريطة</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>${sellers.map((x) => html`<tr>
     <td><b>${x.name}</b>${x.online ? html` <span class="pill ok">متجر إلكتروني</span>` : ''}</td><td>${x.city}</td><td>${x.address || '-'}</td><td>${x.map_url ? html`<a href="${x.map_url}" target="_blank" rel="noopener">فتح</a>` : '-'}</td>
-    <td><div class="actions"><button class="btn btn-sm" type="button" data-edit-seller="${x.id}">تعديل</button><button class="btn btn-sm btn-danger" type="button" data-del-seller="${x.id}">حذف</button></div></td></tr>`)}</tbody></table>`);
+    <td><div class="actions"><a class="btn btn-sm" href="/print/seller/?id=${x.id}" target="_blank" rel="noopener">🏅 شهادة</a><button class="btn btn-sm" type="button" data-edit-seller="${x.id}">تعديل</button><button class="btn btn-sm btn-danger" type="button" data-del-seller="${x.id}">حذف</button></div></td></tr>`)}</tbody></table>`);
 }
 onSubmit($('public-form'), async (f) => {
   const d = await api('/api/m/settings', { method: 'PATCH', body: { public_listed: f.public_listed === 'on', about: f.about || null } });
@@ -468,7 +566,7 @@ onSubmit($('password-form'), async (f) => {
   setTimeout(() => (location.href = '/merchant/login/'), 1200);
 });
 
-const loaders = { home: loadHome, store: loadStore, assistant: async () => { if (!merchant) merchant = (await api('/api/m/overview')).merchant; return loadAssistant(); }, tags: loadTags, loyalty: loadLoyalty, contest: async () => { await loadContest(); await loadContestData(); }, reports: loadReports, monthly: async () => {}, sellers: loadSellers, account: loadAccount };
+const loaders = { home: loadHome, store: loadStore, assistant: async () => { if (!merchant) merchant = (await api('/api/m/overview')).merchant; return loadAssistant(); }, tags: loadTags, loyalty: loadLoyalty, contest: async () => { await loadContest(); await loadContestData(); }, reports: loadReports, monthly: async () => {}, sellers: loadSellers, account: loadAccount, trust: loadTrust };
 // هوية التاجر في القائمة الجانبية حتى لو فتح اللوحة على غير الرئيسية
 api('/api/m/overview').then((d) => { merchant = merchant || d.merchant; brandHeader(d.merchant); }).catch(() => {});
-tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => loaders[id]().catch((e) => toast(e.message, true)));
+const showTab = tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => loaders[id]().catch((e) => toast(e.message, true)));

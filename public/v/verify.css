@@ -132,3 +132,43 @@
 .shop-card b { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .shop-card .price { color: var(--green-ink); font-weight: 700; }
 .shop-sub { font-size: 15px; margin: 6px 0 0; }
+
+/* مستوى العميل */
+.level { width: 100%; display: flex; align-items: center; gap: 12px; text-align: start; background: var(--forest-2); border-radius: 16px; padding: 12px 14px; }
+.level > span { font-size: 30px; line-height: 1; }
+.level > div { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.level small { color: var(--forest-muted); font-size: 12px; }
+.lv-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; margin-top: 4px; }
+.lv-bar i { display: block; height: 100%; background: linear-gradient(90deg, #D9B45A, #F3D68C); border-radius: 3px; width: 0; transition: width 1s .4s ease-out; }
+/* الرسالة الصوتية */
+.voice-btn { width: 100%; display: flex; align-items: center; gap: 12px; text-align: start; border: 1px solid var(--gold); background: rgba(217,180,90,.1); color: #fff; border-radius: 16px; padding: 12px 14px; font: inherit; cursor: pointer; }
+.voice-btn > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; }
+.voice-btn small { color: var(--forest-muted); font-size: 12px; }
+.v-ic { width: 40px; height: 40px; border-radius: 50%; background: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.v-wave { display: flex; gap: 3px; align-items: center; height: 22px; }
+.v-wave i { width: 3px; height: 6px; border-radius: 2px; background: #F3D68C; }
+.voice-btn.playing .v-wave i { animation: vw .9s ease-in-out infinite; }
+.voice-btn.playing .v-wave i:nth-child(2) { animation-delay: .15s; } .voice-btn.playing .v-wave i:nth-child(3) { animation-delay: .3s; } .voice-btn.playing .v-wave i:nth-child(4) { animation-delay: .45s; }
+@keyframes vw { 50% { height: 22px; } }
+@media (prefers-reduced-motion: reduce) { .voice-btn.playing .v-wave i { animation: none; height: 14px; } }
+/* جواز سفر المنتج */
+.pp-h, .g-h { display: flex; gap: 12px; align-items: flex-start; }
+.pp-h > span, .g-ic { font-size: 30px; line-height: 1; }
+.pp-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pp-steps li { position: relative; display: flex; gap: 12px; padding: 0 0 18px; }
+.pp-steps li:last-child { padding-bottom: 0; }
+.pp-steps li::before { content: ''; position: absolute; inset-inline-start: 15px; top: 32px; bottom: 0; width: 2px; background: var(--line); }
+.pp-steps li:last-child::before { display: none; }
+.pp-dot { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--green-tint); color: var(--green-ink); display: flex; align-items: center; justify-content: center; font-size: 15px; z-index: 1; }
+.pp-steps li.you .pp-dot { background: var(--gold); color: #0F2A21; }
+.pp-steps b { display: block; }
+.pp-steps small { color: var(--muted); font-size: 13px; }
+/* ضمان أصالة */
+.guarantee { border: 2px solid var(--gold); background: linear-gradient(180deg, rgba(217,180,90,.12), var(--surface) 60%); }
+.guarantee .ghost-gold { color: var(--green-ink); border-color: var(--gold); }
+.g-done { background: var(--green-tint); color: var(--green-ink); border-radius: 12px; padding: 12px; font-weight: 600; }
+/* صورة البلاغ ورأي الذكاء */
+.photo-field small { font-size: 12px; font-weight: 400; }
+.ai-box { width: 100%; text-align: start; background: var(--ground); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.ai-meter { height: 10px; border-radius: 5px; background: linear-gradient(90deg, #12B76A, #F5B83D, #D92D20); position: relative; }
+.ai-meter i { position: absolute; top: -4px; width: 4px; height: 18px; border-radius: 2px; background: var(--ink); inset-inline-start: 0; transition: inset-inline-start .8s ease-out; }

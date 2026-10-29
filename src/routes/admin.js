@@ -1,5 +1,6 @@
 // اللوحة الأم: المدير العام يدير التجار والحسابات والدفعات وكل العلامات.
 import { pushAlert } from '../lib/push.js';
+import { handleAdminTrust } from './trust.js';
 import { hashPassword, requireUser, validPassword } from '../lib/auth.js';
 import { createResetLink } from './auth.js';
 import { adminPush } from './push.js';
@@ -52,6 +53,8 @@ export async function handleAdmin(req, env, path) {
   const user = await requireUser(db, req, 'admin');
   const m = req.method;
   let match;
+  const trust = await handleAdminTrust(req, env, path);
+  if (trust) return trust;
   if (path.startsWith('/api/admin/push')) {
     const r = await adminPush(req, db, path, user);
     if (r) return r;
@@ -61,7 +64,7 @@ export async function handleAdmin(req, env, path) {
     const [ov, merchants, alerts, unknown] = await Promise.all([
       overviewFor(db, null),
       listMerchants(db),
-      db.prepare("SELECT a.*,m.name AS merchant_name FROM alerts a LEFT JOIN merchants m ON m.id=a.merchant_id WHERE a.kind NOT IN ('store_blocked','staff_password') ORDER BY a.id DESC LIMIT 20").all(),
+      db.prepare("SELECT a.*,m.name AS merchant_name FROM alerts a LEFT JOIN merchants m ON m.id=a.merchant_id WHERE a.kind NOT IN ('store_blocked','staff_password','weekly_summary') ORDER BY a.id DESC LIMIT 20").all(),
       db.prepare('SELECT u.preview,u.count,u.city,u.country,u.last_at,m.name AS merchant_name FROM unknown_codes u LEFT JOIN merchants m ON m.id=u.merchant_id ORDER BY u.last_at DESC LIMIT 20').all(),
     ]);
     const totals = merchants.reduce(
@@ -264,7 +267,7 @@ export async function handleAdmin(req, env, path) {
     return json({ ok: true, audit: r.results });
   }
   if (path === '/api/admin/reports' && m === 'GET') {
-    const r = await db.prepare('SELECT r.id,r.reason,r.city,r.point_of_sale,r.phone,r.note,r.created_at,m.name AS merchant_name FROM reports r LEFT JOIN merchants m ON m.id=r.merchant_id ORDER BY r.id DESC LIMIT 200').all();
+    const r = await db.prepare('SELECT r.id,r.reason,r.city,r.point_of_sale,r.phone,r.note,r.created_at,r.photo_key,r.ai_verdict,r.ai_score,m.name AS merchant_name FROM reports r LEFT JOIN merchants m ON m.id=r.merchant_id ORDER BY r.id DESC LIMIT 200').all();
     return json({ ok: true, reports: r.results });
   }
   fail(404, 'المسار غير موجود');

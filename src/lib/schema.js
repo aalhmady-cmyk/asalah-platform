@@ -16,6 +16,7 @@ import m0013 from '../../migrations/0013_push.sql';
 import m0014 from '../../migrations/0014_qr_batches.sql';
 import m0015 from '../../migrations/0015_push_hide.sql';
 import m0016 from '../../migrations/0016_user_push.sql';
+import m0017 from '../../migrations/0017_trust_features.sql';
 import { randomHex } from './util.js';
 
 const MIGRATIONS = [
@@ -35,6 +36,7 @@ const MIGRATIONS = [
   ['0014_qr_batches.sql', m0014],
   ['0015_push_hide.sql', m0015],
   ['0016_user_push.sql', m0016],
+  ['0017_trust_features.sql', m0017],
 ];
 
 // يقسم الملف لجمل: نشيل التعليقات ونقسم على ; في آخر السطر

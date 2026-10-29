@@ -52,13 +52,13 @@ const PROMPTS = {
   },
 };
 
-function parseJson(text) {
+export function parseJson(text) {
   const m = text.match(/\{[\s\S]*\}/);
   if (!m) return null;
   try { return JSON.parse(m[0]); } catch { return null; }
 }
 
-async function callClaude(env, { system, content, messages, max = 600 }) {
+export async function callClaude(env, { system, content, messages, max = 600 }) {
   if (!assistantEnabled(env)) fail(503, 'الذكاء الاصطناعي غير متاح حالياً', 'assistant_disabled');
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
   let res;

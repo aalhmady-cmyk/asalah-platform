@@ -147,6 +147,10 @@ function ok(d) {
   shareData = { name: t.product_name || '', brand: d.brand.name };
   show('ok');
   $('ok').classList.add('pop');
+  if (d.level) setupLevel(d.level);
+  if (d.voice_url) setupVoice(d.voice_url);
+  if (d.passport) setupPassport(d.passport, t);
+  if (d.guarantee) setupGuarantee(d.guarantee);
   if (d.shop) setupShop(d.shop);
   if (d.loyalty) setupLoyalty(d.loyalty, d.brand);
   if (d.rating) setupRating(d.rating);
@@ -163,6 +167,95 @@ function ok(d) {
     // من ثالث فحص تنزل الصفحة للنموذج مباشرة
     if (t.check_no >= 3) $('contest').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+}
+
+// ---------- مستوى العميل ----------
+function setupLevel(l) {
+  $('lv-icon').textContent = l.icon;
+  $('lv-title').textContent = tx(`مستواك ${l.name}`, `Your level: ${l.name_en}`);
+  $('lv-sub').textContent = l.next
+    ? tx(`تحققت من ${l.count} منتج أصلي · باقي ${l.next.need} للمستوى ${l.next.name} ${l.next.icon}`, `${l.count} original products verified · ${l.next.need} more for ${l.next.name_en} ${l.next.icon}`)
+    : tx(`تحققت من ${l.count} منتج أصلي · أعلى مستوى 👑`, `${l.count} original products verified · top level 👑`);
+  const span = l.next ? l.count + l.next.need : l.count;
+  requestAnimationFrame(() => ($('lv-bar').style.width = Math.min(100, Math.round((l.count / span) * 100)) + '%'));
+  show('level');
+}
+
+// ---------- الرسالة الصوتية ----------
+function setupVoice(url) {
+  const a = $('voice'), b = $('voice-btn');
+  a.src = url;
+  b.addEventListener('click', () => (a.paused ? a.play().catch(() => {}) : a.pause()));
+  a.addEventListener('play', () => b.classList.add('playing'));
+  for (const ev of ['pause', 'ended']) a.addEventListener(ev, () => b.classList.remove('playing'));
+  show('voice-btn');
+}
+
+// ---------- جواز سفر المنتج ----------
+const dateOf = (sec) => new Date(sec * 1000).toLocaleDateString(EN ? 'en-GB' : 'ar-SA-u-ca-gregory-nu-latn', { timeZone: 'Asia/Riyadh', day: 'numeric', month: 'long', year: 'numeric' });
+function setupPassport(p, t) {
+  const steps = [];
+  if (/^\d{4}-\d{2}$/.test(p.produced_on || '')) steps.push(['🏭', tx('الإنتاج', 'Produced'), monthName(p.produced_on)]);
+  if (p.issued_at) steps.push(['🔐', tx('أصدرت أصالة علامته الرقمية', 'Asalah issued its digital tag'), dateOf(p.issued_at)]);
+  if (p.shipped_at) steps.push(['🚚', tx('انشحن للبيع', 'Shipped for sale'), dateOf(p.shipped_at)]);
+  const firstYou = t.check_no === 1;
+  if (p.first_check_at) steps.push(['✅', firstYou ? tx('أنت أول واحد تحقق منه', 'You are the first to verify it') : tx('أول تحقق منه', 'First verified'), firstYou ? tx('الحين', 'Just now') : dateOf(p.first_check_at), firstYou]);
+  if (!firstYou) steps.push(['📍', tx('تحققت منه أنت', 'You verified it'), tx(`التحقق رقم ${t.check_no}`, `Check #${t.check_no}`), true]);
+  const list = $('pp-steps');
+  list.replaceChildren(...steps.map(([icon, title, sub, you]) => {
+    const li = el('li', you ? 'you' : '');
+    const box = el('div');
+    box.append(el('b', '', title), el('small', '', sub));
+    li.append(el('span', 'pp-dot', icon), box);
+    return li;
+  }));
+  // العدد يشمل علامتك، فنطرحها
+  const others = (p.batch_verified || 1) - 1;
+  $('pp-sub').textContent = others > 0
+    ? tx(`${others.toLocaleString('en-US')} غيرك تحققوا من منتجات هذي الدفعة`, `${others.toLocaleString('en-US')} others verified products from this batch`)
+    : tx('أنت أول من يتحقق من هذي الدفعة', 'You are the first to verify from this batch');
+  if (steps.length) show('passport');
+}
+
+// ---------- ضمان أصالة ----------
+function setupGuarantee(g) {
+  if (g.terms) $('g-terms').textContent = g.terms;
+  if (g.claimed) {
+    show('g-open', false);
+    $('g-done').textContent = { new: tx('وصل طلب الضمان لصاحب العلامة، وبيتواصل معك.', 'Your claim reached the brand, they will contact you.'), approved: tx('تم قبول طلب الضمان ✅', 'Your claim was approved ✅'), rejected: tx('صاحب العلامة راجع طلبك ورفضه.', 'The brand reviewed and declined your claim.') }[g.claimed];
+    show('g-done');
+  }
+  show('guarantee');
+}
+$('g-open').addEventListener('click', () => { show('g-open', false); show('g-form'); $('g-form').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+$('g-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const btn = e.target.querySelector('[type=submit]');
+  btn.disabled = true;
+  try {
+    const photo = await photoB64(f.get('photo'));
+    const r = await post('/api/guarantee', { t: token, sid, name: f.get('name'), phone: f.get('phone'), city: f.get('city'), point_of_sale: f.get('point_of_sale'), note: f.get('note'), photo, consent: f.get('consent') === 'on' });
+    show('g-form', false);
+    $('g-done').textContent = EN ? 'Your claim reached the brand, they will contact you.' : r.message;
+    show('g-done');
+  } catch (err) {
+    alert(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// صورة من الكاميرا: نصغّرها JPG قبل الإرسال
+async function photoB64(file) {
+  if (!file || !file.size) return null;
+  const bmp = await createImageBitmap(file).catch(() => null);
+  if (!bmp) return null;
+  const k = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
+  const c = Object.assign(document.createElement('canvas'), { width: Math.round(bmp.width * k), height: Math.round(bmp.height * k) });
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  const url = c.toDataURL('image/jpeg', 0.8);
+  return url.slice(url.indexOf(',') + 1);
 }
 
 const monthName = (ym) => {
@@ -426,14 +519,26 @@ $('report-form').addEventListener('submit', async (e) => {
   const f = Object.fromEntries(new FormData(e.target));
   const btn = e.target.querySelector('[type=submit]');
   btn.disabled = true;
+  const label = btn.textContent;
   try {
-    await post('/api/report', { t: token, reason: lastResult, city: f.city, point_of_sale: f.point_of_sale, phone: f.phone || null, note: f.note || null });
+    const photo = await photoB64(f.photo);
+    if (photo) btn.textContent = tx('نحلل الصورة بالذكاء الصناعي…', 'Analysing the photo with AI…');
+    const r = await post('/api/report', { t: token, reason: lastResult, city: f.city, point_of_sale: f.point_of_sale, phone: f.phone || null, note: f.note || null, photo });
     show('report', false);
     show('reported');
+    if (r.ai?.verdict) {
+      $('ai-verdict').textContent = r.ai.verdict;
+      if (r.ai.score != null) {
+        $('ai-score').textContent = tx(`احتمال إنه مقلّد: ${r.ai.score}٪`, `Likelihood it is fake: ${r.ai.score}%`);
+        requestAnimationFrame(() => ($('ai-bar').style.insetInlineStart = `calc(${r.ai.score}% - 2px)`));
+      }
+      show('ai-box');
+    }
   } catch (err) {
     alert(err.message);
   } finally {
     btn.disabled = false;
+    btn.textContent = label;
   }
 });
 

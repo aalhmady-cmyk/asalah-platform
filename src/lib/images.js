@@ -7,7 +7,7 @@ const TYPES = {
   'image/png': { ext: 'png', magic: (b) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 },
   'image/webp': { ext: 'webp', magic: (b) => b[0] === 0x52 && b[1] === 0x49 && b[8] === 0x57 && b[9] === 0x45 },
 };
-const KEY_RE = /^(logos|products|posters)\/[0-9]+\/[a-f0-9]{24}\.(jpg|png|webp)$/;
+const KEY_RE = /^(logos|products|posters|evidence)\/[0-9]+\/[a-f0-9]{24}\.(jpg|png|webp)$/;
 
 export const imageUrl = (key) => (key ? '/img/' + key : null);
 
@@ -40,7 +40,8 @@ export async function deleteImage(env, key) {
 
 export async function serveImage(env, path) {
   const key = path.slice('/img/'.length);
-  if (!KEY_RE.test(key)) return new Response('Not found', { status: 404 });
+  // صور الأدلة (بلاغات وضمان) خاصة، تنفتح بس من لوحة التاجر أو المدير
+  if (!KEY_RE.test(key) || key.startsWith('evidence/')) return new Response('Not found', { status: 404 });
   const row = await env.DB.prepare('SELECT content_type,data FROM images WHERE key=?').bind(key).first();
   if (!row) return new Response('Not found', { status: 404 });
   return new Response(new Uint8Array(row.data), {

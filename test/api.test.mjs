@@ -870,3 +870,82 @@ test('تطبيق اللوحات: دخول داخل التطبيق وتنبيها
   assert.equal((await post('/api/m/request-tags', { kind: 'qr', count: 50 }, S.merchant)).status, 200);
   assert.equal((await post('/api/u/push/unsubscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/m1' }, S.merchant)).status, 200);
 });
+
+test('مزايا الثقة: جواز السفر والمستوى والضمان والبلاغ بصورة والخريطة والبائع المعتمد والصوت والملخص', async () => {
+  const t = tokenOf(S.urls[40]);
+  let v = await post('/api/verify', { t, sid: sid('7') });
+  assert.equal(v.data.result, 'original', JSON.stringify(v.data));
+  assert.equal(v.data.passport.batch_size, 50);
+  assert.ok(v.data.passport.shipped_at);
+  assert.equal(v.data.level.key, 'bronze');
+  assert.equal(v.data.level.count, 1);
+  assert.equal(v.data.level.next.need, 4);
+  assert.equal(v.data.guarantee, null);
+  assert.equal(v.data.voice_url, null);
+
+  // ضمان أصالة
+  assert.equal((await post('/api/guarantee', { t, sid: sid('7'), name: 'سارة', phone: '0551234567', city: 'جدة', point_of_sale: 'محل', note: 'الريحة مختلفة', consent: true })).status, 403);
+  assert.equal((await patch('/api/m/trust', { guarantee_enabled: true, guarantee_terms: 'نرجع لك المبلغ' }, S.merchant)).status, 200);
+  v = await post('/api/verify', { t, sid: sid('7') });
+  assert.equal(v.data.guarantee.terms, 'نرجع لك المبلغ');
+  const claim = { t, sid: sid('7'), name: 'سارة', phone: '0551234567', city: 'جدة', point_of_sale: 'محل', note: 'الريحة مختلفة', consent: true };
+  assert.equal((await post('/api/guarantee', { ...claim, consent: false })).status, 400);
+  assert.equal((await post('/api/guarantee', claim)).status, 200);
+  assert.equal((await post('/api/guarantee', claim)).status, 409);
+  assert.equal((await post('/api/verify', { t, sid: sid('7') })).data.guarantee.claimed, 'new');
+  const claims = (await call('/api/m/guarantee', { cookie: S.merchant })).data.claims;
+  assert.equal(claims.length, 1);
+  assert.equal((await post('/api/m/guarantee/' + claims[0].id, { status: 'approved', note: 'رجعنا المبلغ' }, S.merchant)).status, 200);
+  assert.equal((await call('/api/admin/guarantee', { cookie: S.admin })).data.claims[0].status, 'approved');
+
+  // بلاغ بصورة: الصورة خاصة، تنفتح من اللوحة بس
+  const jpg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64)]).toString('base64');
+  assert.equal((await post('/api/report', { t: 'bad.token', city: 'الرياض', point_of_sale: 'بسطة', photo: 'not-base64!' })).status, 400);
+  const rp = await post('/api/report', { t: tokenOf(S.urls[41]), reason: 'blocked', city: 'الرياض', point_of_sale: 'بسطة', photo: jpg });
+  assert.equal(rp.status, 200, JSON.stringify(rp.data));
+  const rep = (await call('/api/m/reports', { cookie: S.merchant })).data.reports.find((x) => x.photo_key);
+  assert.ok(rep.photo_key.startsWith('evidence/'));
+  assert.equal((await call('/api/m/evidence/' + rep.photo_key, { cookie: S.merchant })).status, 200);
+  assert.equal((await call('/api/admin/evidence/' + rep.photo_key, { cookie: S.admin })).status, 200);
+  assert.equal((await call('/img/' + rep.photo_key)).status, 404);
+  assert.equal((await call('/api/m/evidence/' + rep.photo_key)).status, 401);
+
+  // خريطة التقليد
+  const map = await call('/api/public/fakes-map?h=720');
+  assert.equal(map.status, 200);
+  assert.ok(Array.isArray(map.data.points));
+  assert.ok(map.data.totals.fake >= 1);
+  assert.equal((await call('/api/m/fakes-map?h=24', { cookie: S.merchant })).status, 200);
+  assert.equal((await call('/map/')).status, 200);
+
+  // شهادة البائع المعتمد
+  const sl = await post('/api/m/sellers', { name: 'عطارة الأمانة', city: 'الدمام' }, S.merchant);
+  const cert = await call(`/api/m/sellers/${sl.data.id}/cert`, { cookie: S.merchant });
+  assert.equal(cert.status, 200);
+  const s = new URL(cert.data.url).searchParams.get('s');
+  const pub = await call('/api/public/seller?s=' + encodeURIComponent(s));
+  assert.equal(pub.data.valid, true);
+  assert.equal(pub.data.seller.name, 'عطارة الأمانة');
+  assert.equal((await call('/api/public/seller?s=' + encodeURIComponent(s.slice(0, -1) + (s.endsWith('A') ? 'B' : 'A')))).data.valid, false);
+  await call('/api/m/sellers/' + sl.data.id, { method: 'DELETE', cookie: S.merchant });
+  assert.equal((await call('/api/public/seller?s=' + encodeURIComponent(s))).data.valid, false);
+
+  // الرسالة الصوتية
+  const m4a = Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypM4A '), Buffer.alloc(200)]);
+  const up = await fetch(BASE + '/api/m/voice', { method: 'POST', headers: { Cookie: S.merchant, Origin: BASE, 'Content-Type': 'audio/mp4' }, body: m4a });
+  assert.equal(up.status, 200);
+  const vu = (await up.json()).voice_url;
+  assert.match(vu, /^\/media\/voice\/\d+\/[a-f0-9]{24}\.m4a$/);
+  assert.equal((await fetch(BASE + vu)).status, 200);
+  const vv = (await post('/api/verify', { t: tokenOf(S.urls[42]), sid: sid('7') })).data;
+  assert.equal(vv.result, 'original', JSON.stringify(vv));
+  assert.equal(vv.voice_url, vu);
+  const bad = await fetch(BASE + '/api/m/voice', { method: 'POST', headers: { Cookie: S.merchant, Origin: BASE }, body: Buffer.from('hello') });
+  assert.equal(bad.status, 415);
+
+  // الملخص الأسبوعي
+  const w = await call('/api/m/weekly', { cookie: S.merchant });
+  assert.equal(w.status, 200);
+  assert.match(w.data.message, /ملخص أسبوعك/);
+  assert.equal(w.data.tips.length >= 1, true);
+});
