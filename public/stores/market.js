@@ -1427,6 +1427,9 @@ let inboxItems = null;
 async function loadInbox() {
   const d = await get('/api/public/push/inbox?lang=' + lang);
   inboxItems = d.items || [];
+  // الإشعارات اللي حذفتها الإدارة نشيلها من شاشة الجوال بعد
+  const live = new Set(inboxItems.map((x) => x.id));
+  navigator.serviceWorker?.getRegistration('/stores/').then((r) => r?.getNotifications()).then((ns) => ns?.forEach((n) => { if (n.data?.c && !live.has(n.data.c)) n.close(); })).catch(() => {});
   return inboxItems;
 }
 function inboxBadge() {

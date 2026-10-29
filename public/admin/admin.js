@@ -349,7 +349,7 @@ document.addEventListener('click', async (e) => {
 
 const ACTIONS = {
   login: 'دخول', merchant_created: 'إنشاء تاجر', merchant_updated: 'تعديل تاجر', user_created: 'إنشاء حساب', user_updated: 'تعديل حساب',
-  batch_created: 'إنشاء دفعة', batch_active: 'تفعيل دفعة', batch_blocked: 'إيقاف دفعة', factory_file_downloaded: 'تنزيل ملف المصنع', qr_printed: 'طباعة ملصقات QR',
+  batch_created: 'إنشاء دفعة', batch_active: 'تفعيل دفعة', batch_blocked: 'إيقاف دفعة', factory_file_downloaded: 'تنزيل ملف المصنع', qr_printed: 'طباعة ملصقات QR', push_sent: 'إرسال إشعار', push_cleared: 'حذف كل الإشعارات', push_hidden: 'حذف إشعار',
   tags_block: 'إيقاف علامات', tags_activate: 'تفعيل علامات', settings_updated: 'تعديل إعدادات التاجر', entries_exported: 'تصدير المشاركات',
   password_changed: 'تغيير كلمة المرور', tags_requested: 'طلب علامات', setup_admin_created: 'إعداد النظام',
   reset_link_created: 'رابط تغيير كلمة المرور', password_reset_done: 'تغيير كلمة المرور بالرابط', staff_created: 'إضافة موظف', staff_updated: 'تعديل موظف',
@@ -377,8 +377,8 @@ async function loadPush() {
     ${d.campaigns.map((c) => html`<tr><td><b>${c.title}</b><div class="small muted">${c.body}</div></td><td>${AUD[c.audience] || c.audience}</td>
       <td>${num(c.sent)} / ${num(c.total)}${c.failed ? html`<div class="small muted">${num(c.failed)} ما وصل</div>` : ''}</td>
       <td>${num(c.clicks)}${c.sent ? html` <span class="small muted">(${Math.round((c.clicks / c.sent) * 100)}%)</span>` : ''}</td>
-      <td>${pill(PST, c.status)}</td><td class="small">${when(c.created_at)}</td>
-      <td>${c.status === 'sending' ? html`<button type="button" class="btn btn-sm" data-push-go="${c.id}">كمّل</button> <button type="button" class="btn btn-sm" data-push-stop="${c.id}">أوقف</button>` : ''}</td></tr>`)}</tbody></table>`);
+      <td>${c.hidden_at ? html`<span class="pill">🗑️ محذوف</span>` : pill(PST, c.status)}</td><td class="small">${when(c.created_at)}</td>
+      <td>${c.status === 'sending' ? html`<button type="button" class="btn btn-sm" data-push-go="${c.id}">كمّل</button> <button type="button" class="btn btn-sm" data-push-stop="${c.id}">أوقف</button> ` : ''}${c.hidden_at ? '' : html`<button type="button" class="btn btn-sm" data-push-hide="${c.id}">احذف</button>`}</td></tr>`)}</tbody></table>`);
   if (!pushProducts) {
     const r = await fetch('/api/public/store/products?limit=200').then((x) => x.json()).catch(() => ({ products: [] }));
     pushProducts = r.products || [];
@@ -418,11 +418,20 @@ onSubmit($('push-form'), async (data, form) => {
   await drivePush(campaign);
 });
 document.addEventListener('click', async (e) => {
-  const go = e.target.closest('[data-push-go]'), stop = e.target.closest('[data-push-stop]');
+  const go = e.target.closest('[data-push-go]'), stop = e.target.closest('[data-push-stop]'), hide = e.target.closest('[data-push-hide]');
+  if (hide && confirm('نحذف هذا الإشعار من تطبيقات كل العملاء؟')) { await api(`/api/admin/push/${hide.dataset.pushHide}/hide`, { method: 'POST', body: {} }).catch((x) => toast(x.message, true)); loadPush(); }
   if (go) await drivePush((await api(`/api/admin/push/${go.dataset.pushGo}/continue`, { method: 'POST', body: {} })).campaign).catch((x) => toast(x.message, true));
   if (stop && confirm('نوقف إرسال هذا الإشعار؟')) { await api(`/api/admin/push/${stop.dataset.pushStop}/stop`, { method: 'POST', body: {} }).catch((x) => toast(x.message, true)); loadPush(); }
 });
 
+$('push-clear').addEventListener('click', async () => {
+  if (!confirm('متأكد؟ بنحذف كل الإشعارات اللي أرسلتها من تطبيقات كل العملاء، وما تقدر ترجعها.')) return;
+  try {
+    const r = await api('/api/admin/push/clear', { method: 'POST', body: {} });
+    toast(r.cleared ? `انحذف ${num(r.cleared)} إشعار من كل التطبيقات ✅` : 'ما فيه إشعارات تنحذف');
+    loadPush();
+  } catch (x) { toast(x.message, true); }
+});
 const loaders = { home: loadHome, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, push: loadPush, reports: loadReports, users: loadUsers, audit: loadAudit };
 let current = 'home';
 const refresh = () => loaders[current]().catch((e) => toast(e.message, true));

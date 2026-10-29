@@ -22,7 +22,7 @@ export async function handlePublicPush(req, env, path) {
     const lang = new URL(req.url).searchParams.get('lang') === 'en' ? 'en' : 'ar';
     const c = await currentCustomer(db, req);
     const aud = c ? "('all','accounts',?)" : "('all',?)";
-    const rows = (await db.prepare(`SELECT id,title,body,url,image,created_at FROM push_campaigns WHERE status!='stopped' AND audience IN ${aud} ORDER BY id DESC LIMIT 50`).bind(lang).all()).results;
+    const rows = (await db.prepare(`SELECT id,title,body,url,image,created_at FROM push_campaigns WHERE status!='stopped' AND hidden_at IS NULL AND audience IN ${aud} ORDER BY id DESC LIMIT 50`).bind(lang).all()).results;
     return json({ ok: true, items: rows });
   }
   if (m !== 'POST') fail(404, 'المسار غير موجود');
@@ -111,6 +111,19 @@ export async function adminPush(req, db, path, user) {
       .first();
     await audit(db, user, 'push_sent', { title, audience, total });
     return json({ ok: true, campaign: await continueCampaign(db, row.id) });
+  }
+  // حذف كل الإشعارات المرسلة من صندوق التطبيق عند كل العملاء، بضغطة وحدة
+  if (path === '/api/admin/push/clear' && m === 'POST') {
+    const r = await db.prepare("UPDATE push_campaigns SET hidden_at=?, status=CASE WHEN status='sending' THEN 'stopped' ELSE status END WHERE hidden_at IS NULL").bind(now()).run();
+    await audit(db, user, 'push_cleared', { count: r.meta.changes });
+    return json({ ok: true, cleared: r.meta.changes });
+  }
+  const hm = path.match(/^\/api\/admin\/push\/(\d+)\/hide$/);
+  if (hm && m === 'POST') {
+    const id = Number(hm[1]);
+    await db.prepare("UPDATE push_campaigns SET hidden_at=?, status=CASE WHEN status='sending' THEN 'stopped' ELSE status END WHERE id=? AND hidden_at IS NULL").bind(now(), id).run();
+    await audit(db, user, 'push_hidden', { id });
+    return json({ ok: true });
   }
   let mm = path.match(/^\/api\/admin\/push\/(\d+)\/(continue|stop)$/);
   if (mm && m === 'POST') {

@@ -803,6 +803,11 @@ test('الإشعارات: الاشتراك والحملات من اللوحة ا
   assert.equal(inbox.status, 200);
   assert.equal(inbox.data.items[0].title, 'عرض نهاية الأسبوع');
   assert.equal((await call('/api/public/push/inbox?lang=en')).data.items.length, 1);
+  assert.equal((await post('/api/admin/push/clear', {}, S.merchant)).status, 403);
+  const cl = await post('/api/admin/push/clear', {}, S.admin);
+  assert.equal(cl.data.cleared, 1);
+  assert.equal((await call('/api/public/push/inbox?lang=ar')).data.items.length, 0);
+  assert.ok((await call('/api/admin/push', { cookie: S.admin })).data.campaigns[0].hidden_at);
   const tp = await post('/api/public/push/test', { endpoint: 'https://fcm.googleapis.com/fcm/send/none' });
   assert.equal(tp.status, 200);
   assert.equal(tp.data.sent, 0);
