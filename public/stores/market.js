@@ -1253,7 +1253,7 @@ const A = {
     myComments: '💬 تعليقاتي', noMine: 'ما علّقت على شي للحين.', onP: 'على منتج', onR: 'على ريل', logout: 'تسجيل الخروج', unavailable: 'غير متاح حالياً',
     app: '📲 تطبيق متاجر أصالة', appP: 'ثبّت المتاجر على شاشة جوالك الرئيسية، وتفتح بضغطة مثل أي تطبيق.', installBtn: 'ثبّت التطبيق', installed: 'التطبيق مثبّت على جهازك ✅',
     pushT: '🔔 فعّل الإشعارات', pushP: 'يوصلك تنبيه إذا نزل سعر منتج تتابعه، أو رد عليك التاجر، وعروض أصالة الحصرية.', pushBtn: 'فعّل', pushOn: 'الإشعارات مفعّلة ✅', pushOff: 'أوقف الإشعارات', pushBlocked: 'الإشعارات موقفة من إعدادات جوالك. فعّلها من الإعدادات ثم التطبيقات ثم متاجر أصالة.', pushDone: 'تم، بيوصلك كل جديد 🔔', pushWatch: 'عشان يوصلك تنبيه نزول السعر على جوالك 👇', pushNeedApp: 'ثبّت التطبيق أول عشان توصلك الإشعارات على جوالك.', pushErr: 'ما قدرنا نفعّل الإشعارات، جرّب بعدين',
-    iosHow: 'في سفاري: اضغط زر المشاركة ⬆️ تحت، بعدها «إضافة إلى الشاشة الرئيسية».', barT: 'ثبّت متاجر أصالة على جوالك', later: 'لاحقاً',
+    iosHow: 'في سفاري: اضغط زر المشاركة ⬆️ تحت، بعدها «إضافة إلى الشاشة الرئيسية».', chromeHow: 'على أندرويد ثبّت التطبيق من متصفح Chrome، عشان تعتمده حماية جوجل وما ينحظر. لو ثبّته من متصفح ثاني وانحظر، احذفه وثبّته من Chrome.', chromeBtn: 'افتح في Chrome وثبّت', chromeBar: 'ثبّته من Chrome عشان حماية جوجل تقبله', barT: 'ثبّت متاجر أصالة على جوالك', later: 'لاحقاً',
   },
   en: {
     account: 'Account', watch: '🔔 Alert me on price drop', watching: '🔔 Watching price ✓', watchOn: 'We’ll alert you when the price drops 🔔', watchOff: 'Stopped watching',
@@ -1264,7 +1264,7 @@ const A = {
     myComments: '💬 My comments', noMine: 'No comments yet.', onP: 'on a product', onR: 'on a reel', logout: 'Sign out', unavailable: 'Not available now',
     app: '📲 Asalah Stores app', appP: 'Add the stores to your home screen and open them in one tap like any app.', installBtn: 'Install app', installed: 'The app is installed ✅',
     pushT: '🔔 Turn on notifications', pushP: 'Get alerted when a product you watch drops in price, when a merchant replies, and for exclusive Asalah offers.', pushBtn: 'Turn on', pushOn: 'Notifications are on ✅', pushOff: 'Turn off', pushBlocked: 'Notifications are blocked in your phone settings. Enable them from Settings, Apps, Asalah Stores.', pushDone: 'Done, you’ll get every update 🔔', pushWatch: 'To get the price-drop alert on your phone 👇', pushNeedApp: 'Install the app first to get notifications on your phone.', pushErr: 'Couldn’t turn on notifications, try later',
-    iosHow: 'In Safari: tap Share ⬆️ then “Add to Home Screen”.', barT: 'Install Asalah Stores on your phone', later: 'Later',
+    iosHow: 'In Safari: tap Share ⬆️ then “Add to Home Screen”.', chromeHow: 'On Android, install the app from Chrome so Google Play Protect trusts it. If you installed it from another browser and it got blocked, remove it and install from Chrome.', chromeBtn: 'Open in Chrome to install', chromeBar: 'Install from Chrome so Play Protect trusts it', barT: 'Install Asalah Stores on your phone', later: 'Later',
   },
 };
 const at = (k, ...x) => { const v = A[lang][k]; return typeof v === 'function' ? v(...x) : v; };
@@ -1344,11 +1344,18 @@ const favCard = () => html`<div class="mk-acc-box row"><div><h2>${at('favs')}</h
 let installEvt = null;
 const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+// متصفحات أندرويد غير Chrome (سامسونج وغيره) تبني التطبيق بنفسها، وحماية جوجل تحظره كتطبيق قديم.
+// Chrome يبني التطبيق من سيرفرات جوجل فينقبل، فنوجّه العميل له بدل زر التثبيت.
+const otherAndroid = /android/i.test(navigator.userAgent) && /SamsungBrowser|MiuiBrowser|HuaweiBrowser|HeyTapBrowser|OppoBrowser|VivoBrowser|UCBrowser|YaBrowser|OPR\/|EdgA|; wv\)/i.test(navigator.userAgent);
+const chromeUrl = () => `intent://${location.host}/stores/?src=chrome#Intent;scheme=https;package=com.android.chrome;end`;
+const chromeBtn = (sm) => html`<a class="mk-btn gold${sm ? ' sm' : ''}" href="${chromeUrl()}">${at('chromeBtn')}</a>`;
 function appCard() {
   if (standalone()) return html`<div class="mk-acc-box"><h2>${at('app')}</h2><p class="mk-muted">${at('installed')}</p>${pushRow()}</div>`;
+  if (otherAndroid) return html`<div class="mk-acc-box"><h2>${at('app')}</h2><p class="mk-muted">${at('chromeHow')}</p>${chromeBtn()}</div>`;
   return html`<div class="mk-acc-box"><h2>${at('app')}</h2><p class="mk-muted">${at('appP')}</p>${installEvt ? html`<button type="button" class="mk-btn gold" data-install>${at('installBtn')}</button>` : isIOS ? html`<p class="mk-ios">${at('iosHow')}</p>` : ''}</div>`;
 }
 async function install() {
+  if (otherAndroid) return (location.href = chromeUrl());
   if (!installEvt) return toast(at('iosHow'));
   installEvt.prompt();
   await installEvt.userChoice.catch(() => {});
@@ -1356,11 +1363,13 @@ async function install() {
   $('#install-bar')?.remove();
 }
 function installBar() {
-  if (standalone() || $('#install-bar') || (!installEvt && !isIOS)) return;
+  if (standalone() || $('#install-bar') || (!installEvt && !isIOS && !otherAndroid)) return;
   if (Date.now() - load('asalah_install_x', 0) < 14 * 86400e3) return;
   const bar = Object.assign(document.createElement('div'), { id: 'install-bar', className: 'mk-install' });
-  render(bar, html`<img src="/stores/icons/icon-192.png" alt="" width="40" height="40"><div><b>${at('barT')}</b><small>${installEvt ? at('appP') : at('iosHow')}</small></div>
-    ${installEvt ? html`<button type="button" class="mk-btn gold sm" data-install>${at('installBtn')}</button>` : ''}<button type="button" class="mk-round" data-install-x aria-label="${at('later')}">×</button>`);
+  const sub = otherAndroid ? at('chromeBar') : installEvt ? at('appP') : at('iosHow');
+  const btn = otherAndroid ? chromeBtn(true) : installEvt ? html`<button type="button" class="mk-btn gold sm" data-install>${at('installBtn')}</button>` : '';
+  render(bar, html`<img src="/stores/icons/icon-192.png" alt="" width="40" height="40"><div><b>${at('barT')}</b><small>${sub}</small></div>
+    ${btn}<button type="button" class="mk-round" data-install-x aria-label="${at('later')}">×</button>`);
   document.body.append(bar);
 }
 addEventListener('beforeinstallprompt', (e) => {
@@ -1368,7 +1377,7 @@ addEventListener('beforeinstallprompt', (e) => {
   installEvt = e;
   setTimeout(installBar, 6000);
 });
-if (isIOS) setTimeout(installBar, 8000);
+if (isIOS || otherAndroid) setTimeout(installBar, 8000);
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/stores/sw.js', { scope: '/stores/' }).catch(() => {});
 
 // ---------- الإشعارات ----------
