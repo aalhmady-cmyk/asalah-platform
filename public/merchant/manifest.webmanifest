@@ -1,0 +1,23 @@
+{
+  "id": "/merchant/",
+  "name": "لوحة تاجر أصالة",
+  "short_name": "لوحة التاجر",
+  "description": "لوحة تاجر أصالة: المسحات والمخزون والمسابقة والمتجر من جوالك.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/merchant/?src=app",
+  "scope": "/merchant/",
+  "display": "standalone",
+  "background_color": "#0F2A21",
+  "theme_color": "#0F2A21",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/merchant/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/merchant/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/merchant/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "متجري", "url": "/merchant/#store", "icons": [{ "src": "/merchant/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "العلامات", "url": "/merchant/#tags", "icons": [{ "src": "/merchant/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

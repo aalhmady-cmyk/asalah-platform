@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0F2A21">
+<link rel="manifest" href="/merchant/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/merchant/icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="لوحة التاجر">
 <title>لوحة التاجر - أصالة</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -34,6 +41,7 @@
   <main class="main">
     <section id="home">
       <div style="display:flex;flex-direction:column;gap:24px">
+        <div id="app-install" hidden></div>
         <div id="alerts" style="display:flex;flex-direction:column;gap:12px"></div>
         <div class="row">
           <div class="hero wide" id="stock"></div>

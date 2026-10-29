@@ -9,7 +9,7 @@ export async function api(path, { method = 'GET', body } = {}) {
   });
   const data = await res.json().catch(() => ({ ok: false, message: 'رد غير متوقع من الخادم' }));
   if (res.status === 401 && data.code === 'unauthenticated' && !location.pathname.startsWith('/login')) {
-    location.href = '/login/';
+    location.href = loginPath();
     throw new Error(data.message);
   }
   if (!res.ok) throw Object.assign(new Error(data.message || 'صار خطأ'), { status: res.status, data });
@@ -146,8 +146,10 @@ export function tabs(nav, sections, onShow) {
 
 export async function logout() {
   await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
-  location.href = '/login/';
+  location.href = loginPath();
 }
+// تطبيق لوحة التاجر نطاقه /merchant/، فصفحة الدخول له داخل نفس النطاق عشان ما يطلع من التطبيق
+export const loginPath = () => (location.pathname.startsWith('/merchant') ? '/merchant/login/' : '/login/');
 
 // الحرف الأول من اسم التاجر بدون "ال" التعريف، للشعار المؤقت
 export const initial = (name) => name.trim().replace(/^ال(?=\S{2})/, '').charAt(0);

@@ -29,6 +29,12 @@ async function route(req, env) {
   env = await prepare(env);
   if (path.startsWith('/img/') && (m === 'GET' || m === 'HEAD')) return serveImage(env, path);
   if (path.startsWith('/media/') && (m === 'GET' || m === 'HEAD')) return serveMedia(req, env, path);
+  // صفحة الدخول داخل نطاق تطبيق لوحة التاجر (نفس صفحة /login/)
+  if ((m === 'GET' || m === 'HEAD') && (path === '/merchant/login/' || path === '/merchant/login')) {
+    const u = new URL(req.url);
+    u.pathname = '/login/';
+    return env.ASSETS.fetch(new Request(u, req));
+  }
   if ((m === 'GET' || m === 'HEAD') && (path === '/robots.txt' || path === '/sitemap.xml' || path.startsWith('/stores/p/') || path.startsWith('/stores/m/'))) {
     const r = await handleSeo(req, env, path);
     if (r) return r;
