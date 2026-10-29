@@ -166,6 +166,7 @@ async function route() {
     else if (tab === 'family') await showFamily(p.get('f'));
     else if (tab === 'saved') await showSaved();
     else if (tab === 'account') await showAccount();
+    else if (tab === 'inbox') await showInbox();
     else if (tab === 'merchant') await showMerchant(p.get('m'));
     else if (tab === 'search') await showSearch(p.get('q'), p.get('cat'));
     else await showHome(p.get('cat'));
@@ -1248,11 +1249,11 @@ const A = {
     account: 'حسابي', watch: '🔔 نبهني لو نزل السعر', watching: '🔔 أتابع السعر ✓', watchOn: 'بنبهك أول ما ينزل السعر 🔔', watchOff: 'وقفنا متابعة السعر',
     noLogin: 'الدخول بحساب Google متوقف حالياً', merchantBadge: '✓ التاجر', accTitle: 'حسابك في متاجر أصالة',
     accP: 'سجّل دخولك بحساب Google عشان تتابع أسعار المنتجات ويوصلك تنبيه لما تنزل، وتشوف تعليقاتك وردود التجار عليها.',
-    notes: '🔔 التنبيهات', noNotes: 'ما فيه تنبيهات للحين. تابع سعر منتج وبنبهك لما ينزل.', watchList: '👁 منتجات أتابع سعرها', noWatch: 'ما تتابع أي منتج. افتح منتج واضغط «نبهني لو نزل السعر».',
+    notes: '🔔 التنبيهات', noNotes: 'ما فيه تنبيهات للحين. أي عرض أو خبر من أصالة، أو نزول سعر منتج تتابعه، بيطلع هنا.', watchList: '👁 منتجات أتابع سعرها', noWatch: 'ما تتابع أي منتج. افتح منتج واضغط «نبهني لو نزل السعر».',
     was: (p) => `كان ${p}`, dropped: 'نزل السعر 🎉', stop: 'إلغاء', favs: '♡ المفضلة', favsN: (n) => `${n} منتج في المفضلة`, openFavs: 'افتح المفضلة',
     myComments: '💬 تعليقاتي', noMine: 'ما علّقت على شي للحين.', onP: 'على منتج', onR: 'على ريل', logout: 'تسجيل الخروج', unavailable: 'غير متاح حالياً',
     app: '📲 تطبيق متاجر أصالة', appP: 'ثبّت المتاجر على شاشة جوالك الرئيسية، وتفتح بضغطة مثل أي تطبيق.', installBtn: 'ثبّت التطبيق', installed: 'التطبيق مثبّت على جهازك ✅',
-    pushT: '🔔 فعّل الإشعارات', pushP: 'يوصلك تنبيه إذا نزل سعر منتج تتابعه، أو رد عليك التاجر، وعروض أصالة الحصرية.', pushBtn: 'فعّل', pushOn: 'الإشعارات مفعّلة ✅', pushOff: 'أوقف الإشعارات', pushBlocked: 'الإشعارات موقفة من إعدادات جوالك. فعّلها من الإعدادات ثم التطبيقات ثم متاجر أصالة.', pushDone: 'تم، بيوصلك كل جديد 🔔', pushWatch: 'عشان يوصلك تنبيه نزول السعر على جوالك 👇', pushNeedApp: 'ثبّت التطبيق أول عشان توصلك الإشعارات على جوالك.', pushErr: 'ما قدرنا نفعّل الإشعارات، جرّب بعدين', pushTest: 'جرّب إشعار', pushTestOk: 'أرسلنا لك إشعار تجربة، بيوصلك خلال ثواني 🔔', pushTestBad: 'ما وصل الإشعار لجوالك، اضغط «أوقف الإشعارات» ثم «فعّل» من جديد',
+    pushT: '🔔 فعّل الإشعارات', pushP: 'يوصلك تنبيه إذا نزل سعر منتج تتابعه، أو رد عليك التاجر، وعروض أصالة الحصرية.', pushBtn: 'فعّل', pushOn: 'الإشعارات مفعّلة ✅', pushOff: 'أوقف الإشعارات', pushBlocked: 'الإشعارات موقفة من إعدادات جوالك. فعّلها من الإعدادات ثم التطبيقات ثم متاجر أصالة.', pushDone: 'تم، بيوصلك كل جديد 🔔', pushWatch: 'عشان يوصلك تنبيه نزول السعر على جوالك 👇', pushNeedApp: 'ثبّت التطبيق أول عشان توصلك الإشعارات على جوالك.', pushErr: 'ما قدرنا نفعّل الإشعارات، جرّب بعدين', pushTest: 'جرّب إشعار', inbox: '🔔 الإشعارات', inboxEmpty: 'ما فيه إشعارات للحين. أول ما ترسل أصالة عرض أو خبر بيطلع هنا.', inboxLbl: 'الإشعارات', inboxAll: 'كل الإشعارات ←', pushTestOk: 'أرسلنا لك إشعار تجربة، بيوصلك خلال ثواني 🔔', pushTestBad: 'ما وصل الإشعار لجوالك، اضغط «أوقف الإشعارات» ثم «فعّل» من جديد',
     iosHow: 'في سفاري: اضغط زر المشاركة ⬆️ تحت، بعدها «إضافة إلى الشاشة الرئيسية».', chromeHow: 'على أندرويد ثبّت التطبيق من متصفح Chrome، عشان تعتمده حماية جوجل وما ينحظر. لو ثبّته من متصفح ثاني وانحظر، احذفه وثبّته من Chrome.', chromeBtn: 'افتح في Chrome وثبّت', chromeBar: 'ثبّته من Chrome عشان حماية جوجل تقبله', barT: 'ثبّت متاجر أصالة على جوالك', later: 'لاحقاً',
   },
   en: {
@@ -1263,7 +1264,7 @@ const A = {
     was: (p) => `was ${p}`, dropped: 'Price dropped 🎉', stop: 'Stop', favs: '♡ Favourites', favsN: (n) => `${n} saved products`, openFavs: 'Open favourites',
     myComments: '💬 My comments', noMine: 'No comments yet.', onP: 'on a product', onR: 'on a reel', logout: 'Sign out', unavailable: 'Not available now',
     app: '📲 Asalah Stores app', appP: 'Add the stores to your home screen and open them in one tap like any app.', installBtn: 'Install app', installed: 'The app is installed ✅',
-    pushT: '🔔 Turn on notifications', pushP: 'Get alerted when a product you watch drops in price, when a merchant replies, and for exclusive Asalah offers.', pushBtn: 'Turn on', pushOn: 'Notifications are on ✅', pushOff: 'Turn off', pushBlocked: 'Notifications are blocked in your phone settings. Enable them from Settings, Apps, Asalah Stores.', pushDone: 'Done, you’ll get every update 🔔', pushWatch: 'To get the price-drop alert on your phone 👇', pushNeedApp: 'Install the app first to get notifications on your phone.', pushErr: 'Couldn’t turn on notifications, try later', pushTest: 'Test notification', pushTestOk: 'Test notification sent, it should arrive in seconds 🔔', pushTestBad: 'The notification did not reach your phone. Tap “Turn off” then enable again',
+    pushT: '🔔 Turn on notifications', pushP: 'Get alerted when a product you watch drops in price, when a merchant replies, and for exclusive Asalah offers.', pushBtn: 'Turn on', pushOn: 'Notifications are on ✅', pushOff: 'Turn off', pushBlocked: 'Notifications are blocked in your phone settings. Enable them from Settings, Apps, Asalah Stores.', pushDone: 'Done, you’ll get every update 🔔', pushWatch: 'To get the price-drop alert on your phone 👇', pushNeedApp: 'Install the app first to get notifications on your phone.', pushErr: 'Couldn’t turn on notifications, try later', pushTest: 'Test notification', inbox: '🔔 Notifications', inboxEmpty: 'No notifications yet. Offers and news from Asalah will show up here.', inboxLbl: 'Notifications', inboxAll: 'All notifications →', pushTestOk: 'Test notification sent, it should arrive in seconds 🔔', pushTestBad: 'The notification did not reach your phone. Tap “Turn off” then enable again',
     iosHow: 'In Safari: tap Share ⬆️ then “Add to Home Screen”.', chromeHow: 'On Android, install the app from Chrome so Google Play Protect trusts it. If you installed it from another browser and it got blocked, remove it and install from Chrome.', chromeBtn: 'Open in Chrome to install', chromeBar: 'Install from Chrome so Play Protect trusts it', barT: 'Install Asalah Stores on your phone', later: 'Later',
   },
 };
@@ -1304,13 +1305,14 @@ async function toggleWatch(id) {
 }
 
 async function showAccount() {
-  await mePromise;
+  await Promise.all([mePromise, loadInbox().catch(() => [])]);
   if (!ME.customer) {
     render(view, html`<section class="mk-acc">
       <div class="mk-acc-hero"><span class="mk-acc-av" aria-hidden="true">👤</span><div><h1>${at('accTitle')}</h1><p>${at('accP')}</p></div></div>
       ${ME.login ? html`<a class="mk-google big" href="${loginUrl('/stores/?v=account')}">${raw(GOOGLE)}<span>${t('googleBtn')}</span></a>` : html`<p class="mk-muted">${at('noLogin')}</p>`}
-      ${favCard()}${appCard()}
+      ${notesBox([])}${favCard()}${appCard()}
     </section>`);
+    markInboxSeen(inboxItems || [], []);
     return;
   }
   render(view, html`<section class="mk-acc"><div class="mk-skel-card"></div></section>`);
@@ -1320,7 +1322,7 @@ async function showAccount() {
   render(view, html`<section class="mk-acc">
     <div class="mk-acc-hero">${c.picture ? html`<img class="mk-acc-av" src="${c.picture}" alt="" referrerpolicy="no-referrer">` : html`<span class="mk-acc-av" aria-hidden="true">${c.name.trim()[0]}</span>`}
       <div><h1>${c.name}</h1><p class="ltr">${c.email}</p></div><button type="button" class="mk-btn ghost-d" data-logout>${at('logout')}</button></div>
-    <div class="mk-acc-box"><h2>${at('notes')}</h2>${d.notes.length ? html`<ul class="mk-notes">${d.notes.map((n) => html`<li class="${n.read_at ? '' : 'new'}"><a href="${n.link || '/stores/'}">${n.message}</a><small>${ago(n.created_at)}</small></li>`)}</ul>` : html`<p class="mk-muted">${at('noNotes')}</p>`}</div>
+    ${notesBox(d.notes)}
     <div class="mk-acc-box"><h2>${at('watchList')}</h2>${d.watch.length ? html`<div class="mk-watch-list">${d.watch.map((w) => html`<div class="mk-wl ${w.live ? '' : 'off'}">
         <button type="button" class="mk-wl-img" ${raw(w.live ? `data-product="${w.id}"` : 'disabled')}>${w.image_url ? html`<img src="${w.image_url}" alt="" loading="lazy">` : raw('🛍️')}</button>
         <div><b>${w.title}</b><small>${w.merchant_name}</small>
@@ -1337,6 +1339,7 @@ async function showAccount() {
     ME.unread = 0;
     drawMe();
   }
+  markInboxSeen(inboxItems || [], []);
 }
 const favCard = () => html`<div class="mk-acc-box row"><div><h2>${at('favs')}</h2><p class="mk-muted">${at('favsN', favs.size)}</p></div><button type="button" class="mk-btn ghost-d" data-go="saved">${at('openFavs')}</button></div>`;
 
@@ -1418,6 +1421,55 @@ async function disablePush() {
   showAccount();
 }
 let pushOnNow = false;
+// ---------- صندوق الإشعارات: كل إشعار انرسل ينحفظ، مع تنبيهات حساب العميل ----------
+const INBOX_SEEN = 'asalah_inbox_seen';
+let inboxItems = null;
+async function loadInbox() {
+  const d = await get('/api/public/push/inbox?lang=' + lang);
+  inboxItems = d.items || [];
+  return inboxItems;
+}
+function inboxBadge() {
+  const b = $('#inbox-btn');
+  if (!b || !inboxItems) return;
+  const seen = Number(load(INBOX_SEEN, 0)) || 0;
+  const n = inboxItems.filter((x) => x.id > seen).length;
+  b.setAttribute('aria-label', at('inboxLbl') + (n ? ` (${n})` : ''));
+  render(b, html`<span aria-hidden="true">🔔</span>${n ? html`<i>${n > 9 ? '9+' : n}</i>` : ''}`);
+}
+function mergeInbox(items, notes) {
+  const seen = Number(load(INBOX_SEEN, 0)) || 0;
+  return [
+    ...items.map((x) => ({ k: 'c' + x.id, title: x.title, body: x.body, url: x.url || '/stores/', image: x.image, at: x.created_at, isNew: x.id > seen })),
+    ...notes.map((n) => ({ k: 'n' + n.id, title: n.message, body: '', url: n.link || '/stores/', at: n.created_at, isNew: !n.read_at })),
+  ].sort((a, b) => b.at - a.at);
+}
+const inboxList = (all) => html`<ul class="mk-in-list">${all.map((x) => html`<li class="${x.isNew ? 'new' : ''}"><a href="${x.url}">
+      <span class="mk-in-ic">${x.image ? html`<img src="${x.image}" alt="" loading="lazy">` : x.k[0] === 'n' ? '🏷️' : '🔔'}</span>
+      <span class="mk-in-t"><b>${x.title}</b>${x.body ? html`<p>${x.body}</p>` : ''}<small>${ago(x.at)}</small></span></a></li>`)}</ul>`;
+function markInboxSeen(items, notes) {
+  const seen = Number(load(INBOX_SEEN, 0)) || 0;
+  if (items.length) keep(INBOX_SEEN, Math.max(seen, items[0].id));
+  inboxBadge();
+  if (notes.some((n) => !n.read_at)) cpost('/api/c/notes/read', 'POST').then(() => { ME.unread = 0; drawMe(); }).catch(() => {});
+}
+async function showInbox() {
+  render(view, html`<section class="mk-inbox"><h1>${at('inbox')}</h1><p class="mk-muted">…</p></section>`);
+  const [items] = await Promise.all([loadInbox(), mePromise]);
+  const notes = ME.customer ? (await get('/api/c/me').catch(() => ({}))).notes || [] : [];
+  const all = mergeInbox(items, notes);
+  render(view, html`<section class="mk-inbox"><h1>${at('inbox')}</h1>
+    ${all.length ? inboxList(all) : html`<p class="mk-muted">${at('inboxEmpty')}</p>`}
+    <div class="mk-acc-box" style="margin-top:18px">${pushRow()}</div>
+  </section>`);
+  markInboxSeen(items, notes);
+}
+// صندوق التنبيهات في صفحة حسابي: نفس الإشعارات، آخر 8
+function notesBox(notes) {
+  const all = mergeInbox(inboxItems || [], notes || []).slice(0, 8);
+  return html`<div class="mk-acc-box"><h2>${at('notes')}</h2>${all.length ? html`${inboxList(all)}<button type="button" class="mk-link" data-go="inbox" style="margin-top:10px">${at('inboxAll')}</button>` : html`<p class="mk-muted">${at('noNotes')}</p>`}</div>`;
+}
+loadInbox().then(inboxBadge).catch(() => {});
 async function testPush() {
   try {
     const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();

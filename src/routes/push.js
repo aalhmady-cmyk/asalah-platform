@@ -17,6 +17,14 @@ const safePath = (v) => (typeof v === 'string' && /^\/(?!\/)[\w\-./?=&%#]{0,300}
 export async function handlePublicPush(req, env, path) {
   const db = env.DB, m = req.method;
   if (path === '/api/public/push/key' && m === 'GET') return json({ ok: true, key: (await vapidKeys(db)).pub });
+  // صندوق إشعارات التطبيق: كل إشعار انرسل من اللوحة الأم ينحفظ هنا للكل، مسجل أو لا
+  if (path === '/api/public/push/inbox' && m === 'GET') {
+    const lang = new URL(req.url).searchParams.get('lang') === 'en' ? 'en' : 'ar';
+    const c = await currentCustomer(db, req);
+    const aud = c ? "('all','accounts',?)" : "('all',?)";
+    const rows = (await db.prepare(`SELECT id,title,body,url,image,created_at FROM push_campaigns WHERE status!='stopped' AND audience IN ${aud} ORDER BY id DESC LIMIT 50`).bind(lang).all()).results;
+    return json({ ok: true, items: rows });
+  }
   if (m !== 'POST') fail(404, 'المسار غير موجود');
   sameSite(req);
   const b = await readJson(req, 4000);

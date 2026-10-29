@@ -799,6 +799,10 @@ test('الإشعارات: الاشتراك والحملات من اللوحة ا
   await post('/api/public/push/click', { c: c.data.campaign.id });
   st = await call('/api/admin/push', { cookie: S.admin });
   assert.equal(st.data.campaigns[0].clicks, 1);
+  const inbox = await call('/api/public/push/inbox?lang=ar');
+  assert.equal(inbox.status, 200);
+  assert.equal(inbox.data.items[0].title, 'عرض نهاية الأسبوع');
+  assert.equal((await call('/api/public/push/inbox?lang=en')).data.items.length, 1);
   const tp = await post('/api/public/push/test', { endpoint: 'https://fcm.googleapis.com/fcm/send/none' });
   assert.equal(tp.status, 200);
   assert.equal(tp.data.sent, 0);
