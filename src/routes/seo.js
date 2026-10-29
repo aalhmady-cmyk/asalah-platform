@@ -143,7 +143,7 @@ async function sitemap(env, origin) {
 }
 
 export async function handleSeo(req, env, path) {
-  const origin = new URL(req.url).origin;
+  const origin = env.PUBLIC_ORIGIN || new URL(req.url).origin;
   if (path === '/robots.txt')
     return new Response(`User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /merchant/\nDisallow: /login/\nDisallow: /api/\nDisallow: /report/\nSitemap: ${origin}/sitemap.xml\n`, {
       headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' },
