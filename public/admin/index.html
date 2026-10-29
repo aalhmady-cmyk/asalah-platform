@@ -61,6 +61,11 @@
 
     <section id="merchants" hidden>
       <div class="page-head"><div><h1>التجار</h1><p>حساب لكل تاجر، بهويته وحدوده</p></div><button class="btn btn-primary" type="button" data-open="dlg-merchant">تاجر جديد</button></div>
+      <div class="card" style="margin-top:24px">
+        <div class="card-head"><h2>صوت نتيجة التحقق 🔔</h2><label class="check" style="margin:0"><input type="checkbox" id="sound-global"> شغّال لكل المنصة</label></div>
+        <p class="small muted" style="margin:0">الأصلي: «هلا والله، المنتج أصلي» + جرس ✅ + «شكراً إنك اخترت المنتج الأصلي، وصحتين وعافية!». المقلّد: طوط + تحذير إنه يبلّغ. تقدر توقفه لتاجر معيّن من «تعديل» التاجر.</p>
+        <div class="actions"><button class="btn" type="button" id="sound-try-ok">▶️ اسمع صوت الأصلي</button><button class="btn" type="button" id="sound-try-bad">▶️ اسمع صوت المقلّد</button></div>
+      </div>
       <div class="card" style="margin-top:24px"><div class="table-wrap" id="merchants-table"></div></div>
     </section>
 
@@ -177,6 +182,7 @@
       <label class="field">حد الفحوصات لكل علامة<input name="max_checks" type="number" min="0" max="100" value="5" class="ltr"></label>
       <label class="check" style="align-self:end"><input type="checkbox" name="public_listed"> يظهر في الموقع العام</label>
       <label class="check" id="merchant-store-field" style="align-self:end" hidden><input type="checkbox" name="store_enabled"> 🛍️ مشترك في متاجر أصالة</label>
+      <label class="check" id="merchant-sound-field" style="align-self:end" hidden><input type="checkbox" name="verify_sound"> 🔔 صوت نتيجة التحقق</label>
       <label class="field" id="merchant-status-field" hidden>الحالة<select name="status"><option value="active">نشط</option><option value="suspended">موقوف</option></select></label>
     </div>
     <div class="actions"><button class="btn btn-primary" type="submit">حفظ</button><button class="btn" type="button" data-close>إلغاء</button></div>

@@ -1,7 +1,7 @@
 // مسارات مزايا الثقة: خريطة التقليد، ضمان أصالة، البائع المعتمد، الرسالة الصوتية، الملخص الأسبوعي، وصور الأدلة.
 import { pushAlert } from '../lib/push.js';
 import { imageUrl, saveImageBytes } from '../lib/images.js';
-import { audioType, evidencePhoto, fakesMap, parseSellerToken, sellerToken, voiceUrl, weeklySummary } from '../lib/trust.js';
+import { audioType, evidencePhoto, fakesMap, parseSellerToken, sellerToken, soundOn, voiceUrl, weeklySummary } from '../lib/trust.js';
 import { audit, fail, ipHash, json, now, randomHex, rateLimit, readJson, saPhone, str } from '../lib/util.js';
 
 const HOURS = { 24: 24, 168: 168, 720: 720 };
@@ -143,9 +143,9 @@ export async function handleMerchantTrust(req, env, path, user, mid) {
   }
 
   if (path === '/api/m/trust' && m === 'GET') {
-    const r = await db.prepare('SELECT guarantee_enabled,guarantee_terms,voice_key,weekly_summary FROM merchants WHERE id=?').bind(mid).first();
+    const r = await db.prepare('SELECT guarantee_enabled,guarantee_terms,voice_key,weekly_summary,verify_sound FROM merchants WHERE id=?').bind(mid).first();
     const open = await db.prepare("SELECT COUNT(*) AS n FROM guarantee_claims WHERE merchant_id=? AND status='new'").bind(mid).first();
-    return json({ ok: true, guarantee_enabled: Boolean(r.guarantee_enabled), guarantee_terms: r.guarantee_terms, voice_url: voiceUrl(r.voice_key), weekly_summary: Boolean(r.weekly_summary), open_claims: open.n });
+    return json({ ok: true, guarantee_enabled: Boolean(r.guarantee_enabled), guarantee_terms: r.guarantee_terms, voice_url: voiceUrl(r.voice_key), weekly_summary: Boolean(r.weekly_summary), verify_sound: Boolean(r.verify_sound), sound_global: await soundOn(db), open_claims: open.n });
   }
   if (path === '/api/m/trust' && m === 'PATCH') {
     if (user.merchant_role === 'staff') fail(403, 'هذي لصاحب الحساب بس', 'owner_only');
@@ -154,6 +154,7 @@ export async function handleMerchantTrust(req, env, path, user, mid) {
     if ('guarantee_enabled' in b) f.guarantee_enabled = b.guarantee_enabled ? 1 : 0;
     if ('guarantee_terms' in b) f.guarantee_terms = str(b.guarantee_terms, 'شروط الضمان', { max: 400, optional: true });
     if ('weekly_summary' in b) f.weekly_summary = b.weekly_summary ? 1 : 0;
+    if ('verify_sound' in b) f.verify_sound = b.verify_sound ? 1 : 0;
     const keys = Object.keys(f);
     if (!keys.length) fail(400, 'ما فيه تغييرات');
     await db.prepare(`UPDATE merchants SET ${keys.map((k) => k + '=?').join(',')} WHERE id=?`).bind(...keys.map((k) => f[k]), mid).run();
@@ -164,8 +165,16 @@ export async function handleMerchantTrust(req, env, path, user, mid) {
 }
 
 // ---------- المدير ----------
-export async function handleAdminTrust(req, env, path) {
+export async function handleAdminTrust(req, env, path, user) {
   const db = env.DB, m = req.method;
+  // صوت نتيجة التحقق لكل المنصة
+  if (path === '/api/admin/sound' && m === 'GET') return json({ ok: true, enabled: await soundOn(db) });
+  if (path === '/api/admin/sound' && m === 'PATCH') {
+    const enabled = Boolean((await readJson(req)).enabled);
+    await db.prepare("INSERT INTO settings(key,value) VALUES('verify_sound',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(enabled ? '1' : '0').run();
+    await audit(db, user, 'verify_sound', { enabled });
+    return json({ ok: true, enabled });
+  }
   if (path === '/api/admin/fakes-map' && m === 'GET') return json({ ok: true, ...(await fakesMap(db, null, hoursOf(req))) });
   if (path.startsWith('/api/admin/evidence/') && m === 'GET') return serveEvidence(env, path.slice('/api/admin/evidence/'.length), null);
   if (path === '/api/admin/guarantee' && m === 'GET') {

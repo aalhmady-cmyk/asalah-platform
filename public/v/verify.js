@@ -1,5 +1,6 @@
 // صفحة التحقق: تقرأ رمز العلامة من الرابط، تشيله من شريط العنوان، وتسأل الخادم.
 import { EN, onLangToggle, takeCachedResult, translatePage, tx } from '/v/i18n.js';
+import { playResult } from '/assets/sound.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => ($(id).hidden = !on);
@@ -85,11 +86,26 @@ function enError(data) {
   return byCode[data.code] || RESULT_EN[data.code] || 'Something went wrong, please try again';
 }
 
-let lastResult = 'unknown', lastData = null;
+let lastResult = 'unknown', lastData = null, replay = false;
+
+// صوت النتيجة: يشتغل لحاله إذا المتصفح سمح، وإلا يطلع زر "اسمع النتيجة"
+function resultSound(kind) {
+  if (replay || !lastData?.sound) return;
+  playResult(kind, EN).then((r) => r === 'blocked' && soundChip(kind)).catch(() => {});
+}
+function soundChip(kind) {
+  const b = $('sound-chip');
+  b.textContent = kind === 'original' ? tx('🔊 اسمع النتيجة', '🔊 Hear the result') : tx('🔊 اسمع التحذير', '🔊 Hear the warning');
+  b.classList.toggle('warn', kind !== 'original');
+  b.onclick = () => { show('sound-chip', false); playResult(kind, EN).catch(() => {}); };
+  show('sound-chip');
+  setTimeout(() => show('sound-chip', false), 20000);
+}
 translatePage();
 onLangToggle(() => lastData);
 async function run() {
   const cached = takeCachedResult();
+  replay = Boolean(cached);
   const steps = cached ? Promise.resolve() : scanSteps();
   if (!token && !cached) { await steps; return bad('unknown', tx('ما لقينا رمز العلامة في الرابط. امسح العلامة مرة ثانية.', 'We could not find the tag code in the link. Scan the tag again.')); }
   let d;
@@ -149,6 +165,7 @@ function ok(d) {
   $('ok').classList.add('pop');
   if (d.level) setupLevel(d.level);
   if (d.voice_url) setupVoice(d.voice_url);
+  resultSound('original');
   if (d.passport) setupPassport(d.passport, t);
   if (d.guarantee) setupGuarantee(d.guarantee);
   if (d.shop) setupShop(d.shop);
@@ -495,6 +512,7 @@ function bad(result, message) {
   $('bad-msg').textContent = message;
   show('bad');
   show('report');
+  if (result !== 'not_activated') resultSound('fake');
 }
 
 $('entry-form').addEventListener('submit', async (e) => {

@@ -1,6 +1,7 @@
 import { api, hotspotsTable, initial, pickImage, bars, BATCH_STATUS, hbars, html, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 import { loadStore } from '/merchant/store.js';
 import { initPanelApp } from '/assets/panel-app.js';
+import { playResult } from '/assets/sound.js';
 
 const $ = (id) => document.getElementById(id);
 const me = await api('/api/auth/me');
@@ -215,6 +216,8 @@ async function loadTrust() {
   f.guarantee_enabled.checked = d.guarantee_enabled;
   f.guarantee_terms.value = d.guarantee_terms || '';
   $('weekly-on').checked = d.weekly_summary;
+  $('sound-on').checked = d.verify_sound;
+  $('sound-global-off').hidden = d.sound_global;
   drawVoice(d.voice_url);
 }
 function drawVoice(url) {
@@ -227,6 +230,11 @@ onSubmit($('guarantee-form'), async (f) => {
 $('weekly-on').addEventListener('change', async (e) => {
   try { await api('/api/m/trust', { method: 'PATCH', body: { weekly_summary: e.target.checked } }); toast('تم الحفظ'); } catch (err) { toast(err.message, true); }
 });
+$('sound-on').addEventListener('change', async (e) => {
+  try { await api('/api/m/trust', { method: 'PATCH', body: { verify_sound: e.target.checked } }); toast(e.target.checked ? 'صار عملاؤك يسمعون صوت النتيجة 🔔' : 'وقّفنا الصوت'); } catch (err) { toast(err.message, true); }
+});
+$('sound-try-ok').addEventListener('click', () => playResult('original').catch(() => {}));
+$('sound-try-bad').addEventListener('click', () => playResult('fake').catch(() => {}));
 $('weekly-btn').addEventListener('click', async (e) => {
   e.target.disabled = true;
   e.target.textContent = 'نجهّز ملخصك…';

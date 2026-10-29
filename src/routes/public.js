@@ -1,6 +1,6 @@
 // المسارات العامة: التحقق من العلامة، المشاركة في المسابقة، بلاغ التقليد.
 import { pushAlert } from '../lib/push.js';
-import { compareWithOriginal, evidencePhoto, levelFor, passportFor, voiceUrl } from '../lib/trust.js';
+import { compareWithOriginal, evidencePhoto, levelFor, passportFor, soundOn, voiceUrl } from '../lib/trust.js';
 import { guaranteeClaim, saveEvidence } from './trust.js';
 import { assistantEnabled } from '../lib/assistant.js';
 import { guide } from '../lib/guide.js';
@@ -57,7 +57,7 @@ async function resolve(env, db, raw) {
               m.name,m.logo_url,m.logo_key,m.brand_color,m.store_url,m.whatsapp,m.status AS merchant_status,m.max_checks,
               m.contest_enabled,m.contest_title,m.contest_ends_at,m.contest_terms_url,b.expires_on,b.details,
               m.loyalty_enabled,m.loyalty_mode,m.loyalty_per_tag,m.loyalty_min_redeem,m.loyalty_reward,m.ratings_enabled,
-              m.slug,m.store_enabled,m.store_coupon,m.store_coupon_note,b.store_product_id,m.guarantee_enabled,m.guarantee_terms,m.voice_key
+              m.slug,m.store_enabled,m.store_coupon,m.store_coupon_note,b.store_product_id,m.guarantee_enabled,m.guarantee_terms,m.voice_key,m.verify_sound
        FROM batches b JOIN merchants m ON m.id=b.merchant_id WHERE b.id=?`
     )
     .bind(p.batchId)
@@ -209,12 +209,13 @@ export async function verify(req, env) {
   const r = await resolve(env, db, body.t);
   if (r.state === 'unknown') {
     await logUnknown(db, req, body.t, r.merchantId ?? null);
-    return json({ ok: false, result: 'unknown', message: MESSAGES.unknown, brand: null });
+    return json({ ok: false, result: 'unknown', message: MESSAGES.unknown, brand: null, sound: await soundOn(db) });
   }
   const b = r.batch;
+  const sound = Boolean(b.verify_sound) && (await soundOn(db));
   const reject = async (result, tagId = null, checkNo = null) => {
     await logScan(db, req, tagId, b.merchant_id, result, checkNo);
-    return json({ ok: false, result, message: MESSAGES[result], brand: brand(b), report_allowed: true });
+    return json({ ok: false, result, message: MESSAGES[result], brand: brand(b), report_allowed: true, sound });
   };
   if (b.merchant_status !== 'active' || b.status === 'blocked') return reject('blocked');
   if (b.status === 'pending') return reject('not_activated');
@@ -291,6 +292,7 @@ export async function verify(req, env) {
     level,
     guarantee: b.guarantee_enabled ? { terms: b.guarantee_terms, claimed: claim?.status || null } : null,
     voice_url: voiceUrl(b.voice_key),
+    sound,
   });
 }
 

@@ -150,6 +150,9 @@ export function audioType(b) {
 }
 export const voiceUrl = (key) => (key ? '/media/' + key : null);
 
+// مفتاح المدير العام لصوت نتيجة التحقق (شغّال إذا ما انحفظ شي)
+export const soundOn = async (db) => (await db.prepare("SELECT value FROM settings WHERE key='verify_sound'").first())?.value !== '0';
+
 // ---------- الملخص الأسبوعي للتاجر ----------
 export async function weeklyStats(db, merchantId, t = now()) {
   const end = riyadhDayStart(t), start = end - 7 * 86400, prev = start - 7 * 86400;

@@ -953,3 +953,24 @@ test('مزايا الثقة: جواز السفر والمستوى والضمان
   assert.match(w.data.message, /ملخص أسبوعك/);
   assert.equal(w.data.tips.length >= 1, true);
 });
+
+test('صوت نتيجة التحقق: التاجر يوقفه لمنتجاته، والمدير يوقفه للكل', async () => {
+  const t = tokenOf(S.urls[43]);
+  const v = async () => (await post('/api/verify', { t, sid: sid('6') })).data.sound;
+  assert.equal(await v(), true);
+  assert.equal((await post('/api/verify', { t: 'zz.2.BBBBBBBBBBBBBBBB', sid: sid('6') })).data.sound, true);
+  assert.equal((await patch('/api/m/trust', { verify_sound: false }, S.merchant)).status, 200);
+  assert.equal((await call('/api/m/trust', { cookie: S.merchant })).data.verify_sound, false);
+  assert.equal(await v(), false);
+  assert.equal((await patch('/api/m/trust', { verify_sound: true }, S.merchant)).status, 200);
+  assert.equal((await patch('/api/admin/sound', { enabled: false }, S.merchant)).status, 403);
+  assert.equal((await patch('/api/admin/sound', { enabled: false }, S.admin)).data.enabled, false);
+  assert.equal(await v(), false);
+  assert.equal((await post('/api/verify', { t: 'zz.2.BBBBBBBBBBBBBBBB', sid: sid('6') })).data.sound, false);
+  assert.equal((await call('/api/m/trust', { cookie: S.merchant })).data.sound_global, false);
+  await patch('/api/admin/sound', { enabled: true }, S.admin);
+  assert.equal((await call('/api/admin/sound', { cookie: S.admin })).data.enabled, true);
+  assert.equal((await patch(`/api/admin/merchants/${S.mid}`, { verify_sound: false }, S.admin)).status, 200);
+  assert.equal((await post('/api/verify', { t: tokenOf(S.urls[44]), sid: sid('6') })).data.sound, false);
+  await patch(`/api/admin/merchants/${S.mid}`, { verify_sound: true }, S.admin);
+});

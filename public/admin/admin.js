@@ -1,4 +1,5 @@
 import { initPanelApp } from '/assets/panel-app.js';
+import { playResult } from '/assets/sound.js';
 import { api, bars, BATCH_STATUS, hbars, hotspotsTable, html, pickImage, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
@@ -25,10 +26,12 @@ function openDialog(id, merchant) {
     $('merchant-form-title').textContent = merchant ? `تعديل ${merchant.name}` : 'تاجر جديد';
     $('merchant-status-field').hidden = !merchant;
     $('merchant-store-field').hidden = !merchant;
+    $('merchant-sound-field').hidden = !merchant;
     f.slug.readOnly = Boolean(merchant);
     if (merchant) for (const k of ['name', 'slug', 'brand_color', 'logo_url', 'store_url', 'whatsapp', 'low_stock_threshold', 'max_checks', 'status']) if (merchant[k] != null) f[k].value = merchant[k];
     f.public_listed.checked = Boolean(merchant?.public_listed);
     f.store_enabled.checked = Boolean(merchant?.store_enabled);
+    f.verify_sound.checked = merchant ? Boolean(merchant.verify_sound) : true;
   }
   if (id === 'dlg-batch' || id === 'dlg-user') {
     const opts = merchants.map((m) => html`<option value="${m.id}">${m.name}</option>`);
@@ -44,7 +47,7 @@ onSubmit($('merchant-form'), async (f, form) => {
     name: f.name, brand_color: f.brand_color, logo_url: optional(f.logo_url), store_url: optional(f.store_url), whatsapp: optional(f.whatsapp),
     low_stock_threshold: Number(f.low_stock_threshold), max_checks: Number(f.max_checks), public_listed: f.public_listed === 'on',
   };
-  if (f.id) await api(`/api/admin/merchants/${f.id}`, { method: 'PATCH', body: { ...body, status: f.status, store_enabled: f.store_enabled === 'on' } });
+  if (f.id) await api(`/api/admin/merchants/${f.id}`, { method: 'PATCH', body: { ...body, status: f.status, store_enabled: f.store_enabled === 'on', verify_sound: f.verify_sound === 'on' } });
   else await api('/api/admin/merchants', { method: 'POST', body: { ...body, slug: f.slug } });
   form.closest('dialog').close();
   toast('تم حفظ التاجر');
@@ -76,7 +79,7 @@ function merchantRows(list, withEdit) {
     const low = m.stock.active > 0 && m.stock.remaining <= m.low_stock_threshold;
     const status = m.status !== 'active' ? pill({ x: ['موقوف', 'err'] }, 'x') : low ? pill({ x: ['مخزون منخفض', 'warn'] }, 'x') : pill({ x: ['نشط', 'ok'] }, 'x');
     return html`<tr>
-      <td><b>${m.name}</b>${m.store_enabled ? html` <span class="pill ok" title="مشترك في متاجر أصالة">🛍️ متجر</span>` : ''}<div class="small muted ltr">${m.slug}</div></td>
+      <td><b>${m.name}</b>${m.store_enabled ? html` <span class="pill ok" title="مشترك في متاجر أصالة">🛍️ متجر</span>` : ''}${m.verify_sound ? '' : html` <span class="pill" title="صوت نتيجة التحقق موقوف">🔇</span>`}<div class="small muted ltr">${m.slug}</div></td>
       <td>${num(m.stock.issued)}</td>
       <td style="font-weight:600;color:${low ? '#8A5300' : 'inherit'}">${num(m.stock.remaining)}${m.stock.days_left != null ? html`<div class="small muted">يخلص خلال ${m.stock.days_left} يوم</div>` : ''}</td>
       <td>${num(m.stock.pending)}</td>
@@ -127,7 +130,13 @@ async function loadHome() {
   return d;
 }
 
+$('sound-global').addEventListener('change', async (e) => {
+  try { await api('/api/admin/sound', { method: 'PATCH', body: { enabled: e.target.checked } }); toast(e.target.checked ? 'صوت النتيجة شغّال لكل المنصة 🔔' : 'وقّفنا الصوت لكل المنصة'); } catch (err) { toast(err.message, true); }
+});
+$('sound-try-ok').addEventListener('click', () => playResult('original').catch(() => {}));
+$('sound-try-bad').addEventListener('click', () => playResult('fake').catch(() => {}));
 async function loadMerchants() {
+  api('/api/admin/sound').then((d) => ($('sound-global').checked = d.enabled)).catch(() => {});
   merchants = (await api('/api/admin/merchants')).merchants;
   render($('merchants-table'), merchantRows(merchants, true));
 }

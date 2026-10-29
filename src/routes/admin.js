@@ -32,6 +32,7 @@ function merchantFields(b, partial) {
   if (has('max_checks')) f.max_checks = int(b.max_checks ?? 5, 'حد الفحوصات', { max: 100 });
   if (has('public_listed')) f.public_listed = b.public_listed ? 1 : 0;
   if (partial && 'store_enabled' in b) f.store_enabled = b.store_enabled ? 1 : 0;
+  if (partial && 'verify_sound' in b) f.verify_sound = b.verify_sound ? 1 : 0;
   if (partial && 'status' in b) {
     if (!['active', 'suspended'].includes(b.status)) fail(400, 'الحالة غير معروفة');
     f.status = b.status;
@@ -53,7 +54,7 @@ export async function handleAdmin(req, env, path) {
   const user = await requireUser(db, req, 'admin');
   const m = req.method;
   let match;
-  const trust = await handleAdminTrust(req, env, path);
+  const trust = await handleAdminTrust(req, env, path, user);
   if (trust) return trust;
   if (path.startsWith('/api/admin/push')) {
     const r = await adminPush(req, db, path, user);
