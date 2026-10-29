@@ -8,6 +8,13 @@ $('me').textContent = me.user.name;
 $('logout').addEventListener('click', logout);
 
 let merchant = null;
+// الموظف: نخفي اللي لصاحب الحساب بس (المسابقة فيها أرقام العملاء، والإعدادات)
+const STAFF = me.user.merchant_role === 'staff';
+if (STAFF) {
+  document.body.classList.add('is-staff');
+  document.querySelector('#nav [data-tab="contest"]')?.remove();
+  $('me').textContent = me.user.name + ' · موظف';
+}
 
 function brandHeader(m) {
   $('merchant-name').textContent = m.name;
@@ -391,8 +398,42 @@ $('notify-test').addEventListener('click', async () => {
   loadNotify();
 });
 
+async function loadStaff() {
+  const d = await api('/api/m/staff');
+  $('staff-count').textContent = `${num(d.staff.filter((s) => s.status === 'active').length)} من ${d.max}`;
+  render($('staff-list'), !d.staff.length ? html`<div class="empty">ما أضفت موظفين للحين</div>` : html`<table><thead><tr><th>الاسم</th><th>البريد</th><th>آخر دخول</th><th>الحالة</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>${d.staff.map((s) => html`<tr>
+    <td><b>${s.name}</b></td><td class="ltr">${s.email}</td><td>${when(s.last_login_at)}</td>
+    <td>${s.status === 'active' ? pill({ x: ['نشط', 'ok'] }, 'x') : pill({ x: ['موقوف', 'err'] }, 'x')}</td>
+    <td><div class="actions"><button class="btn btn-sm" type="button" data-staff="${s.id}" data-staff-status="${s.status === 'active' ? 'disabled' : 'active'}">${s.status === 'active' ? 'إيقاف' : 'تفعيل'}</button><button class="btn btn-sm" type="button" data-staff-pass="${s.id}">كلمة مرور جديدة</button></div></td>
+  </tr>`)}</tbody></table>`);
+}
+$('staff-list').addEventListener('click', async (e) => {
+  const s = e.target.closest('[data-staff-status]'), p = e.target.closest('[data-staff-pass]');
+  try {
+    if (s) {
+      await api(`/api/m/staff/${s.dataset.staff}`, { method: 'PATCH', body: { status: s.dataset.staffStatus } });
+      toast('تم تحديث الموظف');
+    }
+    if (p) {
+      const pw = prompt('اكتب كلمة مرور مؤقتة جديدة للموظف (10 أحرف أو أكثر):');
+      if (!pw) return;
+      await api(`/api/m/staff/${p.dataset.staffPass}`, { method: 'PATCH', body: { password: pw } });
+      toast('تغيّرت كلمة المرور. أرسلها للموظف');
+    }
+    loadStaff();
+  } catch (err) { toast(err.message, true); }
+});
+onSubmit($('staff-form'), async (f, form) => {
+  await api('/api/m/staff', { method: 'POST', body: f });
+  form.reset();
+  toast('أضفنا الموظف. أرسل له البريد وكلمة المرور، ويغيّرها من حسابه');
+  loadStaff();
+});
+
 async function loadAccount() {
+  if (STAFF) return;
   loadNotify().catch((e) => toast(e.message, true));
+  loadStaff().catch((e) => toast(e.message, true));
   if (!merchant) merchant = (await api('/api/m/overview')).merchant;
   render($('logo-box'), html`<div style="display:flex;align-items:center;gap:16px">
     ${merchant.logo_url ? html`<img src="${merchant.logo_url}" alt="" class="thumb" style="width:72px;height:72px">` : html`<span class="thumb thumb-empty" style="width:72px;height:72px;font-size:28px" aria-hidden="true">${initial(merchant.name)}</span>`}

@@ -3,8 +3,8 @@ import { assistantEnabled } from '../lib/assistant.js';
 import { deleteImage, imageUrl, ownsImage, saveImage, saveImageBytes } from '../lib/images.js';
 import { draftProduct, reelTitles, storeChat } from '../lib/shop.js';
 import { CATEGORIES, ORIGINAL_MAX_BYTES, REEL_MAX, REEL_MIN, VIDEO_MAX_BYTES, discoverProducts, importLink, productFields, proxyImage, videoType } from '../lib/store.js';
-import { currentCustomer, googleEnabled } from '../lib/customers.js';
-import { audit, fail, int, ipHash, json, now, randomHex, rateLimit, readJson, sha256, str, url } from '../lib/util.js';
+import { addNote, currentCustomer, googleEnabled, notifyPriceDrop } from '../lib/customers.js';
+import { audit, fail, int, ipHash, json, now, randomHex, rateLimit, readJson, riyadhDay, sha256, str, url } from '../lib/util.js';
 
 const MAX_PRODUCTS = 500;
 const MAX_REELS = 200;
@@ -34,6 +34,18 @@ function b64bytes(s) {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
+
+// وقت نشر الريل: فاضي = الحين، وإلا وقت جاي خلال 60 يوم
+function publishAt(v) {
+  if (v == null || v === '') return null;
+  const t = int(v, 'وقت النشر', { min: 0 });
+  if (t <= now() + 60) return null;
+  if (t > now() + 60 * 86400) fail(400, 'وقت النشر لازم يكون خلال 60 يوم');
+  return t;
+}
+
+// نوع الحدث في العداد: [منتج أو ريل، مشاهدة، ضغطة] لتقرير الأيام
+const DAILY = { view: ['p', 1, 0], click: ['p', 0, 1], reel_view: ['r', 1, 0], reel_click: ['r', 0, 1] };
 
 async function deleteReelFiles(env, reel) {
   if (reel.video_key && env.MEDIA) await env.MEDIA.delete(reel.video_key);
@@ -131,6 +143,37 @@ export async function handleMerchantStore(req, env, path, user) {
     return json({ ok: true, image_key: key, image_url: imageUrl(key) });
   }
 
+  // ---------- تقرير المتجر: مشاهدات وضغطات كل يوم، وأكثر المنتجات والريلز جلباً للزباين ----------
+  if (path === '/api/m/store/stats' && m === 'GET') {
+    const days = [7, 30, 90].includes(Number(new URL(req.url).searchParams.get('days'))) ? Number(new URL(req.url).searchParams.get('days')) : 30;
+    const since = riyadhDay(now() - (days - 1) * 86400);
+    const [daily, top, topReels] = await Promise.all([
+      db.prepare('SELECT day,SUM(views) AS views,SUM(clicks) AS clicks FROM store_daily WHERE merchant_id=? AND day>=? GROUP BY day ORDER BY day').bind(mid, since).all(),
+      db
+        .prepare(
+          `SELECT p.id,p.title,p.image_key,SUM(d.views) AS views,SUM(d.clicks) AS clicks FROM store_daily d JOIN store_products p ON p.id=d.item_id
+           WHERE d.merchant_id=? AND d.kind='p' AND d.day>=? GROUP BY p.id ORDER BY clicks DESC, views DESC LIMIT 5`
+        )
+        .bind(mid, since)
+        .all(),
+      db
+        .prepare(
+          `SELECT r.id,r.title,r.poster_key,SUM(d.views) AS views,SUM(d.clicks) AS clicks FROM store_daily d JOIN reels r ON r.id=d.item_id
+           WHERE d.merchant_id=? AND d.kind='r' AND d.day>=? GROUP BY r.id ORDER BY clicks DESC, views DESC LIMIT 5`
+        )
+        .bind(mid, since)
+        .all(),
+    ]);
+    return json({
+      ok: true,
+      days,
+      since,
+      daily: daily.results,
+      top: top.results.map(({ image_key, ...x }) => ({ ...x, image_url: imageUrl(image_key) })),
+      top_reels: topReels.results.map(({ poster_key, ...x }) => ({ ...x, poster_url: imageUrl(poster_key) })),
+    });
+  }
+
   // ---------- المنتجات ----------
   if (path === '/api/m/store/products' && m === 'POST') {
     const count = await db.prepare('SELECT COUNT(*) AS n FROM store_products WHERE merchant_id=?').bind(mid).first();
@@ -154,6 +197,7 @@ export async function handleMerchantStore(req, env, path, user) {
       await db.batch([
         db.prepare('UPDATE reels SET product_id=NULL WHERE product_id=?').bind(cur.id),
         db.prepare('DELETE FROM product_comments WHERE product_id=?').bind(cur.id),
+        db.prepare('DELETE FROM price_watch WHERE product_id=?').bind(cur.id),
         db.prepare('DELETE FROM store_products WHERE id=?').bind(cur.id),
       ]);
       await deleteImage(env, cur.image_key);
@@ -174,6 +218,7 @@ export async function handleMerchantStore(req, env, path, user) {
       .bind(...keys.map((k) => f[k]), now(), cur.id)
       .first();
     if ('image_key' in f && cur.image_key && cur.image_key !== f.image_key) await deleteImage(env, cur.image_key);
+    if (row.price != null && cur.price != null && row.price < cur.price) await notifyPriceDrop(db, row, cur.price);
     await audit(db, user, 'store_product_updated', { id: cur.id, fields: keys });
     return json({ ok: true, product: productOut(row) });
   }
@@ -197,11 +242,12 @@ export async function handleMerchantStore(req, env, path, user) {
       await db.prepare('DELETE FROM reels WHERE id=?').bind(r.id).run();
     }
     const c = b.clip && typeof b.clip === 'object' ? b.clip : null;
+    const publish_at = publishAt(b.publish_at);
     const row = await db
       .prepare(
-        "INSERT INTO reels(merchant_id,product_id,title,poster_key,duration,status,created_at,clip_mode,clip_start,clip_zoom,clip_x,clip_y) VALUES(?,?,?,?,?,'uploading',?,?,?,?,?,?) RETURNING id"
+        "INSERT INTO reels(merchant_id,product_id,title,poster_key,duration,status,created_at,clip_mode,clip_start,clip_zoom,clip_x,clip_y,publish_at) VALUES(?,?,?,?,?,'uploading',?,?,?,?,?,?,?) RETURNING id"
       )
-      .bind(mid, product_id, title, poster_key, duration, now(), c ? 1 : 0, c ? clamp(c.start, 0, 3600, 0) : 0, c ? clamp(c.zoom, 1, 3, 1) : 1, c ? clamp(c.x, 0, 1, 0.5) : 0.5, c ? clamp(c.y, 0, 1, 0.5) : 0.5)
+      .bind(mid, product_id, title, poster_key, duration, now(), c ? 1 : 0, c ? clamp(c.start, 0, 3600, 0) : 0, c ? clamp(c.zoom, 1, 3, 1) : 1, c ? clamp(c.x, 0, 1, 0.5) : 0.5, c ? clamp(c.y, 0, 1, 0.5) : 0.5, publish_at)
       .first();
     return json({ ok: true, id: row.id }, 201);
   }
@@ -244,8 +290,23 @@ export async function handleMerchantStore(req, env, path, user) {
     const item = await db.prepare(`SELECT id FROM ${K.target} WHERE id=? AND merchant_id=?`).bind(Number(match[2]), mid).first();
     if (!item) fail(404, 'ما لقيناه');
     if (!match[3] && m === 'GET') {
-      const r = await db.prepare(`SELECT id,name,body,rating,created_at FROM ${K.table} WHERE ${K.fk}=? ORDER BY id DESC LIMIT 200`).bind(item.id).all();
+      const r = await db.prepare(`SELECT id,name,body,rating,reply,reply_at,created_at FROM ${K.table} WHERE ${K.fk}=? ORDER BY id DESC LIMIT 200`).bind(item.id).all();
       return json({ ok: true, comments: r.results });
+    }
+    // رد التاجر يظهر تحت التعليق بشارة "التاجر"، وصاحب التعليق يوصله تنبيه في حسابه
+    if (match[3] && m === 'PATCH') {
+      const c = await db.prepare(`SELECT * FROM ${K.table} WHERE id=? AND ${K.fk}=?`).bind(Number(match[3]), item.id).first();
+      if (!c) fail(404, 'ما لقينا التعليق');
+      const b = await readJson(req);
+      const reply = str(b.reply, 'الرد', { max: 300, optional: true });
+      if (reply && /https?:\/\/|www\./i.test(reply)) fail(400, 'الروابط ممنوعة في الرد');
+      await db.prepare(`UPDATE ${K.table} SET reply=?,reply_at=? WHERE id=?`).bind(reply, reply ? now() : null, c.id).run();
+      if (reply && !c.reply && c.customer_id) {
+        const link = match[1] === 'reels' ? `/stores/?v=reels&r=${item.id}&cm=reels:${item.id}` : `/stores/?p=${item.id}&cm=products:${item.id}`;
+        await addNote(db, c.customer_id, `💬 ${merchant.name} رد على تعليقك: ${reply.slice(0, 80)}`, link, match[1] === 'products' ? item.id : null);
+      }
+      await audit(db, user, 'comment_replied', { kind: match[1], id: item.id, comment: c.id });
+      return json({ ok: true, reply, reply_at: reply ? now() : null });
     }
     if (match[3] && m === 'DELETE') {
       const c = await db.prepare(`SELECT * FROM ${K.table} WHERE id=? AND ${K.fk}=?`).bind(Number(match[3]), item.id).first();
@@ -279,6 +340,7 @@ export async function handleMerchantStore(req, env, path, user) {
       if (!['active', 'hidden'].includes(b.status) || reel.status === 'uploading') fail(400, 'الحالة غير معروفة');
       f.status = b.status;
     }
+    if ('publish_at' in b) f.publish_at = publishAt(b.publish_at);
     const keys = Object.keys(f);
     if (!keys.length) fail(400, 'ما فيه تغييرات');
     const row = await db.prepare(`UPDATE reels SET ${keys.map((k) => k + '=?').join(',')} WHERE id=? RETURNING *`).bind(...keys.map((k) => f[k]), reel.id).first();
@@ -290,6 +352,8 @@ export async function handleMerchantStore(req, env, path, user) {
 
 // ================= الواجهة العامة =================
 const LIVE = "m.store_enabled=1 AND m.status='active'";
+// الريل يظهر لو منشور، وما أوقفته الإدارة، وجا وقت نشره
+const REEL_LIVE = "r.status='active' AND r.admin_blocked=0 AND (r.publish_at IS NULL OR r.publish_at<=CAST(strftime('%s','now') AS INTEGER))";
 const PRODUCT_COLS = 'p.id,p.comments,p.rating_sum,p.rating_n,p.title,p.description,p.category,p.price,p.old_price,p.buy_url,p.image_key,p.created_at,p.merchant_id,m.name AS merchant_name,m.slug AS merchant_slug,m.logo_key AS merchant_logo,m.store_coupon,m.store_coupon_note';
 
 function publicProduct(p) {
@@ -305,7 +369,7 @@ const PRODUCT_SORT = {
 };
 
 async function listProducts(db, { cat, merchant, q, ids, sort, max, limit = 60, offset = 0 }) {
-  const where = [LIVE, "p.status='active'"];
+  const where = [LIVE, "p.status='active' AND p.admin_blocked=0"];
   const args = [];
   if (ids?.length) { where.push(`p.id IN (${ids.map(() => '?').join(',')})`); args.push(...ids); }
   if (cat && CATEGORIES[cat]) { where.push('p.category=?'); args.push(cat); }
@@ -332,14 +396,14 @@ async function reelComments(db, reelId) {
 
 // تعليقات وتقييم الريلز والمنتجات. لو دخول Google مفعّل، التعليق لازم يكون من حساب مسجّل
 const COMMENT_KINDS = {
-  reels: { table: 'reel_comments', fk: 'reel_id', target: 'reels', alias: 'r', live: "r.status='active'", voter: 'ip_hash' },
-  products: { table: 'product_comments', fk: 'product_id', target: 'store_products', alias: 'p', live: "p.status='active'", voter: 'voter' },
+  reels: { table: 'reel_comments', fk: 'reel_id', target: 'reels', alias: 'r', live: REEL_LIVE, voter: 'ip_hash' },
+  products: { table: 'product_comments', fk: 'product_id', target: 'store_products', alias: 'p', live: "p.status='active' AND p.admin_blocked=0", voter: 'voter' },
 };
 async function publicComments(req, env, kind, id) {
   const db = env.DB;
   const K = COMMENT_KINDS[kind];
   const item = await db
-    .prepare(`SELECT ${K.alias}.id,${K.alias}.rating_sum,${K.alias}.rating_n,${K.alias}.comments FROM ${K.target} ${K.alias} JOIN merchants m ON m.id=${K.alias}.merchant_id WHERE ${K.alias}.id=? AND ${K.live} AND ${LIVE}`)
+    .prepare(`SELECT ${K.alias}.id,${K.alias}.rating_sum,${K.alias}.rating_n,${K.alias}.comments,m.name AS merchant_name FROM ${K.target} ${K.alias} JOIN merchants m ON m.id=${K.alias}.merchant_id WHERE ${K.alias}.id=? AND ${K.live} AND ${LIVE}`)
     .bind(id)
     .first();
   if (!item) fail(404, kind === 'reels' ? 'الريل غير متاح' : 'المنتج غير متاح');
@@ -347,8 +411,8 @@ async function publicComments(req, env, kind, id) {
   const me = await currentCustomer(db, req);
   if (req.method === 'GET') {
     const rating = item.rating_n ? { avg: Math.round((item.rating_sum / item.rating_n) * 10) / 10, n: item.rating_n } : null;
-    const r = await db.prepare(`SELECT id,name,body,rating,created_at FROM ${K.table} WHERE ${K.fk}=? ORDER BY id DESC LIMIT 100`).bind(id).all();
-    return json({ ok: true, comments: r.results, rating, count: item.comments, login, me: me ? { name: me.name, picture: me.picture } : null });
+    const r = await db.prepare(`SELECT id,name,body,rating,reply,reply_at,created_at FROM ${K.table} WHERE ${K.fk}=? ORDER BY id DESC LIMIT 100`).bind(id).all();
+    return json({ ok: true, comments: r.results, rating, count: item.comments, merchant: item.merchant_name, login, me: me ? { name: me.name, picture: me.picture } : null });
   }
   if (req.method !== 'POST') fail(405, 'غير مسموح');
   if (login && !me) fail(401, 'سجّل دخولك بحساب Google عشان تعلّق', 'login_required');
@@ -372,7 +436,7 @@ async function publicComments(req, env, kind, id) {
 }
 
 async function listReels(db, { merchant, product, sort, limit = 20, offset = 0 }) {
-  const where = [LIVE, "r.status='active'"];
+  const where = [LIVE, REEL_LIVE];
   const args = [];
   if (merchant) { where.push('m.slug=?'); args.push(merchant); }
   if (product) { where.push('r.product_id=?'); args.push(product); }
@@ -380,7 +444,7 @@ async function listReels(db, { merchant, product, sort, limit = 20, offset = 0 }
     .prepare(
       `SELECT r.id,r.title,r.video_key,r.poster_key,r.duration,r.comments,r.rating_sum,r.rating_n,r.clip_mode,r.clip_start,r.clip_zoom,r.clip_x,r.clip_y,r.product_id,r.created_at,r.likes,r.views,m.name AS merchant_name,m.slug AS merchant_slug,m.logo_key AS merchant_logo,
               p.title AS product_title,p.price AS product_price,p.buy_url AS product_buy_url,p.image_key AS product_image
-       FROM reels r JOIN merchants m ON m.id=r.merchant_id LEFT JOIN store_products p ON p.id=r.product_id AND p.status='active'
+       FROM reels r JOIN merchants m ON m.id=r.merchant_id LEFT JOIN store_products p ON p.id=r.product_id AND p.status='active' AND p.admin_blocked=0
        WHERE ${where.join(' AND ')} ORDER BY ${sort === 'popular' ? 'r.views + r.likes * 5 DESC, r.id DESC' : 'r.id DESC'} LIMIT ? OFFSET ?`
     )
     .bind(...args, limit, offset)
@@ -404,11 +468,11 @@ export async function handlePublicStore(req, env, path) {
     const [merchants, counts, products, reels] = await Promise.all([
       db
         .prepare(
-          `SELECT m.name,m.slug,m.logo_key,m.brand_color,(SELECT COUNT(*) FROM store_products p WHERE p.merchant_id=m.id AND p.status='active') AS products
+          `SELECT m.name,m.slug,m.logo_key,m.brand_color,(SELECT COUNT(*) FROM store_products p WHERE p.merchant_id=m.id AND p.status='active' AND p.admin_blocked=0) AS products
            FROM merchants m WHERE ${LIVE} ORDER BY m.store_since DESC, m.id DESC`
         )
         .all(),
-      db.prepare(`SELECT p.category,COUNT(*) AS n FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE ${LIVE} AND p.status='active' GROUP BY p.category`).all(),
+      db.prepare(`SELECT p.category,COUNT(*) AS n FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE ${LIVE} AND p.status='active' AND p.admin_blocked=0 GROUP BY p.category`).all(),
       listProducts(db, { merchant: slug, limit: 60 }),
       listReels(db, { merchant: slug, limit: 12 }),
     ]);
@@ -435,7 +499,7 @@ export async function handlePublicStore(req, env, path) {
     const r = await db
       .prepare(
         `SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id
-         WHERE ${LIVE} AND p.status='active' AND p.id IN (
+         WHERE ${LIVE} AND p.status='active' AND p.admin_blocked=0 AND p.id IN (
            SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY merchant_id ORDER BY id DESC) AS rn, created_at FROM store_products WHERE status='active')
            WHERE rn<=6 AND (rn<=4 OR created_at>?))
          ORDER BY p.created_at DESC`
@@ -453,11 +517,11 @@ export async function handlePublicStore(req, env, path) {
   if (path.startsWith('/api/public/store/family')) return handleFamily(req, db, path, m);
   let match;
   if ((match = path.match(/^\/api\/public\/store\/products\/(\d+)$/)) && m === 'GET') {
-    const p = await db.prepare(`SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE p.id=? AND ${LIVE} AND p.status='active'`).bind(Number(match[1])).first();
+    const p = await db.prepare(`SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE p.id=? AND ${LIVE} AND p.status='active' AND p.admin_blocked=0`).bind(Number(match[1])).first();
     if (!p) fail(404, 'المنتج غير متاح');
     const [more, reels] = await Promise.all([
       db
-        .prepare(`SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE ${LIVE} AND p.status='active' AND p.id<>? AND (p.merchant_id=? OR p.category=?) ORDER BY (p.merchant_id=?) DESC, p.id DESC LIMIT 8`)
+        .prepare(`SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE ${LIVE} AND p.status='active' AND p.admin_blocked=0 AND p.id<>? AND (p.merchant_id=? OR p.category=?) ORDER BY (p.merchant_id=?) DESC, p.id DESC LIMIT 8`)
         .bind(p.id, p.merchant_id, p.category, p.merchant_id)
         .all(),
       listReels(db, { product: p.id, limit: 6 }),
@@ -492,7 +556,19 @@ export async function handlePublicStore(req, env, path) {
     } catch {
       return json({ ok: true });
     }
-    await db.prepare(sql).bind(id).run();
+    const daily = DAILY[b.type];
+    if (daily) {
+      const [kind, v, c] = daily;
+      await db.batch([
+        db.prepare(sql).bind(id),
+        db
+          .prepare(
+            `INSERT INTO store_daily(day,kind,item_id,merchant_id,views,clicks) SELECT ?,?,id,merchant_id,?,? FROM ${kind === 'p' ? 'store_products' : 'reels'} WHERE id=?
+             ON CONFLICT(day,kind,item_id) DO UPDATE SET views=views+excluded.views,clicks=clicks+excluded.clicks`
+          )
+          .bind(riyadhDay(now()), kind, v, c, id),
+      ]);
+    } else await db.prepare(sql).bind(id).run();
     return json({ ok: true });
   }
   if (path === '/api/public/store/chat' && m === 'POST') {
@@ -500,7 +576,7 @@ export async function handlePublicStore(req, env, path) {
     const b = await readJson(req, 20000);
     const catalog = (
       await db
-        .prepare(`SELECT p.id,p.title,p.category,p.price,m.name AS merchant_name FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE ${LIVE} AND p.status='active' ORDER BY p.clicks DESC, p.id DESC LIMIT 250`)
+        .prepare(`SELECT p.id,p.title,p.category,p.price,m.name AS merchant_name FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE ${LIVE} AND p.status='active' AND p.admin_blocked=0 ORDER BY p.clicks DESC, p.id DESC LIMIT 250`)
         .all()
     ).results;
     const r = await storeChat(env, b.messages, catalog, b.lang === 'en' ? 'en' : 'ar');
@@ -518,14 +594,18 @@ export async function handlePublicStore(req, env, path) {
 export async function shopForVerify(db, b) {
   const [linked, more] = await Promise.all([
     b.store_product_id
-      ? db.prepare(`SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE p.id=? AND p.merchant_id=? AND p.status='active'`).bind(b.store_product_id, b.merchant_id).first()
+      ? db.prepare(`SELECT ${PRODUCT_COLS} FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE p.id=? AND p.merchant_id=? AND p.status='active' AND p.admin_blocked=0`).bind(b.store_product_id, b.merchant_id).first()
       : null,
-    listProducts(db, { merchant: b.slug, limit: 6 }),
+    listProducts(db, { merchant: b.slug, sort: 'popular', limit: 12 }),
   ]);
   const product = linked ? publicProduct(linked) : null;
   let reels = product ? await listReels(db, { product: product.id, limit: 6 }) : [];
   if (!reels.length) reels = await listReels(db, { merchant: b.slug, sort: 'popular', limit: 6 });
-  const others = more.filter((p) => p.id !== product?.id).slice(0, 4);
+  // منتجات ثانية من نفس التاجر: نفس فئة المنتج اللي معه أول، بعدها الأكثر طلباً
+  const others = more
+    .filter((p) => p.id !== product?.id)
+    .sort((x, y) => (y.category === product?.category) - (x.category === product?.category))
+    .slice(0, 8);
   if (!product && !others.length && !reels.length) return null;
   return { slug: b.slug, product, more: others, reels, coupon: b.store_coupon ? { code: b.store_coupon, note: b.store_coupon_note } : null };
 }
@@ -540,7 +620,7 @@ async function familyOut(db, list) {
     .prepare(
       `SELECT f.id AS item_id,f.who,f.qty,f.bought,f.created_at AS added_at,${PRODUCT_COLS}
        FROM family_items f JOIN store_products p ON p.id=f.product_id JOIN merchants m ON m.id=p.merchant_id
-       WHERE f.list_id=? AND ${LIVE} AND p.status='active' ORDER BY f.bought, f.id DESC`
+       WHERE f.list_id=? AND ${LIVE} AND p.status='active' AND p.admin_blocked=0 ORDER BY f.bought, f.id DESC`
     )
     .bind(list.id)
     .all();
@@ -581,7 +661,7 @@ async function handleFamily(req, db, path, m) {
     const product_id = int(b.product_id, 'المنتج', { min: 1 });
     const who = str(b.who, 'اسمك', { min: 1, max: 30 });
     const qty = int(b.qty ?? 1, 'الكمية', { min: 1, max: 20 });
-    const p = await db.prepare(`SELECT p.id FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE p.id=? AND ${LIVE} AND p.status='active'`).bind(product_id).first();
+    const p = await db.prepare(`SELECT p.id FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE p.id=? AND ${LIVE} AND p.status='active' AND p.admin_blocked=0`).bind(product_id).first();
     if (!p) fail(404, 'المنتج غير متاح');
     const same = await db.prepare('SELECT id FROM family_items WHERE list_id=? AND product_id=? AND who=? AND bought=0').bind(list.id, product_id, who).first();
     if (same) await db.prepare('UPDATE family_items SET qty=MIN(20,qty+?) WHERE id=?').bind(qty, same.id).run();

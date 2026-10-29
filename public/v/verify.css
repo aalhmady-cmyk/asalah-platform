@@ -129,3 +129,4 @@
 .shop-card img, .shop-card .ph { width: 124px; height: 124px; border-radius: 14px; object-fit: cover; background: var(--ground); border: 1px solid var(--line); }
 .shop-card b { font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .shop-card .price { color: var(--green-ink); font-weight: 700; }
+.shop-sub { font-size: 15px; margin: 6px 0 0; }

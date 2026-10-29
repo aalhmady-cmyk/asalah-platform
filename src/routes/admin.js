@@ -1,5 +1,6 @@
 // اللوحة الأم: المدير العام يدير التجار والحسابات والدفعات وكل العلامات.
 import { hashPassword, requireUser, validPassword } from '../lib/auth.js';
+import { createResetLink } from './auth.js';
 import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
 import { hotspots, monthlyReport } from '../lib/insights.js';
 import { lookupTag, overviewFor, setTagStatus } from '../lib/ops.js';
@@ -54,7 +55,7 @@ export async function handleAdmin(req, env, path) {
     const [ov, merchants, alerts, unknown] = await Promise.all([
       overviewFor(db, null),
       listMerchants(db),
-      db.prepare('SELECT a.*,m.name AS merchant_name FROM alerts a LEFT JOIN merchants m ON m.id=a.merchant_id ORDER BY a.id DESC LIMIT 20').all(),
+      db.prepare("SELECT a.*,m.name AS merchant_name FROM alerts a LEFT JOIN merchants m ON m.id=a.merchant_id WHERE a.kind NOT IN ('store_blocked','staff_password') ORDER BY a.id DESC LIMIT 20").all(),
       db.prepare('SELECT u.preview,u.count,u.city,u.country,u.last_at,m.name AS merchant_name FROM unknown_codes u LEFT JOIN merchants m ON m.id=u.merchant_id ORDER BY u.last_at DESC LIMIT 20').all(),
     ]);
     const totals = merchants.reduce(
@@ -116,7 +117,7 @@ export async function handleAdmin(req, env, path) {
 
   // ---------- الحسابات ----------
   if (path === '/api/admin/users' && m === 'GET') {
-    const r = await db.prepare('SELECT u.id,u.email,u.name,u.role,u.merchant_id,u.status,u.last_login_at,m.name AS merchant_name FROM users u LEFT JOIN merchants m ON m.id=u.merchant_id ORDER BY u.id').all();
+    const r = await db.prepare('SELECT u.id,u.email,u.name,u.role,u.merchant_id,u.merchant_role,u.status,u.last_login_at,m.name AS merchant_name,m.whatsapp AS merchant_whatsapp FROM users u LEFT JOIN merchants m ON m.id=u.merchant_id ORDER BY u.id').all();
     return json({ ok: true, users: r.results });
   }
   if (path === '/api/admin/users' && m === 'POST') {
@@ -154,6 +155,19 @@ export async function handleAdmin(req, env, path) {
     await audit(db, user, 'user_updated', { id, status: b.status, password_reset: 'password' in b });
     return json({ ok: true });
   }
+
+  // رابط إعادة كلمة المرور لمرة وحدة (24 ساعة). الإدارة ترسله لصاحبه على واتساب
+  if ((match = path.match(/^\/api\/admin\/users\/(\d+)\/reset-link$/)) && m === 'POST') {
+    const target = await db.prepare('SELECT id,email,name,merchant_id FROM users WHERE id=?').bind(Number(match[1])).first();
+    if (!target) fail(404, 'ما لقينا الحساب');
+    const link = await createResetLink(db, req, target, user);
+    await db.prepare("UPDATE alerts SET read_at=? WHERE kind='password_request' AND read_at IS NULL AND message LIKE ?").bind(now(), '%(' + target.email + ')%').run();
+    await audit(db, user, 'reset_link_created', { id: target.id, email: target.email }, target.merchant_id);
+    return json({ ok: true, link, expires_in_hours: 24 });
+  }
+
+  // ---------- المتاجر: كل منتجات وريلز وتعليقات التجار، والإدارة توقف المخالف ----------
+  if (path.startsWith('/api/admin/store')) return adminStore(req, env, path, user);
 
   // ---------- الدفعات ----------
   if (path === '/api/admin/batches' && m === 'GET') {
@@ -236,6 +250,106 @@ export async function handleAdmin(req, env, path) {
   if (path === '/api/admin/reports' && m === 'GET') {
     const r = await db.prepare('SELECT r.id,r.reason,r.city,r.point_of_sale,r.phone,r.note,r.created_at,m.name AS merchant_name FROM reports r LEFT JOIN merchants m ON m.id=r.merchant_id ORDER BY r.id DESC LIMIT 200').all();
     return json({ ok: true, reports: r.results });
+  }
+  fail(404, 'المسار غير موجود');
+}
+
+const STORE_KINDS = {
+  products: { table: 'store_products', ctable: 'product_comments', fk: 'product_id' },
+  reels: { table: 'reels', ctable: 'reel_comments', fk: 'reel_id' },
+};
+
+async function adminStore(req, env, path, user) {
+  const db = env.DB;
+  const m = req.method;
+  const sp = new URL(req.url).searchParams;
+  const q = (sp.get('q') || '').trim().slice(0, 60);
+  const mid = sp.get('merchant') ? int(sp.get('merchant'), 'التاجر') : null;
+  const like = '%' + q.replace(/[%_]/g, '') + '%';
+  let match;
+
+  if (path === '/api/admin/store' && m === 'GET') {
+    const since = now() - 7 * 86400;
+    const [sum, merchants] = await Promise.all([
+      db
+        .prepare(
+          `SELECT (SELECT COUNT(*) FROM merchants WHERE store_enabled=1) AS stores,
+                  (SELECT COUNT(*) FROM store_products WHERE status='active') AS products,
+                  (SELECT COUNT(*) FROM reels WHERE status='active') AS reels,
+                  (SELECT COUNT(*) FROM store_products WHERE admin_blocked=1) + (SELECT COUNT(*) FROM reels WHERE admin_blocked=1) AS blocked,
+                  (SELECT COUNT(*) FROM product_comments WHERE created_at>=?) + (SELECT COUNT(*) FROM reel_comments WHERE created_at>=?) AS comments_7d,
+                  (SELECT COALESCE(SUM(clicks),0) FROM store_daily WHERE day>=date(?, 'unixepoch')) AS clicks_7d`
+        )
+        .bind(since, since, since + 10800)
+        .first(),
+      db.prepare('SELECT id,name FROM merchants WHERE store_enabled=1 ORDER BY name').all(),
+    ]);
+    return json({ ok: true, summary: sum, merchants: merchants.results });
+  }
+  if (path === '/api/admin/store/products' && m === 'GET') {
+    const r = await db
+      .prepare(
+        `SELECT p.id,p.title,p.category,p.price,p.status,p.admin_blocked,p.image_key,p.views,p.clicks,p.comments,p.rating_sum,p.rating_n,p.buy_url,p.created_at,m.id AS merchant_id,m.name AS merchant_name
+         FROM store_products p JOIN merchants m ON m.id=p.merchant_id
+         WHERE (?='' OR p.title LIKE ? OR m.name LIKE ?) AND (? IS NULL OR p.merchant_id=?) AND (?='' OR p.admin_blocked=1)
+         ORDER BY p.admin_blocked DESC, p.id DESC LIMIT 100`
+      )
+      .bind(q, like, like, mid, mid, sp.get('blocked') ? '1' : '')
+      .all();
+    return json({ ok: true, products: r.results.map(({ image_key, price, ...x }) => ({ ...x, price: price == null ? null : price / 100, image_url: imageUrl(image_key) })) });
+  }
+  if (path === '/api/admin/store/reels' && m === 'GET') {
+    const r = await db
+      .prepare(
+        `SELECT r.id,r.title,r.status,r.admin_blocked,r.publish_at,r.poster_key,r.video_key,r.views,r.clicks,r.likes,r.comments,r.created_at,m.id AS merchant_id,m.name AS merchant_name
+         FROM reels r JOIN merchants m ON m.id=r.merchant_id
+         WHERE r.status<>'uploading' AND (?='' OR r.title LIKE ? OR m.name LIKE ?) AND (? IS NULL OR r.merchant_id=?) AND (?='' OR r.admin_blocked=1)
+         ORDER BY r.admin_blocked DESC, r.id DESC LIMIT 100`
+      )
+      .bind(q, like, like, mid, mid, sp.get('blocked') ? '1' : '')
+      .all();
+    return json({ ok: true, reels: r.results.map(({ poster_key, video_key, ...x }) => ({ ...x, poster_url: imageUrl(poster_key), video_url: video_key ? '/media/' + video_key : null })) });
+  }
+  // آخر التعليقات من كل المتاجر
+  if (path === '/api/admin/store/comments' && m === 'GET') {
+    const r = await db
+      .prepare(
+        `SELECT * FROM (
+           SELECT 'products' AS kind,c.id,c.name,c.body,c.rating,c.reply,c.created_at,p.id AS item_id,p.title,m.name AS merchant_name,m.id AS merchant_id
+           FROM product_comments c JOIN store_products p ON p.id=c.product_id JOIN merchants m ON m.id=p.merchant_id
+           UNION ALL
+           SELECT 'reels',c.id,c.name,c.body,c.rating,c.reply,c.created_at,r.id,r.title,m.name,m.id
+           FROM reel_comments c JOIN reels r ON r.id=c.reel_id JOIN merchants m ON m.id=r.merchant_id)
+         WHERE (?='' OR body LIKE ? OR name LIKE ? OR title LIKE ?) AND (? IS NULL OR merchant_id=?)
+         ORDER BY created_at DESC LIMIT 150`
+      )
+      .bind(q, like, like, like, mid, mid)
+      .all();
+    return json({ ok: true, comments: r.results });
+  }
+  if ((match = path.match(/^\/api\/admin\/store\/(products|reels)\/(\d+)\/block$/)) && m === 'POST') {
+    const K = STORE_KINDS[match[1]];
+    const b = await readJson(req);
+    const row = await db.prepare(`UPDATE ${K.table} SET admin_blocked=? WHERE id=? RETURNING id,title,merchant_id`).bind(b.blocked ? 1 : 0, Number(match[2])).first();
+    if (!row) fail(404, 'ما لقيناه');
+    const what = match[1] === 'products' ? 'المنتج' : 'الريل';
+    if (b.blocked) {
+      const reason = str(b.reason, 'السبب', { max: 200, optional: true });
+      await db.prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(?,'store_blocked',?,?)").bind(row.merchant_id, `🚫 إدارة أصالة أوقفت ${what} «${row.title}»${reason ? ': ' + reason : ''}`, now()).run();
+    }
+    await audit(db, user, b.blocked ? 'store_item_blocked' : 'store_item_unblocked', { kind: match[1], id: row.id, title: row.title }, row.merchant_id);
+    return json({ ok: true, blocked: !!b.blocked });
+  }
+  if ((match = path.match(/^\/api\/admin\/store\/(products|reels)\/(\d+)\/comments\/(\d+)$/)) && m === 'DELETE') {
+    const K = STORE_KINDS[match[1]];
+    const c = await db.prepare(`SELECT * FROM ${K.ctable} WHERE id=? AND ${K.fk}=?`).bind(Number(match[3]), Number(match[2])).first();
+    if (!c) fail(404, 'ما لقينا التعليق');
+    await db.batch([
+      db.prepare(`DELETE FROM ${K.ctable} WHERE id=?`).bind(c.id),
+      db.prepare(`UPDATE ${K.table} SET comments=MAX(0,comments-?),rating_sum=rating_sum-?,rating_n=MAX(0,rating_n-?) WHERE id=?`).bind(c.body ? 1 : 0, c.rating || 0, c.rating ? 1 : 0, c[K.fk]),
+    ]);
+    await audit(db, user, 'store_comment_deleted', { kind: match[1], id: c[K.fk], name: c.name });
+    return json({ ok: true });
   }
   fail(404, 'المسار غير موجود');
 }

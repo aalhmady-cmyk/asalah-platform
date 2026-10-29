@@ -221,6 +221,8 @@ function setupShop(s) {
         return a;
       })
     );
+    $('shop-more-h').textContent = tx(`منتجات أصلية ثانية من ${lastData.brand.name} 🛡️`, `More originals from ${lastData.brand.name} 🛡️`);
+    show('shop-more-h');
     show('shop-more');
   }
   show('shop');

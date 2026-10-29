@@ -61,7 +61,7 @@ export async function currentUser(db, req) {
   if (!token) return null;
   const u = await db
     .prepare(
-      `SELECT u.id,u.email,u.name,u.role,u.merchant_id,u.status,m.status AS merchant_status
+      `SELECT u.id,u.email,u.name,u.role,u.merchant_id,u.merchant_role,u.status,m.status AS merchant_status
        FROM sessions s JOIN users u ON u.id=s.user_id LEFT JOIN merchants m ON m.id=u.merchant_id
        WHERE s.token_hash=? AND s.expires_at>?`
     )

@@ -20,6 +20,7 @@
       <button type="button" data-tab="merchants">التجار</button>
       <button type="button" data-tab="batches">الدفعات</button>
       <button type="button" data-tab="tags">العلامات</button>
+      <button type="button" data-tab="store">المتاجر 🛍️</button>
       <button type="button" data-tab="reports">التقليد والبلاغات <span class="badge" id="unknown-badge"></span></button>
       <button type="button" data-tab="users">الحسابات</button>
       <button type="button" data-tab="audit">سجل العمليات</button>
@@ -79,6 +80,26 @@
             <button class="btn btn-primary" type="submit" name="action" value="activate">تفعيل</button>
           </div>
         </form>
+      </div>
+    </section>
+
+    <section id="store" hidden>
+      <div class="page-head"><div><h1>المتاجر 🛍️</h1><p>كل منتجات وريلز وتعليقات التجار في مكان واحد. أوقف أي شي مخالف بضغطة، والتاجر ما يقدر يرجّعه.</p></div>
+        <a class="btn" href="/stores/" target="_blank" rel="noopener">افتح المتاجر ↗</a></div>
+      <div class="kpis" id="store-kpis" style="margin-top:24px"></div>
+      <div class="card" style="margin-top:24px">
+        <div class="ad-tabs" id="store-kind" role="tablist">
+          <button type="button" data-kind="products" aria-selected="true">المنتجات</button>
+          <button type="button" data-kind="reels">الريلز</button>
+          <button type="button" data-kind="comments">التعليقات</button>
+        </div>
+        <form class="ad-filter" id="store-filter">
+          <input name="q" type="search" placeholder="ابحث بالاسم أو التاجر أو نص التعليق" aria-label="بحث">
+          <select name="merchant" id="store-merchant" aria-label="التاجر"><option value="">كل التجار</option></select>
+          <label class="check" id="store-blocked-f"><input type="checkbox" name="blocked"> الموقوف فقط</label>
+          <button class="btn btn-primary" type="submit">بحث</button>
+        </form>
+        <div id="store-list"></div>
       </div>
     </section>
 
@@ -153,6 +174,15 @@
     </div>
     <div class="actions"><button class="btn btn-primary" type="submit">إنشاء</button><button class="btn" type="button" data-close>إلغاء</button></div>
   </form>
+</dialog>
+
+<dialog id="dlg-reset">
+  <div class="dlg-body">
+    <h2>رابط تغيير كلمة المرور 🔑</h2>
+    <p class="small muted" style="margin:0">أرسل الرابط لصاحب الحساب. يشتغل مرة وحدة خلال 24 ساعة، وبعده يختار كلمة مرور جديدة بنفسه.</p>
+    <input id="reset-link" class="ltr" readonly aria-label="الرابط" style="width:100%">
+    <div class="actions"><button class="btn btn-primary" type="button" id="reset-copy">انسخ الرابط</button><a class="btn" id="reset-wa" target="_blank" rel="noopener">أرسله على واتساب</a><button class="btn" type="button" data-close>إغلاق</button></div>
+  </div>
 </dialog>
 
 <script type="module" src="/admin/admin.js"></script>

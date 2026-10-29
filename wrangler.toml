@@ -15,7 +15,7 @@ fallthrough = true
 directory = "./public"
 binding = "ASSETS"
 not_found_handling = "404-page"
-run_worker_first = ["/api/*", "/img/*", "/media/*"]
+run_worker_first = ["/api/*", "/img/*", "/media/*", "/stores/p/*", "/stores/m/*", "/sitemap.xml", "/robots.txt"]
 
 # قاعدة البيانات تنشأ تلقائياً في حسابك أول مرة تنشر (بدون نسخ أي معرّف)
 [[d1_databases]]

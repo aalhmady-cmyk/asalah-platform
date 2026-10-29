@@ -25,6 +25,11 @@ async function call(path, { method = 'GET', body, cookie, origin = BASE } = {}) 
   return { status: res.status, data, cookie: set ? set.split(';')[0] : null };
 }
 const post = (path, body, cookie) => call(path, { method: 'POST', body, cookie });
+// تعليق من IP مختلف (حد التعليقات لكل IP)
+const postFrom = async (ip, path, body) => {
+  const res = await fetch(BASE + path, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: BASE, 'CF-Connecting-IP': ip }, body: JSON.stringify(body) });
+  return { status: res.status, data: await res.json() };
+};
 const patch = (path, body, cookie) => call(path, { method: 'PATCH', body, cookie });
 const sid = (c) => c.repeat(64);
 const tokenOf = (u) => new URL(u).searchParams.get('t');
@@ -623,4 +628,146 @@ test('تقييم وتعليقات المنتجات، وحساب العميل', a
   assert.equal((await call(`/api/m/store/products/${pid}/comments/${mine.data.comments[0].id}`, { method: 'DELETE', cookie: S.merchant })).status, 200);
   assert.equal((await call(pc)).data.rating.n, 1);
   assert.equal((await call('/api/public/store/products/99999/comments')).status, 404);
+});
+
+test('إدارة المتاجر: إيقاف منتج وتعليقات كل المتاجر', async () => {
+  const st = await call('/api/m/store', { cookie: S.merchant });
+  const pid = st.data.products.find((p) => p.status === 'active').id;
+  const sum = await call('/api/admin/store', { cookie: S.admin });
+  assert.equal(sum.status, 200);
+  assert.ok(sum.data.summary.products >= 1);
+  assert.equal((await call('/api/admin/store', { cookie: S.merchant })).status, 403);
+  const list = await call('/api/admin/store/products?q=' + encodeURIComponent(st.data.products[0].title.slice(0, 3)), { cookie: S.admin });
+  assert.ok(list.data.products.length >= 1);
+  assert.equal((await post(`/api/admin/store/products/${pid}/block`, { blocked: true, reason: 'صورة مخالفة' }, S.admin)).status, 200);
+  assert.equal((await call('/api/public/store/products/' + pid)).status, 404);
+  const mine = await call('/api/m/store', { cookie: S.merchant });
+  assert.equal(mine.data.products.find((p) => p.id === pid).admin_blocked, 1);
+  const ov = await call('/api/m/overview', { cookie: S.merchant });
+  assert.ok(ov.data.alerts.some((a) => a.kind === 'store_blocked'));
+  assert.equal((await post(`/api/admin/store/products/${pid}/block`, { blocked: false }, S.admin)).status, 200);
+  assert.equal((await call('/api/public/store/products/' + pid)).status, 200);
+  assert.equal((await postFrom('10.0.0.31', `/api/public/store/products/${pid}/comments`, { name: 'زائر', body: 'تعليق للإدارة', device: 'cccccccccccccccc3' })).status, 201);
+  const cms = await call('/api/admin/store/comments?q=' + encodeURIComponent('للإدارة'), { cookie: S.admin });
+  assert.equal(cms.data.comments.length, 1);
+  const c = cms.data.comments[0];
+  assert.equal((await call(`/api/admin/store/products/${c.item_id}/comments/${c.id}`, { method: 'DELETE', cookie: S.admin })).status, 200);
+  assert.equal((await call('/api/admin/store/comments?q=' + encodeURIComponent('للإدارة'), { cookie: S.admin })).data.comments.length, 0);
+});
+
+test('نسيت كلمة المرور: طلب ورابط لمرة وحدة', async () => {
+  const f = await post('/api/auth/forgot', { email: 'gk@asalah.test' });
+  assert.equal(f.status, 200);
+  assert.equal((await post('/api/auth/forgot', { email: 'nobody@asalah.test' })).data.message, f.data.message);
+  const ov = await call('/api/admin/overview', { cookie: S.admin });
+  assert.ok(ov.data.alerts.some((a) => a.kind === 'password_request' && a.message.includes('gk@asalah.test')));
+  const u = (await call('/api/admin/users', { cookie: S.admin })).data.users.find((x) => x.email === 'gk@asalah.test');
+  const l = await post(`/api/admin/users/${u.id}/reset-link`, {}, S.admin);
+  assert.equal(l.status, 200);
+  const token = new URL(l.data.link).searchParams.get('reset');
+  assert.equal((await post('/api/auth/reset', { token, check: true })).data.email, 'gk@asalah.test');
+  assert.equal((await post('/api/auth/reset', { token, password: 'short' })).status, 400);
+  assert.equal((await post('/api/auth/reset', { token, password: 'merchant-pass-2' })).status, 200);
+  assert.equal((await post('/api/auth/reset', { token, password: 'merchant-pass-3' })).status, 400);
+  assert.equal((await call('/api/m/overview', { cookie: S.merchant })).status, 401);
+  assert.equal((await post('/api/auth/login', { email: 'gk@asalah.test', password: 'merchant-pass-1' })).status, 401);
+  const m = await post('/api/auth/login', { email: 'gk@asalah.test', password: 'merchant-pass-2' });
+  assert.equal(m.status, 200);
+  assert.equal(m.data.user.merchant_role, 'owner');
+  S.merchant = m.cookie;
+});
+
+test('موظفين التاجر: صلاحيات محدودة', async () => {
+  const r = await post('/api/m/staff', { name: 'خالد', email: 'staff@asalah.test', password: 'staff-pass-001' }, S.merchant);
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  const lg = await post('/api/auth/login', { email: 'staff@asalah.test', password: 'staff-pass-001' });
+  assert.equal(lg.status, 200);
+  assert.equal(lg.data.user.merchant_role, 'staff');
+  const sc = lg.cookie;
+  assert.equal((await call('/api/m/store', { cookie: sc })).status, 200);
+  assert.equal((await call('/api/m/overview', { cookie: sc })).status, 200);
+  assert.equal((await patch('/api/m/store', { store_coupon: 'HACK' }, sc)).status, 403);
+  assert.equal((await call('/api/m/entries', { cookie: sc })).status, 403);
+  assert.equal((await call('/api/m/staff', { cookie: sc })).status, 403);
+  assert.equal((await patch('/api/m/settings', { about: 'x' }, sc)).status, 403);
+  const list = await call('/api/m/staff', { cookie: S.merchant });
+  assert.equal(list.data.staff.length, 1);
+  assert.equal((await patch(`/api/m/staff/${list.data.staff[0].id}`, { status: 'disabled' }, S.merchant)).status, 200);
+  assert.equal((await call('/api/m/store', { cookie: sc })).status, 401);
+  assert.equal((await post('/api/auth/login', { email: 'staff@asalah.test', password: 'staff-pass-001' })).status, 403);
+});
+
+test('تقرير المتجر ورد التاجر وجدولة الريلز وصفحات جوجل', async () => {
+  const st = await call('/api/m/store', { cookie: S.merchant });
+  const p = st.data.products.find((x) => x.status === 'active');
+  await post('/api/public/store/track', { type: 'view', id: p.id });
+  await post('/api/public/store/track', { type: 'click', id: p.id });
+  const stats = await call('/api/m/store/stats?days=7', { cookie: S.merchant });
+  assert.equal(stats.status, 200);
+  assert.ok(stats.data.daily.reduce((a, d) => a + d.clicks, 0) >= 1);
+  assert.ok(stats.data.top.some((x) => x.id === p.id));
+
+  const pc = `/api/public/store/products/${p.id}/comments`;
+  assert.equal((await postFrom('10.0.0.32', pc, { name: 'نورة', body: 'متى يوصل؟', device: 'dddddddddddddddd4' })).status, 201);
+  const cm = (await call(`/api/m/store/products/${p.id}/comments`, { cookie: S.merchant })).data.comments.find((c) => c.body === 'متى يوصل؟');
+  assert.equal((await patch(`/api/m/store/products/${p.id}/comments/${cm.id}`, { reply: 'خلال يومين إن شاء الله' }, S.merchant)).status, 200);
+  const pub = (await call(pc)).data;
+  assert.equal(pub.comments.find((c) => c.id === cm.id).reply, 'خلال يومين إن شاء الله');
+  assert.equal(pub.merchant, 'الكيف الأخضر');
+
+  const later = Math.floor(Date.now() / 1000) + 3 * 86400;
+  const r = await post('/api/m/store/reels', { title: 'ريل مجدول', duration: 12, publish_at: later }, S.merchant);
+  assert.equal(r.status, 201);
+  const mp4 = new Uint8Array(2048);
+  mp4.set([0, 0, 0, 0x20, 0x66, 0x74, 0x79, 0x70]);
+  assert.equal((await fetch(`${BASE}/api/m/store/reels/${r.data.id}/video`, { method: 'PUT', headers: { Cookie: S.merchant, Origin: BASE, 'Content-Type': 'video/mp4' }, body: mp4 })).status, 200);
+  assert.ok(!(await call('/api/public/store/reels')).data.reels.some((x) => x.id === r.data.id));
+  assert.equal((await post('/api/m/store/reels', { title: 'بعيد جداً', duration: 12, publish_at: later + 90 * 86400 }, S.merchant)).status, 400);
+  assert.equal((await patch(`/api/m/store/reels/${r.data.id}`, { publish_at: null }, S.merchant)).status, 200);
+  assert.ok((await call('/api/public/store/reels')).data.reels.some((x) => x.id === r.data.id));
+
+  const page = await fetch(`${BASE}/stores/p/${p.id}`);
+  assert.equal(page.status, 200);
+  const h = await page.text();
+  assert.match(h, /og:title/);
+  assert.match(h, /"@type":"Product"/);
+  assert.ok(h.includes('/stores/?p=' + p.id));
+  assert.equal((await fetch(`${BASE}/stores/p/999999`, { redirect: 'manual' })).status, 302);
+  assert.equal((await fetch(`${BASE}/stores/m/green-kif`)).status, 200);
+  const sm = await (await fetch(`${BASE}/sitemap.xml`)).text();
+  assert.ok(sm.includes('/stores/p/' + p.id));
+  assert.match(await (await fetch(`${BASE}/robots.txt`)).text(), /Sitemap:/);
+});
+
+test('حساب الزبون: متابعة السعر وتنبيه النزول', async () => {
+  assert.equal((await call('/api/c/account')).status, 401);
+  assert.equal((await post('/api/c/watch', { product_id: 1 })).status, 401);
+  // جلسة زبون مباشرة في القاعدة (دخول Google ما يشتغل في الاختبار)
+  const token = 'e'.repeat(64);
+  const { createHash } = await import('node:crypto');
+  const th = createHash('sha256').update(token).digest('hex');
+  const t = Math.floor(Date.now() / 1000);
+  const sql = `INSERT INTO customers(id,email,name,created_at,last_at) VALUES(900,'c@asalah.test','ريم',${t},${t}); INSERT INTO customer_sessions(token_hash,customer_id,created_at,expires_at) VALUES('${th}',900,${t},${t + 3600});`;
+  const { execFileSync } = await import('node:child_process');
+  execFileSync('npx', ['wrangler', 'd1', 'execute', 'asalah', '--local', '--persist-to', persist, '--command', sql], { stdio: 'ignore', env: { ...process.env, WRANGLER_SEND_METRICS: 'false' } });
+  const ck = '__Host-asalah_c=' + token;
+  const me = await call('/api/c/me', { cookie: ck });
+  assert.equal(me.data.customer.name, 'ريم');
+  const st = await call('/api/m/store', { cookie: S.merchant });
+  const p = st.data.products.find((x) => x.status === 'active' && x.price);
+  assert.equal((await call('/api/c/watch', { method: 'POST', body: { product_id: p.id }, cookie: ck })).status, 200);
+  assert.deepEqual((await call('/api/c/me', { cookie: ck })).data.watching, [p.id]);
+  assert.equal((await patch('/api/m/store/products/' + p.id, { price: Math.max(1, p.price - 5) }, S.merchant)).status, 200);
+  const me2 = await call('/api/c/me', { cookie: ck });
+  assert.equal(me2.data.unread, 1);
+  const acc = await call('/api/c/account', { cookie: ck });
+  assert.equal(acc.data.watch[0].id, p.id);
+  assert.match(acc.data.notes[0].message, /نزل سعر/);
+  // رفع السعر ما يرسل تنبيه
+  await patch('/api/m/store/products/' + p.id, { price: p.price }, S.merchant);
+  assert.equal((await call('/api/c/me', { cookie: ck })).data.unread, 1);
+  assert.equal((await call('/api/c/notes/read', { method: 'POST', body: {}, cookie: ck })).status, 200);
+  assert.equal((await call('/api/c/me', { cookie: ck })).data.unread, 0);
+  assert.equal((await call('/api/c/watch', { method: 'DELETE', body: { product_id: p.id }, cookie: ck })).status, 200);
+  assert.deepEqual((await call('/api/c/me', { cookie: ck })).data.watching, []);
 });

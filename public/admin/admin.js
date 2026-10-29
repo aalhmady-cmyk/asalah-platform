@@ -116,7 +116,7 @@ async function loadHome() {
     <div class="kpi"><span class="label">تجار نشطون</span><span class="value">${num(d.totals.active_merchants)} من ${num(merchants.length)}</span><span class="note">نسبة الأصلي ${o.original_ratio ?? '-'}%</span></div>
     <div class="kpi"><span class="label">أكواد مزيّفة اليوم</span><span class="value">${num(o.unknown_today)}</span><span class="note bad">${num(o.reports_7d)} بلاغ خلال 7 أيام</span></div>`);
   const unread = d.alerts.filter((a) => !a.read_at);
-  render($('home-alerts'), html`${unread.map((a) => html`<div class="alert ${a.kind === 'tag_request' || a.kind === 'join_request' ? 'info' : a.kind === 'low_stock' ? 'warn' : 'err'}"><div><b>${a.merchant_name || 'المنصة'}</b><div class="small">${a.message} · ${when(a.created_at)}</div></div></div>`)}${unread.length ? html`<div><button class="btn" type="button" id="alerts-read">تم الاطلاع على التنبيهات</button></div>` : ''}`);
+  render($('home-alerts'), html`${unread.map((a) => html`<div class="alert ${['tag_request', 'join_request', 'store_request', 'password_request'].includes(a.kind) ? 'info' : a.kind === 'low_stock' ? 'warn' : 'err'}"><div><b>${a.merchant_name || 'المنصة'}</b><div class="small">${a.message} · ${when(a.created_at)}</div></div></div>`)}${unread.length ? html`<div><button class="btn" type="button" id="alerts-read">تم الاطلاع على التنبيهات</button></div>` : ''}`);
   $('alerts-read')?.addEventListener('click', async () => { await api('/api/admin/alerts/read', { method: 'POST', body: {} }); loadHome(); });
   render($('home-bars'), bars(o.daily));
   render($('home-cities'), hbars(o.cities_7d));
@@ -229,15 +229,24 @@ async function loadUsers() {
   if (!merchants.length) merchants = (await api('/api/admin/merchants')).merchants;
   const { users } = await api('/api/admin/users');
   render($('users-table'), html`<table style="min-width:720px"><thead><tr><th>الاسم</th><th>البريد</th><th>النوع</th><th>آخر دخول</th><th>الحالة</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>${users.map((u) => html`<tr>
-    <td><b>${u.name}</b></td><td class="ltr">${u.email}</td><td>${u.role === 'admin' ? 'مدير عام' : 'تاجر: ' + (u.merchant_name || '')}</td><td>${when(u.last_login_at)}</td>
+    <td><b>${u.name}</b></td><td class="ltr">${u.email}</td><td>${u.role === 'admin' ? 'مدير عام' : (u.merchant_role === 'staff' ? 'موظف عند ' : 'تاجر: ') + (u.merchant_name || '')}</td><td>${when(u.last_login_at)}</td>
     <td>${u.status === 'active' ? pill({ x: ['نشط', 'ok'] }, 'x') : pill({ x: ['موقوف', 'err'] }, 'x')}</td>
-    <td>${u.id === me.user.id ? '' : html`<div class="actions"><button class="btn" type="button" data-user="${u.id}" data-user-status="${u.status === 'active' ? 'disabled' : 'active'}">${u.status === 'active' ? 'إيقاف' : 'تفعيل'}</button><button class="btn" type="button" data-user-reset="${u.id}">كلمة مرور جديدة</button></div>`}</td>
+    <td>${u.id === me.user.id ? '' : html`<div class="actions"><button class="btn" type="button" data-user="${u.id}" data-user-status="${u.status === 'active' ? 'disabled' : 'active'}">${u.status === 'active' ? 'إيقاف' : 'تفعيل'}</button><button class="btn" type="button" data-user-link="${u.id}" data-wa="${u.merchant_whatsapp || ''}" data-name="${u.name}">رابط تغيير كلمة المرور</button><button class="btn" type="button" data-user-reset="${u.id}">كلمة مرور مؤقتة</button></div>`}</td>
   </tr>`)}</tbody></table>`);
 }
 document.addEventListener('click', async (e) => {
   const s = e.target.closest('[data-user-status]');
   const r = e.target.closest('[data-user-reset]');
+  const l = e.target.closest('[data-user-link]');
   try {
+    if (l) {
+      const d = await api(`/api/admin/users/${l.dataset.userLink}/reset-link`, { method: 'POST', body: {} });
+      $('reset-link').value = d.link;
+      const msg = `هلا ${l.dataset.name}، هذا رابط تغيير كلمة المرور في أصالة (يشتغل مرة وحدة خلال 24 ساعة):\n${d.link}`;
+      const wa = (l.dataset.wa || '').replace(/\D/g, '');
+      $('reset-wa').href = 'https://wa.me/' + (wa ? wa : '') + '?text=' + encodeURIComponent(msg);
+      $('dlg-reset').showModal();
+    }
     if (s) {
       await api(`/api/admin/users/${s.dataset.user}`, { method: 'PATCH', body: { status: s.dataset.userStatus } });
       toast('تم تحديث الحساب');
@@ -251,11 +260,100 @@ document.addEventListener('click', async (e) => {
     }
   } catch (err) { toast(err.message, true); }
 });
+$('reset-copy').addEventListener('click', async () => {
+  await navigator.clipboard?.writeText($('reset-link').value).catch(() => {});
+  $('reset-link').select();
+  toast('نسخنا الرابط');
+});
+
+// ---------- المتاجر ----------
+const ST = { kind: 'products', merchants: null };
+const CAT_AR = { perfume: 'عطور وبخور', coffee: 'قهوة وشاي', food: 'تمور وأغذية', health: 'صحة ومكملات', beauty: 'عناية وتجميل', fashion: 'أزياء', accessories: 'شنط وإكسسوارات', watches: 'ساعات', home: 'المنزل', kids: 'أطفال', electronics: 'إلكترونيات', other: 'أخرى' };
+const sarAd = (n) => (n == null ? '' : Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ر.س');
+async function loadStore() {
+  const d = await api('/api/admin/store');
+  const s = d.summary;
+  render($('store-kpis'), html`
+    <div class="kpi"><span class="label">متاجر مشتركة</span><span class="value">${num(s.stores)}</span></div>
+    <div class="kpi"><span class="label">منتجات معروضة</span><span class="value">${num(s.products)}</span><span class="note">${num(s.reels)} ريل</span></div>
+    <div class="kpi"><span class="label">ضغطات "اشتر" 7 أيام</span><span class="value">${num(s.clicks_7d)}</span></div>
+    <div class="kpi"><span class="label">تعليقات 7 أيام</span><span class="value">${num(s.comments_7d)}</span><span class="note ${s.blocked ? 'bad' : ''}">${num(s.blocked)} موقوف من الإدارة</span></div>`);
+  if (!ST.merchants) {
+    ST.merchants = d.merchants;
+    render($('store-merchant'), html`<option value="">كل التجار</option>${d.merchants.map((m) => html`<option value="${m.id}">${m.name}</option>`)}`);
+  }
+  await loadStoreList();
+}
+async function loadStoreList() {
+  const f = $('store-filter');
+  const q = new URLSearchParams({ q: f.q.value.trim() });
+  if (f.merchant.value) q.set('merchant', f.merchant.value);
+  if (f.blocked.checked && ST.kind !== 'comments') q.set('blocked', '1');
+  $('store-blocked-f').hidden = ST.kind === 'comments';
+  const el = $('store-list');
+  if (ST.kind === 'comments') {
+    const { comments } = await api('/api/admin/store/comments?' + q);
+    return render(el, !comments.length ? html`<div class="empty">ما فيه تعليقات</div>` : html`${comments.map((c) => html`<div class="ad-cm">
+      <div><b>${c.name}</b> ${c.rating ? '⭐'.repeat(c.rating) : ''} <span class="small muted">على ${c.kind === 'reels' ? 'ريل' : 'منتج'} «${c.title}» · ${c.merchant_name} · ${when(c.created_at)}</span>
+        ${c.body ? html`<p>${c.body}</p>` : ''}${c.reply ? html`<div class="reply">رد التاجر: ${c.reply}</div>` : ''}</div>
+      <button class="btn btn-sm btn-danger" type="button" data-ad-cdel="${c.kind}/${c.item_id}/${c.id}">حذف</button></div>`)}`);
+  }
+  if (ST.kind === 'products') {
+    const { products } = await api('/api/admin/store/products?' + q);
+    return render(el, !products.length ? html`<div class="empty">ما فيه منتجات</div>` : html`<div class="ad-items">${products.map((p) => html`<article class="ad-item ${p.admin_blocked ? 'off' : ''}">
+      <div class="media">${p.image_url ? html`<img src="${p.image_url}" alt="" loading="lazy">` : '🛍️'}${p.admin_blocked ? html`<span class="pill err">موقوف من الإدارة</span>` : p.status !== 'active' ? html`<span class="pill">مخفي من التاجر</span>` : ''}</div>
+      <div class="info"><b>${p.title}</b><span class="small muted">${p.merchant_name} · ${CAT_AR[p.category] || p.category} · ${sarAd(p.price)}</span>
+        <span class="small muted">👁 ${num(p.views)} · 🛒 ${num(p.clicks)} · 💬 ${num(p.comments)}${p.rating_n ? ` · ⭐ ${(p.rating_sum / p.rating_n).toFixed(1)}` : ''}</span>
+        <div class="actions"><a class="btn btn-sm" href="${p.buy_url}" target="_blank" rel="noopener">صفحته في سلة ↗</a>${p.admin_blocked ? html`<button class="btn btn-sm btn-primary" type="button" data-ad-block="products/${p.id}" data-on="0">إرجاع</button>` : html`<button class="btn btn-sm btn-danger" type="button" data-ad-block="products/${p.id}" data-on="1">إيقاف</button>`}</div></div>
+    </article>`)}</div>`);
+  }
+  const { reels } = await api('/api/admin/store/reels?' + q);
+  render(el, !reels.length ? html`<div class="empty">ما فيه ريلز</div>` : html`<div class="ad-items">${reels.map((r) => html`<article class="ad-item reel ${r.admin_blocked ? 'off' : ''}">
+    <div class="media">${r.video_url ? html`<video src="${r.video_url}" poster="${r.poster_url || ''}" preload="none" controls playsinline></video>` : r.poster_url ? html`<img src="${r.poster_url}" alt="">` : '🎬'}${r.admin_blocked ? html`<span class="pill err">موقوف من الإدارة</span>` : r.status !== 'active' ? html`<span class="pill">مخفي من التاجر</span>` : r.publish_at && r.publish_at * 1000 > Date.now() ? html`<span class="pill warn">مجدول</span>` : ''}</div>
+    <div class="info"><b>${r.title}</b><span class="small muted">${r.merchant_name} · ${when(r.created_at)}</span>
+      <span class="small muted">👁 ${num(r.views)} · 🛒 ${num(r.clicks)} · ❤️ ${num(r.likes)} · 💬 ${num(r.comments)}</span>
+      <div class="actions">${r.admin_blocked ? html`<button class="btn btn-sm btn-primary" type="button" data-ad-block="reels/${r.id}" data-on="0">إرجاع</button>` : html`<button class="btn btn-sm btn-danger" type="button" data-ad-block="reels/${r.id}" data-on="1">إيقاف</button>`}</div></div>
+  </article>`)}</div>`);
+}
+$('store-kind').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-kind]');
+  if (!b) return;
+  ST.kind = b.dataset.kind;
+  $('store-kind').querySelectorAll('[data-kind]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+  loadStoreList().catch((err) => toast(err.message, true));
+});
+onSubmit($('store-filter'), () => loadStoreList());
+$('store-merchant').addEventListener('change', () => loadStoreList().catch((err) => toast(err.message, true)));
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-ad-block]'), c = e.target.closest('[data-ad-cdel]');
+  if (!b && !c) return;
+  try {
+    if (b) {
+      const on = b.dataset.on === '1';
+      let reason = null;
+      if (on) {
+        reason = prompt('سبب الإيقاف (يوصل للتاجر، اختياري):');
+        if (reason === null) return;
+      }
+      await api(`/api/admin/store/${b.dataset.adBlock}/block`, { method: 'POST', body: { blocked: on, reason: reason || null } });
+      toast(on ? 'تم الإيقاف ووصل تنبيه للتاجر' : 'رجع يظهر في المتاجر');
+    } else {
+      if (!confirm('تحذف التعليق؟')) return;
+      const [kind, item, id] = c.dataset.adCdel.split('/');
+      await api(`/api/admin/store/${kind}/${item}/comments/${id}`, { method: 'DELETE' });
+      toast('انحذف التعليق');
+    }
+    loadStore();
+  } catch (err) { toast(err.message, true); }
+});
+
 const ACTIONS = {
   login: 'دخول', merchant_created: 'إنشاء تاجر', merchant_updated: 'تعديل تاجر', user_created: 'إنشاء حساب', user_updated: 'تعديل حساب',
   batch_created: 'إنشاء دفعة', batch_active: 'تفعيل دفعة', batch_blocked: 'إيقاف دفعة', factory_file_downloaded: 'تنزيل ملف المصنع',
   tags_block: 'إيقاف علامات', tags_activate: 'تفعيل علامات', settings_updated: 'تعديل إعدادات التاجر', entries_exported: 'تصدير المشاركات',
   password_changed: 'تغيير كلمة المرور', tags_requested: 'طلب علامات', setup_admin_created: 'إعداد النظام',
+  reset_link_created: 'رابط تغيير كلمة المرور', password_reset_done: 'تغيير كلمة المرور بالرابط', staff_created: 'إضافة موظف', staff_updated: 'تعديل موظف',
+  store_item_blocked: 'إيقاف من المتاجر', store_item_unblocked: 'إرجاع للمتاجر', store_comment_deleted: 'حذف تعليق', comment_replied: 'رد على تعليق',
 };
 async function loadAudit() {
   const { audit } = await api('/api/admin/audit');
@@ -263,7 +361,7 @@ async function loadAudit() {
 }
 
 $('hot-days').addEventListener('change', () => loadReports().catch((e) => toast(e.message, true)));
-const loaders = { home: loadHome, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, reports: loadReports, users: loadUsers, audit: loadAudit };
+const loaders = { home: loadHome, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, reports: loadReports, users: loadUsers, audit: loadAudit };
 let current = 'home';
 const refresh = () => loaders[current]().catch((e) => toast(e.message, true));
 tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => { current = id; refresh(); });

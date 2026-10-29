@@ -187,3 +187,29 @@ dialog form { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .comment { border-top: 1px solid var(--line-soft); padding: 10px 0; display: flex; flex-direction: column; gap: 4px; }
 .gold-stars { color: var(--gold); letter-spacing: 2px; }
 @media (max-width: 560px) { .mode-pick { grid-template-columns: minmax(0, 1fr); } }
+
+/* اللوحة الأم: قسم المتاجر */
+.dlg-body { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+.dlg-body input { min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; font: inherit; }
+.ad-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line-soft); margin: -4px 0 14px; overflow-x: auto; }
+.ad-tabs button { border: 0; background: none; font: inherit; font-weight: 600; padding: 10px 14px; color: var(--muted); border-bottom: 3px solid transparent; cursor: pointer; white-space: nowrap; }
+.ad-tabs button[aria-selected="true"] { color: var(--green); border-bottom-color: var(--green); }
+.ad-filter { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.ad-filter input[type=search], .ad-filter select { min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; font: inherit; background: var(--surface, #fff); }
+.ad-filter input[type=search] { flex: 1 1 220px; min-width: 0; }
+.ad-filter .check { align-items: center; }
+.ad-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.ad-item { border: 1px solid var(--line-soft); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; background: var(--surface, #fff); }
+.ad-item.off { border-color: #e4a3a3; background: #fff7f7; }
+.ad-item .media { aspect-ratio: 1; background: var(--ground); display: flex; align-items: center; justify-content: center; font-size: 34px; position: relative; }
+.ad-item.reel .media { aspect-ratio: 9 / 12; }
+.ad-item .media img, .ad-item .media video { width: 100%; height: 100%; object-fit: cover; }
+.ad-item .media .pill { position: absolute; top: 8px; inset-inline-start: 8px; }
+.ad-item .info { padding: 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.ad-item .info b { line-height: 1.35; }
+.ad-item .actions { margin-top: auto; }
+.ad-cm { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--line-soft); }
+.ad-cm > div { flex: 1; min-width: 0; }
+.ad-cm p { margin: 4px 0 0; word-break: break-word; }
+.ad-cm .reply { margin-top: 6px; padding: 6px 10px; border-radius: 10px; background: var(--ground); font-size: 13px; }
+.is-staff .owner-only { display: none !important; }

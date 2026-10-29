@@ -1,6 +1,7 @@
 // دخول العملاء بحساب Google (OAuth بالتحويل، بدون سكربت خارجي في الصفحة).
 // يحتاج GOOGLE_CLIENT_ID و GOOGLE_CLIENT_SECRET في إعدادات Cloudflare. بدونهم التعليق يكون بالاسم فقط.
-import { fail, json, now, randomHex, sha256 } from './util.js';
+import { imageUrl } from './images.js';
+import { fail, int, json, now, randomHex, readJson, sha256 } from './util.js';
 
 const COOKIE = '__Host-asalah_c';
 const STATE = '__Host-asalah_cs';
@@ -25,12 +26,92 @@ export async function currentCustomer(db, req) {
     .first();
 }
 
+// تنبيه داخل حساب الزبون (جرس في المتاجر)
+export async function addNote(db, customerId, message, link, productId = null) {
+  await db.prepare('INSERT INTO customer_notes(customer_id,product_id,link,message,created_at) VALUES(?,?,?,?,?)').bind(customerId, productId, link, message.slice(0, 200), now()).run();
+}
+
+const sarText = (h) => (h / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
+
+// السعر نزل: كل من يتابع المنتج وسعره وقت المتابعة أعلى من الجديد يوصله تنبيه
+export async function notifyPriceDrop(db, product, oldPrice) {
+  const watchers = (await db.prepare('SELECT customer_id FROM price_watch WHERE product_id=? AND (price_at IS NULL OR price_at>?)').bind(product.id, product.price).all()).results;
+  if (!watchers.length) return 0;
+  const t = now();
+  const msg = `🔔 نزل سعر «${String(product.title).slice(0, 60)}» من ${sarText(oldPrice)} إلى ${sarText(product.price)} ر.س`;
+  await db.batch([
+    ...watchers.map((w) => db.prepare('INSERT INTO customer_notes(customer_id,product_id,link,message,created_at) VALUES(?,?,?,?,?)').bind(w.customer_id, product.id, '/stores/?p=' + product.id, msg, t)),
+    db.prepare('UPDATE price_watch SET price_at=? WHERE product_id=?').bind(product.price, product.id),
+  ]);
+  return watchers.length;
+}
+
+const sar = (h) => (h == null ? null : h / 100);
+
+async function account(db, c) {
+  const [watch, notes, pc, rc] = await Promise.all([
+    db
+      .prepare(
+        `SELECT p.id,p.title,p.price,p.old_price,p.image_key,w.price_at,w.created_at AS watched_at,m.name AS merchant_name,
+                (p.status='active' AND p.admin_blocked=0 AND m.store_enabled=1 AND m.status='active') AS live
+         FROM price_watch w JOIN store_products p ON p.id=w.product_id JOIN merchants m ON m.id=p.merchant_id WHERE w.customer_id=? ORDER BY w.created_at DESC LIMIT 100`
+      )
+      .bind(c.id)
+      .all(),
+    db.prepare('SELECT id,message,link,created_at,read_at FROM customer_notes WHERE customer_id=? ORDER BY id DESC LIMIT 50').bind(c.id).all(),
+    db
+      .prepare('SELECT c.id,c.body,c.rating,c.reply,c.created_at,p.id AS item_id,p.title FROM product_comments c JOIN store_products p ON p.id=c.product_id WHERE c.customer_id=? ORDER BY c.id DESC LIMIT 30')
+      .bind(c.id)
+      .all(),
+    db.prepare('SELECT c.id,c.body,c.rating,c.reply,c.created_at,r.id AS item_id,r.title FROM reel_comments c JOIN reels r ON r.id=c.reel_id WHERE c.customer_id=? ORDER BY c.id DESC LIMIT 30').bind(c.id).all(),
+  ]);
+  return {
+    customer: { name: c.name, email: c.email, picture: c.picture },
+    watch: watch.results.map(({ image_key, price, old_price, price_at, live, ...x }) => ({ ...x, live: !!live, price: sar(price), old_price: sar(old_price), price_at: sar(price_at), image_url: imageUrl(image_key) })),
+    notes: notes.results,
+    comments: [...pc.results.map((x) => ({ ...x, kind: 'products' })), ...rc.results.map((x) => ({ ...x, kind: 'reels' }))].sort((a, b) => b.created_at - a.created_at).slice(0, 30),
+  };
+}
+
 export async function handleCustomer(req, env, path) {
   const db = env.DB;
   const url = new URL(req.url);
   if (path === '/api/c/me' && req.method === 'GET') {
     const c = await currentCustomer(db, req);
-    return json({ ok: true, login: googleEnabled(env), customer: c ? { name: c.name, email: c.email, picture: c.picture } : null });
+    const unread = c ? (await db.prepare('SELECT COUNT(*) AS n FROM customer_notes WHERE customer_id=? AND read_at IS NULL').bind(c.id).first()).n : 0;
+    const watching = c ? (await db.prepare('SELECT product_id FROM price_watch WHERE customer_id=?').bind(c.id).all()).results.map((r) => r.product_id) : [];
+    return json({ ok: true, login: googleEnabled(env), customer: c ? { name: c.name, email: c.email, picture: c.picture } : null, unread, watching });
+  }
+  // حساب الزبون: المتابعات والتنبيهات وتعليقاته
+  if (path.startsWith('/api/c/') && !path.startsWith('/api/c/google/') && path !== '/api/c/logout') {
+    const c = await currentCustomer(db, req);
+    if (!c) fail(401, 'سجّل دخولك بحساب Google أول', 'login_required');
+    if (req.method !== 'GET') {
+      const origin = req.headers.get('Origin');
+      if (!origin || origin !== url.origin) fail(403, 'مصدر الطلب غير مسموح');
+    }
+    if (path === '/api/c/account' && req.method === 'GET') return json({ ok: true, ...(await account(db, c)) });
+    if (path === '/api/c/notes/read' && req.method === 'POST') {
+      await db.prepare('UPDATE customer_notes SET read_at=? WHERE customer_id=? AND read_at IS NULL').bind(now(), c.id).run();
+      return json({ ok: true });
+    }
+    if (path === '/api/c/watch' && (req.method === 'POST' || req.method === 'DELETE')) {
+      const b = await readJson(req);
+      const pid = int(b.product_id, 'المنتج', { min: 1 });
+      if (req.method === 'DELETE') {
+        await db.prepare('DELETE FROM price_watch WHERE customer_id=? AND product_id=?').bind(c.id, pid).run();
+        return json({ ok: true, watching: false });
+      }
+      const p = await db
+        .prepare("SELECT p.id,p.price FROM store_products p JOIN merchants m ON m.id=p.merchant_id WHERE p.id=? AND p.status='active' AND p.admin_blocked=0 AND m.store_enabled=1 AND m.status='active'")
+        .bind(pid)
+        .first();
+      if (!p) fail(404, 'المنتج غير متاح');
+      const n = await db.prepare('SELECT COUNT(*) AS n FROM price_watch WHERE customer_id=?').bind(c.id).first();
+      if (n.n >= 100) fail(400, 'وصلت حد المتابعة (100 منتج)');
+      await db.prepare('INSERT INTO price_watch(customer_id,product_id,price_at,created_at) VALUES(?,?,?,?) ON CONFLICT(customer_id,product_id) DO UPDATE SET price_at=excluded.price_at').bind(c.id, pid, p.price, now()).run();
+      return json({ ok: true, watching: true });
+    }
   }
   if (path === '/api/c/logout' && req.method === 'POST') {
     const v = readCookie(req, COOKIE);

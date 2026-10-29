@@ -97,6 +97,7 @@ function applyLang() {
   $('#ai-fab').setAttribute('aria-label', t('chat'));
   $('#ai-fab small').textContent = t('fabT');
   $('#lang').setAttribute('aria-label', lang === 'en' ? 'العربية' : 'English');
+  drawMe();
 }
 
 let D = null; // بيانات الصفحة الرئيسية
@@ -146,6 +147,7 @@ async function route() {
     else if (tab === 'browse') await showBrowse();
     else if (tab === 'family') await showFamily(p.get('f'));
     else if (tab === 'saved') await showSaved();
+    else if (tab === 'account') await showAccount();
     else if (tab === 'merchant') await showMerchant(p.get('m'));
     else if (tab === 'search') await showSearch(p.get('q'), p.get('cat'));
     else await showHome(p.get('cat'));
@@ -155,11 +157,14 @@ async function route() {
   if (p.get('p')) openProduct(Number(p.get('p')), true);
   else closeSheet(true);
   // راجع من الدخول بحساب Google: نفتح التعليقات اللي كان فيها
-  if (p.get('login') || p.get('cm')) {
+  if (p.get('login') || p.get('cm') || p.get('watch')) {
     if (p.get('login')) toast(p.get('login') === 'ok' ? t('loginOk') : t('loginFail'));
     const [kind, cid] = String(p.get('cm') || '').split(':');
+    const w = Number(p.get('watch'));
     p.delete('login');
     p.delete('cm');
+    p.delete('watch');
+    if (w) mePromise.then(() => ME.customer && !ME.watching.includes(w) && toggleWatch(w));
     history.replaceState(null, '', '/stores/' + (p.toString() ? '?' + p : ''));
     if ((kind === 'reels' || kind === 'products') && Number(cid)) openComments(Number(cid), kind);
   }
@@ -327,7 +332,10 @@ function drawProduct(p, d) {
         <button type="button" class="mk-btn ghost-d mk-icon-btn mk-fav-btn ${fav ? 'on' : ''}" data-fav="${p.id}" aria-pressed="${fav}" aria-label="${t('save_aria')}">${fav ? '♥' : '♡'}</button>
         <button type="button" class="mk-btn ghost-d mk-icon-btn" data-share="${p.id}" aria-label="${t('share')}">↗</button>
       </div>
-      <button type="button" class="mk-btn ghost-d mk-fam-add" data-fam-add="${p.id}">${t('famAdd')}</button>
+      <div class="mk-p-more">
+        <button type="button" class="mk-btn ghost-d mk-fam-add" data-fam-add="${p.id}">${t('famAdd')}</button>
+        ${ME.login && p.price != null ? html`<button type="button" class="mk-btn ghost-d mk-watch ${ME.watching.includes(p.id) ? 'on' : ''}" data-watch="${p.id}" aria-pressed="${ME.watching.includes(p.id)}">${ME.watching.includes(p.id) ? at('watching') : at('watch')}</button>` : ''}
+      </div>
       ${d && d.reels.length ? html`<h2>${t('productReels')}</h2><div class="mk-row">${d.reels.map(reelTile)}</div>` : ''}
       ${d && d.more.length ? html`<h2>${t('youMayLike')}</h2><div class="mk-row cards">${d.more.map(card)}</div>` : ''}
     </div>
@@ -487,7 +495,8 @@ async function openComments(id, kind = 'reels') {
         <button type="button" class="mk-round dark" data-cm-close aria-label="${t('close')}">×</button></header>
       <div class="mk-cm-list">${d.comments.length ? d.comments.map((c) => html`<div class="mk-cm-c"><span class="mk-cm-av" aria-hidden="true">${(c.name || '?').trim()[0]}</span><div>
           <div class="mk-cm-n"><b>${c.name}</b>${c.rating ? html`<span class="mk-stars sm">${stars(c.rating)}</span>` : ''}<small>${ago(c.created_at)}</small></div>
-          ${c.body ? html`<p>${c.body}</p>` : ''}</div></div>`) : html`<div class="mk-empty small">${t('noComments')}</div>`}</div>
+          ${c.body ? html`<p>${c.body}</p>` : ''}
+          ${c.reply ? html`<div class="mk-cm-reply"><b>${d.merchant} <span>${at('merchantBadge')}</span></b><p>${c.reply}</p></div>` : ''}</div></div>`) : html`<div class="mk-empty small">${t('noComments')}</div>`}</div>
       ${d.login && !d.me
         ? html`<div class="mk-cm-f mk-cm-login"><p>${t('loginToComment')}</p><a class="mk-google" href="/api/c/google/start?next=${encodeURIComponent(location.pathname + (location.search || '?') + (location.search ? '&' : '') + 'cm=' + kind + ':' + id)}">${raw(GOOGLE)}<span>${t('googleBtn')}</span></a></div>`
         : html`<form class="mk-cm-f" id="cm-form">
@@ -643,6 +652,16 @@ document.addEventListener('click', async (e) => {
     if (buy.dataset.reelBuy) track('reel_click', Number(buy.dataset.reelBuy));
     return; // الرابط يفتح متجر التاجر
   }
+  const wt = el.closest('[data-watch]');
+  if (wt) return toggleWatch(Number(wt.dataset.watch));
+  if (el.closest('[data-install]')) return install();
+  if (el.closest('[data-install-x]')) { keep('asalah_install_x', Date.now()); return $('#install-bar')?.remove(); }
+  if (el.closest('[data-logout]')) {
+    await fetch('/api/c/logout', { method: 'POST' }).catch(() => {});
+    ME = { ...ME, customer: null, unread: 0, watching: [] };
+    drawMe();
+    return route();
+  }
   if (el.closest('#lang')) {
     lang = lang === 'en' ? 'ar' : 'en';
     keep('asalah_lang', lang);
@@ -705,7 +724,7 @@ document.addEventListener('click', async (e) => {
   const sh = el.closest('[data-share]');
   if (sh) {
     const p = cache.get(Number(sh.dataset.share));
-    shareLink(p.title, t('shareText', p.title, p.merchant_name), location.origin + '/stores/?p=' + p.id);
+    shareLink(p.title, t('shareText', p.title, p.merchant_name), location.origin + '/stores/p/' + p.id);
   }
 });
 document.addEventListener('keydown', (e) => {
@@ -1132,6 +1151,133 @@ document.addEventListener('click', (e) => {
   closeSheet(true);
   openPosts(Number(cardEl.dataset.product), ids);
 }, true);
+
+
+// ---------- حساب الزبون: المتابعات والتنبيهات وتعليقاته ----------
+const A = {
+  ar: {
+    account: 'حسابي', watch: '🔔 نبهني لو نزل السعر', watching: '🔔 أتابع السعر ✓', watchOn: 'بنبهك أول ما ينزل السعر 🔔', watchOff: 'وقفنا متابعة السعر',
+    noLogin: 'الدخول بحساب Google متوقف حالياً', merchantBadge: '✓ التاجر', accTitle: 'حسابك في متاجر أصالة',
+    accP: 'سجّل دخولك بحساب Google عشان تتابع أسعار المنتجات ويوصلك تنبيه لما تنزل، وتشوف تعليقاتك وردود التجار عليها.',
+    notes: '🔔 التنبيهات', noNotes: 'ما فيه تنبيهات للحين. تابع سعر منتج وبنبهك لما ينزل.', watchList: '👁 منتجات أتابع سعرها', noWatch: 'ما تتابع أي منتج. افتح منتج واضغط «نبهني لو نزل السعر».',
+    was: (p) => `كان ${p}`, dropped: 'نزل السعر 🎉', stop: 'إلغاء', favs: '♡ المفضلة', favsN: (n) => `${n} منتج في المفضلة`, openFavs: 'افتح المفضلة',
+    myComments: '💬 تعليقاتي', noMine: 'ما علّقت على شي للحين.', onP: 'على منتج', onR: 'على ريل', logout: 'تسجيل الخروج', unavailable: 'غير متاح حالياً',
+    app: '📲 تطبيق متاجر أصالة', appP: 'ثبّت المتاجر على شاشة جوالك الرئيسية، وتفتح بضغطة مثل أي تطبيق.', installBtn: 'ثبّت التطبيق', installed: 'التطبيق مثبّت على جهازك ✅',
+    iosHow: 'في سفاري: اضغط زر المشاركة ⬆️ تحت، بعدها «إضافة إلى الشاشة الرئيسية».', barT: 'ثبّت متاجر أصالة على جوالك', later: 'لاحقاً',
+  },
+  en: {
+    account: 'Account', watch: '🔔 Alert me on price drop', watching: '🔔 Watching price ✓', watchOn: 'We’ll alert you when the price drops 🔔', watchOff: 'Stopped watching',
+    noLogin: 'Google sign-in is currently off', merchantBadge: '✓ Brand', accTitle: 'Your Asalah Stores account',
+    accP: 'Sign in with Google to watch prices and get alerts when they drop, and see your comments and brand replies.',
+    notes: '🔔 Alerts', noNotes: 'No alerts yet. Watch a product’s price and we’ll tell you when it drops.', watchList: '👁 Watched products', noWatch: 'You’re not watching any product. Open one and tap “Alert me on price drop”.',
+    was: (p) => `was ${p}`, dropped: 'Price dropped 🎉', stop: 'Stop', favs: '♡ Favourites', favsN: (n) => `${n} saved products`, openFavs: 'Open favourites',
+    myComments: '💬 My comments', noMine: 'No comments yet.', onP: 'on a product', onR: 'on a reel', logout: 'Sign out', unavailable: 'Not available now',
+    app: '📲 Asalah Stores app', appP: 'Add the stores to your home screen and open them in one tap like any app.', installBtn: 'Install app', installed: 'The app is installed ✅',
+    iosHow: 'In Safari: tap Share ⬆️ then “Add to Home Screen”.', barT: 'Install Asalah Stores on your phone', later: 'Later',
+  },
+};
+const at = (k, ...x) => { const v = A[lang][k]; return typeof v === 'function' ? v(...x) : v; };
+let ME = { login: false, customer: null, unread: 0, watching: [] };
+const loginUrl = (next) => '/api/c/google/start?next=' + encodeURIComponent(next);
+const mePromise = get('/api/c/me').then((d) => { ME = d; drawMe(); }).catch(() => {});
+
+function drawMe() {
+  const b = $('#me-btn');
+  if (!b) return;
+  b.setAttribute('aria-label', at('account') + (ME.unread ? ` (${ME.unread})` : ''));
+  render(b, ME.customer?.picture ? html`<img src="${ME.customer.picture}" alt="" referrerpolicy="no-referrer">${ME.unread ? html`<i>${ME.unread > 9 ? '9+' : ME.unread}</i>` : ''}` : html`<span aria-hidden="true">👤</span>${ME.unread ? html`<i>${ME.unread > 9 ? '9+' : ME.unread}</i>` : ''}`);
+}
+
+async function cpost(path, method, body) {
+  const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(lang === 'en' ? t('err') : d.message || t('err')), { code: d.code });
+  return d;
+}
+
+async function toggleWatch(id) {
+  if (!ME.customer) {
+    if (!ME.login) return toast(at('noLogin'));
+    location.href = loginUrl(`/stores/?p=${id}&watch=${id}`);
+    return;
+  }
+  const on = ME.watching.includes(id);
+  try {
+    await cpost('/api/c/watch', on ? 'DELETE' : 'POST', { product_id: id });
+    ME.watching = on ? ME.watching.filter((x) => x !== id) : [...ME.watching, id];
+    document.querySelectorAll(`[data-watch="${id}"]`).forEach((b) => { b.classList.toggle('on', !on); b.setAttribute('aria-pressed', String(!on)); b.textContent = on ? at('watch') : at('watching'); });
+    toast(on ? at('watchOff') : at('watchOn'));
+    if (document.body.dataset.view === 'account' && on) showAccount();
+  } catch (e) { toast(e.message); }
+}
+
+async function showAccount() {
+  await mePromise;
+  if (!ME.customer) {
+    render(view, html`<section class="mk-acc">
+      <div class="mk-acc-hero"><span class="mk-acc-av" aria-hidden="true">👤</span><div><h1>${at('accTitle')}</h1><p>${at('accP')}</p></div></div>
+      ${ME.login ? html`<a class="mk-google big" href="${loginUrl('/stores/?v=account')}">${raw(GOOGLE)}<span>${t('googleBtn')}</span></a>` : html`<p class="mk-muted">${at('noLogin')}</p>`}
+      ${favCard()}${appCard()}
+    </section>`);
+    return;
+  }
+  render(view, html`<section class="mk-acc"><div class="mk-skel-card"></div></section>`);
+  let d;
+  try { d = await get('/api/c/account'); } catch (e) { return render(view, html`<div class="mk-empty"><b>${e.message}</b></div>`); }
+  const c = d.customer;
+  render(view, html`<section class="mk-acc">
+    <div class="mk-acc-hero">${c.picture ? html`<img class="mk-acc-av" src="${c.picture}" alt="" referrerpolicy="no-referrer">` : html`<span class="mk-acc-av" aria-hidden="true">${c.name.trim()[0]}</span>`}
+      <div><h1>${c.name}</h1><p class="ltr">${c.email}</p></div><button type="button" class="mk-btn ghost-d" data-logout>${at('logout')}</button></div>
+    <div class="mk-acc-box"><h2>${at('notes')}</h2>${d.notes.length ? html`<ul class="mk-notes">${d.notes.map((n) => html`<li class="${n.read_at ? '' : 'new'}"><a href="${n.link || '/stores/'}">${n.message}</a><small>${ago(n.created_at)}</small></li>`)}</ul>` : html`<p class="mk-muted">${at('noNotes')}</p>`}</div>
+    <div class="mk-acc-box"><h2>${at('watchList')}</h2>${d.watch.length ? html`<div class="mk-watch-list">${d.watch.map((w) => html`<div class="mk-wl ${w.live ? '' : 'off'}">
+        <button type="button" class="mk-wl-img" ${raw(w.live ? `data-product="${w.id}"` : 'disabled')}>${w.image_url ? html`<img src="${w.image_url}" alt="" loading="lazy">` : raw('🛍️')}</button>
+        <div><b>${w.title}</b><small>${w.merchant_name}</small>
+          <span class="mk-wl-p">${w.live ? sar(w.price) : at('unavailable')}${w.price_at != null && w.price != null && w.price < w.price_at ? html` <em>${at('dropped')}</em>` : ''}</span></div>
+        <button type="button" class="mk-btn ghost-d sm" data-watch="${w.id}">${at('stop')}</button></div>`)}</div>` : html`<p class="mk-muted">${at('noWatch')}</p>`}</div>
+    ${favCard()}
+    <div class="mk-acc-box"><h2>${at('myComments')}</h2>${d.comments.length ? html`<ul class="mk-mine">${d.comments.map((x) => html`<li>
+        <a href="${x.kind === 'reels' ? `/stores/?v=reels&r=${x.item_id}` : `/stores/?p=${x.item_id}`}"><small>${x.kind === 'reels' ? at('onR') : at('onP')} «${x.title}» · ${ago(x.created_at)}</small>${x.rating ? html`<span class="mk-stars sm">${stars(x.rating)}</span>` : ''}${x.body ? html`<p>${x.body}</p>` : ''}</a>
+        ${x.reply ? html`<div class="mk-cm-reply"><b>${at('merchantBadge')}</b><p>${x.reply}</p></div>` : ''}</li>`)}</ul>` : html`<p class="mk-muted">${at('noMine')}</p>`}</div>
+    ${appCard()}
+  </section>`);
+  if (ME.unread) {
+    cpost('/api/c/notes/read', 'POST').catch(() => {});
+    ME.unread = 0;
+    drawMe();
+  }
+}
+const favCard = () => html`<div class="mk-acc-box row"><div><h2>${at('favs')}</h2><p class="mk-muted">${at('favsN', favs.size)}</p></div><button type="button" class="mk-btn ghost-d" data-go="saved">${at('openFavs')}</button></div>`;
+
+// ---------- تطبيق على الجوال (PWA) ----------
+let installEvt = null;
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+function appCard() {
+  if (standalone()) return html`<div class="mk-acc-box"><h2>${at('app')}</h2><p class="mk-muted">${at('installed')}</p></div>`;
+  return html`<div class="mk-acc-box"><h2>${at('app')}</h2><p class="mk-muted">${at('appP')}</p>${installEvt ? html`<button type="button" class="mk-btn gold" data-install>${at('installBtn')}</button>` : isIOS ? html`<p class="mk-ios">${at('iosHow')}</p>` : ''}</div>`;
+}
+async function install() {
+  if (!installEvt) return toast(at('iosHow'));
+  installEvt.prompt();
+  await installEvt.userChoice.catch(() => {});
+  installEvt = null;
+  $('#install-bar')?.remove();
+}
+function installBar() {
+  if (standalone() || $('#install-bar') || (!installEvt && !isIOS)) return;
+  if (Date.now() - load('asalah_install_x', 0) < 14 * 86400e3) return;
+  const bar = Object.assign(document.createElement('div'), { id: 'install-bar', className: 'mk-install' });
+  render(bar, html`<img src="/stores/icons/icon-192.png" alt="" width="40" height="40"><div><b>${at('barT')}</b><small>${installEvt ? at('appP') : at('iosHow')}</small></div>
+    ${installEvt ? html`<button type="button" class="mk-btn gold sm" data-install>${at('installBtn')}</button>` : ''}<button type="button" class="mk-round" data-install-x aria-label="${at('later')}">×</button>`);
+  document.body.append(bar);
+}
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installEvt = e;
+  setTimeout(installBar, 6000);
+});
+if (isIOS) setTimeout(installBar, 8000);
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/stores/sw.js', { scope: '/stores/' }).catch(() => {});
 
 applyLang();
 route();

@@ -4,10 +4,40 @@ const home = (role) => (role === 'admin' ? '/admin/' : '/merchant/');
 const login = document.getElementById('login');
 const setup = document.getElementById('setup');
 
-if (new URLSearchParams(location.search).has('setup')) {
-  login.hidden = true;
-  setup.hidden = false;
+const forgot = document.getElementById('forgot');
+const reset = document.getElementById('reset');
+const qs = new URLSearchParams(location.search);
+const showForm = (f) => { for (const x of [login, setup, forgot, reset]) x.hidden = x !== f; };
+if (qs.has('setup')) showForm(setup);
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-show]');
+  if (b) showForm(document.getElementById(b.dataset.show));
+});
+
+// رابط إعادة كلمة المرور: نتأكد إنه صالح ونعرض البريد
+const resetToken = qs.get('reset');
+if (resetToken) {
+  showForm(reset);
+  api('/api/auth/reset', { method: 'POST', body: { token: resetToken, check: true } })
+    .then((d) => (document.getElementById('reset-for').textContent = `اختر كلمة مرور جديدة لحساب ${d.email}`))
+    .catch((e) => { toast(e.message, true); showForm(forgot); });
 }
+onSubmit(forgot, async (f, form) => {
+  if (!form.reportValidity()) return;
+  const d = await scanning(form, 'نرسل…', () => api('/api/auth/forgot', { method: 'POST', body: { email: f.email } }));
+  const done = document.getElementById('forgot-done');
+  done.textContent = d.message;
+  done.hidden = false;
+});
+onSubmit(reset, async (f, form) => {
+  if (!form.reportValidity()) return;
+  if (f.password !== f.confirm) return toast('كلمتين المرور مو نفس بعض', true);
+  const d = await scanning(form, 'نحفظ…', () => api('/api/auth/reset', { method: 'POST', body: { token: resetToken, password: f.password } }));
+  toast(d.message);
+  history.replaceState(null, '', '/login/');
+  form.reset();
+  showForm(login);
+});
 
 api('/api/auth/me').then((d) => (location.href = home(d.user.role))).catch(() => {});
 

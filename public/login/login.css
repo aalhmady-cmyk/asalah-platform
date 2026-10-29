@@ -80,3 +80,6 @@ body.auth { background: var(--forest); min-height: 100vh; }
   .scene-art *, .scene-glow, .scene-badge .dot, .scan-bar { animation: none !important; }
   .ok { opacity: 1; } .scanning, .waves path { opacity: 0; }
 }
+.link-btn { border: 0; background: none; font: inherit; color: var(--green); font-weight: 600; cursor: pointer; padding: 6px; align-self: center; }
+.link-btn:hover { text-decoration: underline; }
+.tip-ok { margin: 0; padding: 12px 14px; border-radius: 12px; background: #E7F2EC; color: #0B5A42; font-size: 14px; }

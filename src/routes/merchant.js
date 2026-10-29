@@ -1,5 +1,5 @@
 // لوحة التاجر: كل استعلام مقيّد بتاجر المستخدم.
-import { requireUser } from '../lib/auth.js';
+import { hashPassword, requireUser, validPassword } from '../lib/auth.js';
 import { ask, assistantEnabled, merchantContext, tips } from '../lib/assistant.js';
 import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
 import { entriesWithFlags, FLAGS, hotspots, listDraws, monthlyReport, runDraw } from '../lib/insights.js';
@@ -20,11 +20,65 @@ function sellerFields(b) {
   };
 }
 
+// الموظف يشتغل على المنتجات والريلز والعلامات والتقارير، وما يوصل للإعدادات ولا بيانات العملاء
+function ownerOnly(path, m) {
+  if (/^\/api\/m\/(staff|notify|excluded|entries|logo|request-tags)(\/|\.|$)/.test(path)) return true;
+  if (/^\/api\/m\/draws/.test(path) && (m !== 'GET' || path.endsWith('.csv'))) return true;
+  if ((path === '/api/m/settings' || path === '/api/m/loyalty' || path === '/api/m/store') && m !== 'GET') return true;
+  return path === '/api/m/store/request';
+}
+const MAX_STAFF = 10;
+
 export async function handleMerchant(req, env, path) {
   const db = env.DB;
   const user = await requireUser(db, req, 'merchant');
   const mid = user.merchant_id;
   const m = req.method;
+  if (user.merchant_role === 'staff' && ownerOnly(path, m)) fail(403, 'هذي الصفحة لصاحب الحساب بس', 'owner_only');
+
+  // ---------- حسابات الموظفين ----------
+  if (path === '/api/m/staff' && m === 'GET') {
+    const r = await db.prepare("SELECT id,name,email,status,last_login_at,created_at FROM users WHERE merchant_id=? AND merchant_role='staff' ORDER BY id").bind(mid).all();
+    return json({ ok: true, staff: r.results, max: MAX_STAFF });
+  }
+  if (path === '/api/m/staff' && m === 'POST') {
+    const b = await readJson(req);
+    const n = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE merchant_id=? AND merchant_role='staff'").bind(mid).first();
+    if (n.n >= MAX_STAFF) fail(400, `وصلت الحد (${MAX_STAFF} موظفين)`);
+    const email = str(b.email, 'البريد', { max: 200 }).toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail(400, 'البريد غير صحيح');
+    if (await db.prepare('SELECT id FROM users WHERE email=?').bind(email).first()) fail(409, 'البريد مستخدم لحساب ثاني');
+    const { hash, salt } = await hashPassword(validPassword(b.password));
+    const row = await db
+      .prepare("INSERT INTO users(email,name,role,merchant_id,merchant_role,password_hash,password_salt,created_at) VALUES(?,?,'merchant',?,'staff',?,?,?) RETURNING id,name,email,status,created_at")
+      .bind(email, str(b.name, 'الاسم', { max: 100 }), mid, hash, salt, now())
+      .first();
+    await audit(db, user, 'staff_created', { email });
+    return json({ ok: true, staff: row }, 201);
+  }
+  let sm;
+  if ((sm = path.match(/^\/api\/m\/staff\/(\d+)$/)) && (m === 'PATCH' || m === 'DELETE')) {
+    const st = await db.prepare("SELECT id,email FROM users WHERE id=? AND merchant_id=? AND merchant_role='staff'").bind(Number(sm[1]), mid).first();
+    if (!st) fail(404, 'ما لقينا الموظف');
+    const stmts = [];
+    if (m === 'DELETE') stmts.push(db.prepare("UPDATE users SET status='disabled' WHERE id=?").bind(st.id));
+    else {
+      const b = await readJson(req);
+      if ('status' in b) {
+        if (!['active', 'disabled'].includes(b.status)) fail(400, 'الحالة غير معروفة');
+        stmts.push(db.prepare('UPDATE users SET status=? WHERE id=?').bind(b.status, st.id));
+      }
+      if ('password' in b) {
+        const { hash, salt } = await hashPassword(validPassword(b.password));
+        stmts.push(db.prepare('UPDATE users SET password_hash=?,password_salt=? WHERE id=?').bind(hash, salt, st.id));
+      }
+      if (!stmts.length) fail(400, 'ما فيه تغييرات');
+    }
+    stmts.push(db.prepare('DELETE FROM sessions WHERE user_id=?').bind(st.id));
+    await db.batch(stmts);
+    await audit(db, user, 'staff_updated', { email: st.email, method: m });
+    return json({ ok: true });
+  }
   if (path === '/api/m/store' || path.startsWith('/api/m/store/')) return handleMerchantStore(req, env, path, user);
 
   if (path === '/api/m/overview' && m === 'GET') {

@@ -92,6 +92,26 @@
           <div class="ibox"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><input name="password" type="password" autocomplete="current-password" required class="ltr" placeholder="••••••••••"><button type="button" class="eye" aria-label="إظهار كلمة المرور" data-eye><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button></div>
         </label>
         <button class="scan-btn" type="submit"><span class="scan-label">دخول</span><span class="scan-bar" aria-hidden="true"></span></button>
+        <button type="button" class="link-btn" data-show="forgot">نسيت كلمة المرور؟</button>
+      </form>
+      <form id="forgot" class="auth-form" hidden novalidate>
+        <div>
+          <h1>نسيت كلمة المرور؟</h1>
+          <p class="muted">اكتب بريدك، ويوصل طلبك لإدارة أصالة. بيرسلون لك رابط تختار منه كلمة مرور جديدة. لو أنت موظف، صاحب الحساب يغيّرها لك.</p>
+        </div>
+        <label class="ifield"><span>البريد الإلكتروني</span><div class="ibox"><input name="email" type="email" autocomplete="username" required class="ltr" placeholder="name@example.com"></div></label>
+        <button class="scan-btn" type="submit"><span class="scan-label">أرسل الطلب</span><span class="scan-bar" aria-hidden="true"></span></button>
+        <p class="tip-ok" id="forgot-done" hidden></p>
+        <button type="button" class="link-btn" data-show="login">رجوع لتسجيل الدخول</button>
+      </form>
+      <form id="reset" class="auth-form" hidden novalidate>
+        <div>
+          <h1>كلمة مرور جديدة</h1>
+          <p class="muted" id="reset-for">اختر كلمة مرور جديدة لحسابك.</p>
+        </div>
+        <label class="ifield"><span>كلمة المرور الجديدة (10 أحرف أو أكثر)</span><div class="ibox"><input name="password" type="password" minlength="10" autocomplete="new-password" required class="ltr"></div></label>
+        <label class="ifield"><span>أكّد كلمة المرور</span><div class="ibox"><input name="confirm" type="password" minlength="10" autocomplete="new-password" required class="ltr"></div></label>
+        <button class="scan-btn" type="submit"><span class="scan-label">احفظ كلمة المرور</span><span class="scan-bar" aria-hidden="true"></span></button>
       </form>
 
       <form id="setup" class="auth-form" hidden>

@@ -6,8 +6,9 @@ import { serveImage } from './lib/images.js';
 import { prepare } from './lib/schema.js';
 import { HttpError, json } from './lib/util.js';
 import { handleAdmin } from './routes/admin.js';
-import { changePassword, login, logout, me, setup } from './routes/auth.js';
+import { changePassword, forgotPassword, login, logout, me, resetPassword, setup } from './routes/auth.js';
 import { handleMerchant } from './routes/merchant.js';
+import { handleSeo } from './routes/seo.js';
 import { handlePublicStore } from './routes/store.js';
 import { handleCustomer } from './lib/customers.js';
 import { serveMedia } from './lib/store.js';
@@ -26,6 +27,10 @@ async function route(req, env) {
   env = await prepare(env);
   if (path.startsWith('/img/') && (m === 'GET' || m === 'HEAD')) return serveImage(env, path);
   if (path.startsWith('/media/') && (m === 'GET' || m === 'HEAD')) return serveMedia(req, env, path);
+  if ((m === 'GET' || m === 'HEAD') && (path === '/robots.txt' || path === '/sitemap.xml' || path.startsWith('/stores/p/') || path.startsWith('/stores/m/'))) {
+    const r = await handleSeo(req, env, path);
+    if (r) return r;
+  }
   if (path === '/api/public/store' || path.startsWith('/api/public/store/')) return handlePublicStore(req, env, path);
   if (path.startsWith('/api/c/')) return handleCustomer(req, env, path);
   if (path === '/api/verify' && m === 'POST') return verify(req, env);
@@ -48,6 +53,8 @@ async function route(req, env) {
   if (path === '/api/auth/me' && m === 'GET') return me(req, env);
   if (path === '/api/auth/password' && m === 'POST') return changePassword(req, env);
   if (path === '/api/setup' && m === 'POST') return setup(req, env);
+  if (path === '/api/auth/forgot' && m === 'POST') return forgotPassword(req, env);
+  if (path === '/api/auth/reset' && m === 'POST') return resetPassword(req, env);
   if (path.startsWith('/api/admin/')) return handleAdmin(req, env, path);
   if (path.startsWith('/api/m/')) return handleMerchant(req, env, path);
   return json({ ok: false, message: 'المسار غير موجود' }, 404);

@@ -232,12 +232,23 @@
 
     <section id="account" hidden>
       <div class="page-head"><div><h1>الحساب</h1></div></div>
-      <div class="card" style="margin-top:24px;max-width:480px">
+      <div class="card owner-only" id="staff-card" style="margin-top:24px;max-width:720px">
+        <div class="card-head"><h2>الموظفين 👥</h2><span class="small muted" id="staff-count"></span></div>
+        <p class="small muted" style="margin:0">أضف موظف يدخل بحسابه الخاص. يقدر يضيف المنتجات والريلز ويرد على التعليقات ويتابع العلامات والتقارير. ما يشوف أرقام العملاء ولا يغيّر الإعدادات.</p>
+        <div class="table-wrap" id="staff-list"></div>
+        <form id="staff-form" class="form-grid">
+          <label class="field">الاسم<input name="name" required maxlength="100"></label>
+          <label class="field">البريد<input name="email" type="email" required class="ltr"></label>
+          <label class="field">كلمة مرور مؤقتة<input name="password" type="text" minlength="10" required class="ltr" autocomplete="off"></label>
+          <div style="align-self:end"><button class="btn btn-primary" type="submit">إضافة موظف</button></div>
+        </form>
+      </div>
+      <div class="card owner-only" style="margin-top:24px;max-width:480px">
         <h2>شعار علامتك التجارية</h2>
         <p class="small muted" style="margin:0">يظهر في صفحة التحقق، وبدل صورة المنتج للدفعات اللي ما لها صورة.</p>
         <div id="logo-box"></div>
       </div>
-      <form class="card" id="notify-form" style="margin-top:24px;max-width:480px">
+      <form class="card owner-only" id="notify-form" style="margin-top:24px;max-width:480px">
         <h2>تنبيهات واتساب 💬</h2>
         <p class="small muted" style="margin:0">توصلك رسالة لما يقرب مخزون العلامات يخلص، أو يجيك بلاغ تقليد، أو تصير موجة أكواد مزيّفة.</p>
         <p id="notify-off" class="tip info" style="margin:0" hidden>الإرسال بيبدأ لما تفعّل أصالة خدمة واتساب. احفظ رقمك من الحين.</p>

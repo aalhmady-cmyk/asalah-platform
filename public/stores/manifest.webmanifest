@@ -1,0 +1,22 @@
+{
+  "name": "متاجر أصالة",
+  "short_name": "متاجر أصالة",
+  "description": "منتجات أصلية وموثّقة من علامات سعودية، مع ريلز ومساعد تسوق ذكي.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/stores/?src=app",
+  "scope": "/stores/",
+  "display": "standalone",
+  "background_color": "#0F2A21",
+  "theme_color": "#0F2A21",
+  "categories": ["shopping"],
+  "icons": [
+    { "src": "/stores/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/stores/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/stores/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "ريلز", "url": "/stores/?v=reels", "icons": [{ "src": "/stores/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "حسابي", "url": "/stores/?v=account", "icons": [{ "src": "/stores/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

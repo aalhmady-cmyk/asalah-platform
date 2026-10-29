@@ -60,15 +60,16 @@ export async function loadStore() {
       <div class="kpi"><span class="label">ضغطات "اشتر الآن"</span><span class="value">${num(S.stats.clicks + S.stats.reel_clicks)}</span><span class="note">تحوّلت لمتجرك في سلة</span></div>
       <div class="kpi"><span class="label">مشاهدات الريلز</span><span class="value">${num(S.stats.reel_views)}</span></div>
     </div>
+    <div class="card" style="margin-top:24px" id="st-stats"></div>
     <div class="row" style="margin-top:24px">
       <form class="card" id="st-sync">
         <div class="card-head"><h2>🔄 اسحب منتجاتك من سلة</h2></div>
         <p class="small muted" style="margin:0">الصق رابط متجرك كامل أو رابط منتج واحد. نقرأ المنتجات بصورها وأسعارها، وأنت تعلّم على اللي تبي تنشره.</p>
         <div class="st-inline"><input name="store_url" type="url" required class="ltr" value="${S.store_url || ''}" placeholder="https://your-store.salla.sa" aria-label="رابط متجرك أو رابط منتج"><button class="btn btn-primary" type="submit">اقرأ المنتجات</button></div>
-        <label class="check"><input type="checkbox" name="auto" data-st="auto" ${S.auto_sync ? 'checked' : ''}> حدّث الأسعار تلقائياً من سلة (كل 12 ساعة)</label>
+        <label class="check owner-only"><input type="checkbox" name="auto" data-st="auto" ${S.auto_sync ? 'checked' : ''}> حدّث الأسعار تلقائياً من سلة (كل 12 ساعة)</label>
         <div id="st-sync-body"></div>
       </form>
-      <form class="card" id="st-coupon">
+      <form class="card owner-only" id="st-coupon">
         <div class="card-head"><h2>🎟️ كوبون متاجر أصالة</h2>${S.coupon.code ? html`<span class="small muted">انسخ ${num(S.coupon.copies)} مرة</span>` : ''}</div>
         <p class="small muted" style="margin:0">سوّ كود خصم في سلة خاص بعملاء أصالة، واكتبه هنا. يظهر للعميل مع زر "اشتر الآن"، وتعرف من سلة كم طلب جاك منا.</p>
         <div class="form-grid">
@@ -90,6 +91,54 @@ export async function loadStore() {
   renderCompose();
   renderProducts();
   renderReels();
+  loadStats(STATS_DAYS);
+}
+
+// ---------- تقرير المتجر: رسم بياني للمشاهدات والضغطات ----------
+let STATS_DAYS = 30;
+async function loadStats(days) {
+  STATS_DAYS = days;
+  const el = $('st-stats');
+  if (!el) return;
+  let d;
+  try { d = await api('/api/m/store/stats?days=' + days); } catch (e) { return render(el, html`<div class="empty">${e.message}</div>`); }
+  // نعبّي الأيام الفاضية بصفر عشان الرسم يكون متصل
+  const map = Object.fromEntries(d.daily.map((x) => [x.day, x]));
+  const series = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const day = new Date(Date.now() + 3 * 3600e3 - i * 86400e3).toISOString().slice(0, 10);
+    series.push({ day, views: map[day]?.views || 0, clicks: map[day]?.clicks || 0 });
+  }
+  const tv = series.reduce((a, x) => a + x.views, 0), tc = series.reduce((a, x) => a + x.clicks, 0);
+  const rate = tv ? ((tc / tv) * 100).toFixed(1) : '0';
+  render(el, html`<div class="card-head"><h2>📈 أداء متجرك</h2>
+      <div class="st-seg" role="group" aria-label="المدة">${[7, 30, 90].map((n) => html`<button type="button" data-st="stats" data-days="${n}" aria-pressed="${n === days}">${n === 7 ? 'أسبوع' : n === 30 ? 'شهر' : '3 شهور'}</button>`)}</div></div>
+    <div class="st-stat-kpis">
+      <div><small><span class="st-dot v"></span>مشاهدات</small><b>${num(tv)}</b></div>
+      <div><small><span class="st-dot c"></span>ضغطات "اشتر"</small><b>${num(tc)}</b></div>
+      <div><small>نسبة الشراء من المشاهدة</small><b>${rate}٪</b></div>
+    </div>
+    ${tv || tc ? chart(series) : html`<div class="empty">ما فيه زيارات في هالمدة للحين. شارك رابط متجرك في واتساب وانستقرام عشان تبدأ الأرقام 🚀</div>`}
+    <div class="row st-tops">
+      <div><h3>أكثر المنتجات جلباً للزباين</h3>${d.top.length ? html`<ol class="st-top">${d.top.map((p) => html`<li>${p.image_url ? html`<img src="${p.image_url}" alt="" loading="lazy">` : html`<span class="ph">🛍️</span>`}<span>${p.title}</span><small>👁 ${num(p.views)} · 🛒 ${num(p.clicks)}</small></li>`)}</ol>` : html`<p class="small muted">بيطلع هنا لما تجيك زيارات</p>`}</div>
+      <div><h3>أكثر الريلز جلباً للزباين</h3>${d.top_reels.length ? html`<ol class="st-top">${d.top_reels.map((r) => html`<li>${r.poster_url ? html`<img src="${r.poster_url}" alt="" loading="lazy">` : html`<span class="ph">🎬</span>`}<span>${r.title}</span><small>👁 ${num(r.views)} · 🛒 ${num(r.clicks)}</small></li>`)}</ol>` : html`<p class="small muted">ارفع ريل وبيطلع أداؤه هنا</p>`}</div>
+    </div>`);
+}
+// أعمدة المشاهدات وخط الضغطات (SVG داخل الصفحة)
+function chart(series) {
+  const W = 720, H = 200, P = 24, n = series.length;
+  const bw = (W - P * 2) / n;
+  const mv = Math.max(1, ...series.map((x) => x.views)), mc = Math.max(1, ...series.map((x) => x.clicks));
+  const y = (v, m) => H - P - (v / m) * (H - P * 2);
+  const pts = series.map((x, i) => `${(P + bw * i + bw / 2).toFixed(1)},${y(x.clicks, mc).toFixed(1)}`).join(' ');
+  const label = (iso) => new Date(iso + 'T12:00:00Z').toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { day: 'numeric', month: 'short' });
+  const step = Math.ceil(n / 6);
+  return raw(`<div class="st-chart"><svg viewBox="0 0 ${W} ${H + 18}" role="img" aria-label="المشاهدات والضغطات لكل يوم" preserveAspectRatio="none">
+    ${series.map((x, i) => `<rect x="${(P + bw * i + bw * 0.15).toFixed(1)}" y="${y(x.views, mv).toFixed(1)}" width="${(bw * 0.7).toFixed(1)}" height="${(H - P - y(x.views, mv)).toFixed(1)}" rx="3" class="v"><title>${label(x.day)}: ${x.views} مشاهدة، ${x.clicks} ضغطة</title></rect>`).join('')}
+    <polyline points="${pts}" class="c" fill="none"/>
+    ${series.map((x, i) => (x.clicks ? `<circle cx="${(P + bw * i + bw / 2).toFixed(1)}" cy="${y(x.clicks, mc).toFixed(1)}" r="3.5" class="c"/>` : '')).join('')}
+    ${series.map((x, i) => (i % step === 0 || i === n - 1 ? `<text x="${(P + bw * i + bw / 2).toFixed(1)}" y="${H + 12}" text-anchor="middle">${i === n - 1 ? 'اليوم' : label(x.day)}</text>` : '')).join('')}
+  </svg></div>`);
 }
 
 function renderLocked(root) {
@@ -383,7 +432,7 @@ function drawRows() {
     const qy = quality(p);
     return html`<div class="st-tr ${p.status === 'hidden' ? 'off' : ''}" role="row">
       <span role="cell"><input type="checkbox" data-sel="${p.id}" ${raw(PF.sel.has(p.id) ? 'checked' : '')} aria-label="تحديد ${p.title}"></span>
-      <span role="cell" class="st-td-p"><span class="st-td-img">${p.image_url ? html`<img src="${p.image_url}" alt="" loading="lazy">` : raw('🛍️')}</span><span><b>${p.title}</b><small class="muted">${S.categories[p.category]}${p.sync_error ? ' · ⚠️ ما تحدّث السعر' : ''}</small></span></span>
+      <span role="cell" class="st-td-p"><span class="st-td-img">${p.image_url ? html`<img src="${p.image_url}" alt="" loading="lazy">` : raw('🛍️')}</span><span><b>${p.title}</b><small class="muted">${S.categories[p.category]}${p.sync_error ? ' · ⚠️ ما تحدّث السعر' : ''}</small>${p.admin_blocked ? html`<small class="st-blocked">🚫 أوقفته إدارة أصالة، ما يظهر للعملاء</small>` : ''}</span></span>
       <span role="cell" class="st-td-price"><b>${sar(p.price)}</b>${p.old_price ? html`<s>${sar(p.old_price)}</s>` : ''}</span>
       <span role="cell" class="small muted">👁 ${num(p.views)} · 🛒 ${num(p.clicks)}${p.comments || p.rating_n ? html`<br><button class="st-link" type="button" data-st="p-comments" data-id="${p.id}">⭐ ${p.rating_n ? (p.rating_sum / p.rating_n).toFixed(1) : '–'} · 💬 ${num(p.comments)}</button>` : ''}</span>
       <span role="cell" class="st-q" title="${qy.tips.join('، ') || 'البطاقة كاملة'}"><i style="--q:${qy.score}%"></i><small>${qy.tips[0] || 'ممتازة ✓'}</small></span>
@@ -427,7 +476,7 @@ function renderReels() {
   render(el, html`<div class="st-reels">${S.reels.map(
     (r) => html`<article class="st-reel ${r.status === 'hidden' ? 'off' : ''}">
       <div class="st-reel-media">${r.video_url ? html`<video data-rid="${r.id}" src="${r.video_url}${r.clip ? '#t=' + r.clip.start : ''}" poster="${r.poster_url || ''}" preload="${r.poster_url ? 'none' : 'metadata'}" playsinline></video><span class="st-tap" aria-hidden="true">▶</span>` : r.poster_url ? html`<img src="${r.poster_url}" alt="" loading="lazy">` : ''}<span class="st-dur">${r.duration} ث</span></div>
-      ${r.status === 'active' ? html`<a class="small" href="/stores/?v=reels&r=${r.id}" target="_blank" rel="noopener">✅ منشور في المتاجر ↗</a>` : r.status === 'uploading' ? html`<span class="small" style="color:var(--danger,#b42318)">⚠️ الفيديو ما وصل كامل. احذفه وارفعه مرة ثانية</span>` : html`<span class="small muted">مخفي عن المتاجر</span>`}
+      ${r.admin_blocked ? html`<span class="small st-blocked">🚫 أوقفته إدارة أصالة</span>` : r.status === 'active' && r.publish_at && r.publish_at * 1000 > Date.now() ? html`<span class="small st-sched">⏰ ينزل ${new Date(r.publish_at * 1000).toLocaleString('ar-SA-u-ca-gregory-nu-latn', { weekday: 'long', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })} <button class="st-link" type="button" data-st="reel-now" data-id="${r.id}">انشره الحين</button></span>` : r.status === 'active' ? html`<a class="small" href="/stores/?v=reels&r=${r.id}" target="_blank" rel="noopener">✅ منشور في المتاجر ↗</a>` : r.status === 'uploading' ? html`<span class="small" style="color:var(--danger,#b42318)">⚠️ الفيديو ما وصل كامل. احذفه وارفعه مرة ثانية</span>` : html`<span class="small muted">مخفي عن المتاجر</span>`}
       <b>${r.title}</b>
       <div class="small muted">👁 ${num(r.views)} · 🛒 ${num(r.clicks)} · ❤️ ${num(r.likes || 0)} · 💬 ${num(r.comments || 0)}${r.rating ? ` · ⭐ ${r.rating.avg}` : ''}</div>
       <div class="actions">
@@ -467,6 +516,11 @@ function reelDialog(file, duration, original) {
         <label class="field"><span>يبدأ من الثانية <b data-out="start">0</b></span><input name="start" type="range" min="0" max="${Math.max(0, Math.floor(duration - S.reel_limits.min))}" step="0.5" value="0"></label>
         <label class="field"><span>المدة <b data-out="dur">${maxDur}</b> ثانية <small class="muted">(من ${S.reel_limits.min} إلى ${S.reel_limits.max})</small></span><input name="dur" type="range" min="${S.reel_limits.min}" max="${maxDur}" step="1" value="${maxDur}"></label>
         <label class="field"><span>التكبير</span><input name="zoom" type="range" min="1" max="2.5" step="0.05" value="1"></label>
+        <fieldset class="st-when"><legend>وقت النشر</legend>
+          <label class="check"><input type="radio" name="when" value="now" checked> الحين</label>
+          <label class="check"><input type="radio" name="when" value="later"> جدوله لوقت ثاني</label>
+          <input name="at" type="datetime-local" class="ltr" hidden aria-label="وقت النشر">
+        </fieldset>
         <div class="actions"><button class="btn" type="button" data-play>▶︎ شغّل المقطع</button><button class="btn btn-gold" type="submit">${original ? 'انشر الريل' : 'قص وانشر'}</button></div>
         <div class="st-progress" hidden><div class="bar"><i></i></div><span></span></div>
       </div>
@@ -509,6 +563,16 @@ async function newReel() {
   };
   form.addEventListener('input', sync);
   sync();
+  // جدولة: نقترح بكرة الساعة 8 المغرب (وقت ذروة المشاهدة)
+  const at = form.at;
+  const pad = (x) => String(x).padStart(2, '0');
+  const local = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const tmr = new Date(Date.now() + 86400e3);
+  tmr.setHours(20, 0, 0, 0);
+  at.value = local(tmr);
+  at.min = local(new Date(Date.now() + 5 * 60e3));
+  at.max = local(new Date(Date.now() + 59 * 86400e3));
+  form.addEventListener('change', (e) => { if (e.target.name === 'when') at.hidden = form.when.value !== 'later'; });
   let working = false;
   const close = () => { if (working) return; editor.dispose(); dlg.close(); dlg.remove(); };
   dlg.querySelector('[data-x]').addEventListener('click', close);
@@ -555,13 +619,18 @@ async function newReel() {
       }
       const base = original ? 0 : 0.5;
       step(base, 'نجهّز الرفع…');
-      const { id } = await api('/api/m/store/reels', { method: 'POST', body: { title: form.title.value, product_id: form.product_id.value ? Number(form.product_id.value) : null, duration: s.dur, poster: out.poster, clip: out.clip || null } });
+      let publish_at = null;
+      if (form.when.value === 'later') {
+        publish_at = Math.floor(new Date(form.at.value).getTime() / 1000);
+        if (!publish_at || publish_at * 1000 < Date.now() + 60e3) throw new Error('اختر وقت نشر جاي');
+      }
+      const { id } = await api('/api/m/store/reels', { method: 'POST', body: { title: form.title.value, product_id: form.product_id.value ? Number(form.product_id.value) : null, duration: s.dur, poster: out.poster, clip: out.clip || null, publish_at } });
       const mb = (out.video.size / 1048576).toFixed(1);
       await upload(`/api/m/store/reels/${id}/video`, out.video, (p) => step(base + p * (1 - base) * 0.98, `نرفع الريل… ${(p * mb).toFixed(1)} من ${mb} ميجا. خل الصفحة مفتوحة`));
       step(1, 'تم! 🎉');
       working = false;
       close();
-      toast('نُشر الريل في متاجر أصالة 🎬');
+      toast(publish_at ? 'تمت الجدولة ⏰ الريل بينزل في وقته' : 'نُشر الريل في متاجر أصالة 🎬');
       await loadStore();
     } catch (err) {
       working = false;
@@ -581,13 +650,27 @@ async function reelComments(id, kind = 'reels') {
   const draw = async () => {
     const { comments } = await api(`/api/m/store/${kind}/${id}/comments`);
     render(dlg, html`<div class="card-head"><h2>${kind === 'reels' ? 'تعليقات الريل' : 'تقييمات وتعليقات المنتج'} 💬</h2><button class="btn btn-sm" type="button" data-x>إغلاق</button></div>
-      ${comments.length ? html`<div class="st-cm-list">${comments.map((c) => html`<div class="st-cm"><div><b>${c.name}</b> ${c.rating ? '⭐'.repeat(c.rating) : ''}<div class="small muted">${new Date(c.created_at * 1000).toLocaleString('ar-SA-u-nu-latn')}</div>${c.body ? html`<p>${c.body}</p>` : ''}</div>
+      ${comments.length ? html`<div class="st-cm-list">${comments.map((c) => html`<div class="st-cm"><div><b>${c.name}</b> ${c.rating ? '⭐'.repeat(c.rating) : ''}<div class="small muted">${new Date(c.created_at * 1000).toLocaleString('ar-SA-u-nu-latn')}</div>${c.body ? html`<p>${c.body}</p>` : ''}
+          ${c.reply ? html`<div class="st-reply"><b>ردك ✓</b> ${c.reply} <button class="st-link" type="button" data-unreply="${c.id}">حذف الرد</button></div>` : c.body ? html`<form class="st-reply-f" data-reply="${c.id}"><input name="reply" maxlength="300" required placeholder="اكتب ردك للعميل…" aria-label="ردك"><button class="btn btn-sm btn-primary" type="submit">رد</button></form>` : ''}</div>
         <button class="btn btn-sm btn-danger" type="button" data-del="${c.id}">حذف</button></div>`)}</div>` : html`<div class="empty">ما فيه تعليقات</div>`}`);
   };
   dlg.addEventListener('click', async (e) => {
     if (e.target.closest('[data-x]')) { dlg.close(); dlg.remove(); return loadStore(); }
     const d = e.target.closest('[data-del]');
     if (d && confirm('تحذف التعليق؟')) { await api(`/api/m/store/${kind}/${id}/comments/${d.dataset.del}`, { method: 'DELETE' }); await draw(); }
+    const u = e.target.closest('[data-unreply]');
+    if (u && confirm('تحذف ردك؟')) { await api(`/api/m/store/${kind}/${id}/comments/${u.dataset.unreply}`, { method: 'PATCH', body: { reply: null } }); await draw(); }
+  });
+  dlg.addEventListener('submit', async (e) => {
+    const f = e.target.closest('[data-reply]');
+    if (!f) return;
+    e.preventDefault();
+    f.querySelector('button').disabled = true;
+    try {
+      await api(`/api/m/store/${kind}/${id}/comments/${f.dataset.reply}`, { method: 'PATCH', body: { reply: f.reply.value } });
+      toast('وصل ردك، ويظهر تحت تعليق العميل');
+      await draw();
+    } catch (err) { toast(err.message, true); f.querySelector('button').disabled = false; }
   });
   await draw();
   dlg.showModal();
@@ -676,6 +759,11 @@ document.addEventListener('click', async (e) => {
       if (!confirm('تحذف المنتج نهائياً؟')) return;
       await api('/api/m/store/products/' + id, { method: 'DELETE' });
       toast('انحذف المنتج');
+      await loadStore();
+    } else if (act === 'stats') await loadStats(Number(b.dataset.days));
+    else if (act === 'reel-now') {
+      await api('/api/m/store/reels/' + id, { method: 'PATCH', body: { publish_at: null } });
+      toast('نُشر الريل الحين 🎬');
       await loadStore();
     } else if (act === 'reel-new') await newReel();
     else if (act === 'reel-comments') await reelComments(id);
