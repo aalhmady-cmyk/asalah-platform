@@ -1,7 +1,7 @@
 // إشعارات الجوال: اشتراك الأجهزة (عام) وحملات اللوحة الأم (الإدارة)
 import { currentCustomer } from '../lib/customers.js';
 import { imageUrl } from '../lib/images.js';
-import { continueCampaign, unb64u, validEndpoint, vapidKeys } from '../lib/push.js';
+import { continueCampaign, sendMany, unb64u, validEndpoint, vapidKeys } from '../lib/push.js';
 import { audit, fail, int, ipHash, json, now, rateLimit, readJson, str } from '../lib/util.js';
 
 const sameSite = (req) => {
@@ -37,6 +37,16 @@ export async function handlePublicPush(req, env, path) {
   if (path === '/api/public/push/unsubscribe') {
     if (typeof b.endpoint === 'string') await db.prepare('DELETE FROM push_subs WHERE endpoint=?').bind(b.endpoint).run();
     return json({ ok: true });
+  }
+  // إشعار تجربة لنفس الجهاز بس (يتأكد العميل إن الإشعار والصوت يوصلون)
+  if (path === '/api/public/push/test') {
+    await rateLimit(db, 'pushtest:' + (await ipHash(req)), 5, 3600);
+    if (!validEndpoint(b.endpoint)) fail(400, 'اشتراك غير صالح');
+    const sub = await db.prepare('SELECT id,endpoint,p256dh,auth,lang FROM push_subs WHERE endpoint=?').bind(b.endpoint).first();
+    if (!sub) return json({ ok: true, sent: 0 });
+    const en = sub.lang === 'en';
+    const r = await sendMany(db, [sub], () => ({ title: en ? 'Asalah Stores 🔔' : 'متاجر أصالة 🔔', body: en ? 'Notifications are working on your phone ✅' : 'الإشعارات شغالة على جوالك ✅', url: '/stores/', tag: 'test' }));
+    return json({ ok: true, sent: r.sent });
   }
   if (path === '/api/public/push/click') {
     const id = int(b.c, 'الحملة', { min: 1 });

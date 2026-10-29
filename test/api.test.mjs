@@ -799,6 +799,10 @@ test('الإشعارات: الاشتراك والحملات من اللوحة ا
   await post('/api/public/push/click', { c: c.data.campaign.id });
   st = await call('/api/admin/push', { cookie: S.admin });
   assert.equal(st.data.campaigns[0].clicks, 1);
+  const tp = await post('/api/public/push/test', { endpoint: 'https://fcm.googleapis.com/fcm/send/none' });
+  assert.equal(tp.status, 200);
+  assert.equal(tp.data.sent, 0);
+  assert.equal((await post('/api/public/push/test', { endpoint: 'https://evil.test/x' })).status, 400);
   assert.equal((await post('/api/public/push/unsubscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/t1' })).status, 200);
   assert.equal((await call('/api/admin/push', { cookie: S.admin })).data.stats.total, 0);
 });

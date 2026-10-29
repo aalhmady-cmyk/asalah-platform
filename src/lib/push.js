@@ -80,7 +80,7 @@ export async function sendPush(keys, sub, payload) {
     const body = await encryptPayload(sub.p256dh, sub.auth, JSON.stringify(payload));
     const r = await fetch(sub.endpoint, {
       method: 'POST',
-      headers: { Authorization: await vapidAuth(keys, sub.endpoint), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '86400', Urgency: 'normal' },
+      headers: { Authorization: await vapidAuth(keys, sub.endpoint), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '86400', Urgency: 'high' },
       body,
     });
     if (r.status === 404 || r.status === 410) return 'gone';

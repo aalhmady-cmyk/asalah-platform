@@ -1252,7 +1252,7 @@ const A = {
     was: (p) => `كان ${p}`, dropped: 'نزل السعر 🎉', stop: 'إلغاء', favs: '♡ المفضلة', favsN: (n) => `${n} منتج في المفضلة`, openFavs: 'افتح المفضلة',
     myComments: '💬 تعليقاتي', noMine: 'ما علّقت على شي للحين.', onP: 'على منتج', onR: 'على ريل', logout: 'تسجيل الخروج', unavailable: 'غير متاح حالياً',
     app: '📲 تطبيق متاجر أصالة', appP: 'ثبّت المتاجر على شاشة جوالك الرئيسية، وتفتح بضغطة مثل أي تطبيق.', installBtn: 'ثبّت التطبيق', installed: 'التطبيق مثبّت على جهازك ✅',
-    pushT: '🔔 فعّل الإشعارات', pushP: 'يوصلك تنبيه إذا نزل سعر منتج تتابعه، أو رد عليك التاجر، وعروض أصالة الحصرية.', pushBtn: 'فعّل', pushOn: 'الإشعارات مفعّلة ✅', pushOff: 'أوقف الإشعارات', pushBlocked: 'الإشعارات موقفة من إعدادات جوالك. فعّلها من الإعدادات ثم التطبيقات ثم متاجر أصالة.', pushDone: 'تم، بيوصلك كل جديد 🔔', pushWatch: 'عشان يوصلك تنبيه نزول السعر على جوالك 👇', pushNeedApp: 'ثبّت التطبيق أول عشان توصلك الإشعارات على جوالك.', pushErr: 'ما قدرنا نفعّل الإشعارات، جرّب بعدين',
+    pushT: '🔔 فعّل الإشعارات', pushP: 'يوصلك تنبيه إذا نزل سعر منتج تتابعه، أو رد عليك التاجر، وعروض أصالة الحصرية.', pushBtn: 'فعّل', pushOn: 'الإشعارات مفعّلة ✅', pushOff: 'أوقف الإشعارات', pushBlocked: 'الإشعارات موقفة من إعدادات جوالك. فعّلها من الإعدادات ثم التطبيقات ثم متاجر أصالة.', pushDone: 'تم، بيوصلك كل جديد 🔔', pushWatch: 'عشان يوصلك تنبيه نزول السعر على جوالك 👇', pushNeedApp: 'ثبّت التطبيق أول عشان توصلك الإشعارات على جوالك.', pushErr: 'ما قدرنا نفعّل الإشعارات، جرّب بعدين', pushTest: 'جرّب إشعار', pushTestOk: 'أرسلنا لك إشعار تجربة، بيوصلك خلال ثواني 🔔', pushTestBad: 'ما وصل الإشعار لجوالك، اضغط «أوقف الإشعارات» ثم «فعّل» من جديد',
     iosHow: 'في سفاري: اضغط زر المشاركة ⬆️ تحت، بعدها «إضافة إلى الشاشة الرئيسية».', chromeHow: 'على أندرويد ثبّت التطبيق من متصفح Chrome، عشان تعتمده حماية جوجل وما ينحظر. لو ثبّته من متصفح ثاني وانحظر، احذفه وثبّته من Chrome.', chromeBtn: 'افتح في Chrome وثبّت', chromeBar: 'ثبّته من Chrome عشان حماية جوجل تقبله', barT: 'ثبّت متاجر أصالة على جوالك', later: 'لاحقاً',
   },
   en: {
@@ -1263,7 +1263,7 @@ const A = {
     was: (p) => `was ${p}`, dropped: 'Price dropped 🎉', stop: 'Stop', favs: '♡ Favourites', favsN: (n) => `${n} saved products`, openFavs: 'Open favourites',
     myComments: '💬 My comments', noMine: 'No comments yet.', onP: 'on a product', onR: 'on a reel', logout: 'Sign out', unavailable: 'Not available now',
     app: '📲 Asalah Stores app', appP: 'Add the stores to your home screen and open them in one tap like any app.', installBtn: 'Install app', installed: 'The app is installed ✅',
-    pushT: '🔔 Turn on notifications', pushP: 'Get alerted when a product you watch drops in price, when a merchant replies, and for exclusive Asalah offers.', pushBtn: 'Turn on', pushOn: 'Notifications are on ✅', pushOff: 'Turn off', pushBlocked: 'Notifications are blocked in your phone settings. Enable them from Settings, Apps, Asalah Stores.', pushDone: 'Done, you’ll get every update 🔔', pushWatch: 'To get the price-drop alert on your phone 👇', pushNeedApp: 'Install the app first to get notifications on your phone.', pushErr: 'Couldn’t turn on notifications, try later',
+    pushT: '🔔 Turn on notifications', pushP: 'Get alerted when a product you watch drops in price, when a merchant replies, and for exclusive Asalah offers.', pushBtn: 'Turn on', pushOn: 'Notifications are on ✅', pushOff: 'Turn off', pushBlocked: 'Notifications are blocked in your phone settings. Enable them from Settings, Apps, Asalah Stores.', pushDone: 'Done, you’ll get every update 🔔', pushWatch: 'To get the price-drop alert on your phone 👇', pushNeedApp: 'Install the app first to get notifications on your phone.', pushErr: 'Couldn’t turn on notifications, try later', pushTest: 'Test notification', pushTestOk: 'Test notification sent, it should arrive in seconds 🔔', pushTestBad: 'The notification did not reach your phone. Tap “Turn off” then enable again',
     iosHow: 'In Safari: tap Share ⬆️ then “Add to Home Screen”.', chromeHow: 'On Android, install the app from Chrome so Google Play Protect trusts it. If you installed it from another browser and it got blocked, remove it and install from Chrome.', chromeBtn: 'Open in Chrome to install', chromeBar: 'Install from Chrome so Play Protect trusts it', barT: 'Install Asalah Stores on your phone', later: 'Later',
   },
 };
@@ -1352,7 +1352,7 @@ const chromeBtn = (sm) => html`<a class="mk-btn gold${sm ? ' sm' : ''}" href="${
 function appCard() {
   if (standalone()) return html`<div class="mk-acc-box"><h2>${at('app')}</h2><p class="mk-muted">${at('installed')}</p>${pushRow()}</div>`;
   if (otherAndroid) return html`<div class="mk-acc-box"><h2>${at('app')}</h2><p class="mk-muted">${at('chromeHow')}</p>${chromeBtn()}</div>`;
-  return html`<div class="mk-acc-box"><h2>${at('app')}</h2><p class="mk-muted">${at('appP')}</p>${installEvt ? html`<button type="button" class="mk-btn gold" data-install>${at('installBtn')}</button>` : isIOS ? html`<p class="mk-ios">${at('iosHow')}</p>` : ''}</div>`;
+  return html`<div class="mk-acc-box"><h2>${at('app')}</h2><p class="mk-muted">${at('appP')}</p>${!isIOS ? pushRow() : ''}${installEvt ? html`<button type="button" class="mk-btn gold" data-install>${at('installBtn')}</button>` : isIOS ? html`<p class="mk-ios">${at('iosHow')}</p>` : ''}</div>`;
 }
 async function install() {
   if (otherAndroid) return (location.href = chromeUrl());
@@ -1399,7 +1399,7 @@ async function syncPush(create) {
 }
 async function enablePush() {
   $('#push-bar')?.remove();
-  if (!standalone()) return toast(at('pushNeedApp'));
+  if (isIOS && !standalone()) return toast(at('pushNeedApp'));
   try {
     const p = await Notification.requestPermission();
     if (p !== 'granted') { keep('asalah_push_x', Date.now()); if (document.body.dataset.view === 'account') showAccount(); return; }
@@ -1418,11 +1418,20 @@ async function disablePush() {
   showAccount();
 }
 let pushOnNow = false;
+async function testPush() {
+  try {
+    const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    if (!sub) throw 0;
+    await syncPush(false);
+    const r = await cpost('/api/public/push/test', 'POST', { endpoint: sub.endpoint, lang });
+    toast(r.sent ? at('pushTestOk') : at('pushTestBad'));
+  } catch { toast(at('pushTestBad')); }
+}
 function pushRow() {
   const st = pushState();
   if (st === 'na') return '';
   if (st === 'denied') return html`<p class="mk-ios">${at('pushBlocked')}</p>`;
-  if (st === 'granted' && pushOnNow) return html`<div class="mk-push-row"><span>${at('pushOn')}</span><button type="button" class="mk-link" data-push-off>${at('pushOff')}</button></div>`;
+  if (st === 'granted' && pushOnNow) return html`<div class="mk-push-row"><span>${at('pushOn')}</span><button type="button" class="mk-btn ghost-d sm" data-push-test>${at('pushTest')}</button><button type="button" class="mk-link" data-push-off>${at('pushOff')}</button></div>`;
   return html`<div class="mk-push-row"><span>${at('pushP')}</span><button type="button" class="mk-btn gold sm" data-push>${at('pushBtn')}</button></div>`;
 }
 function pushBar(why) {
@@ -1436,11 +1445,12 @@ function pushBar(why) {
 document.addEventListener('click', (e) => {
   if (e.target.closest('[data-push]')) return enablePush();
   if (e.target.closest('[data-push-off]')) return disablePush();
+  if (e.target.closest('[data-push-test]')) return testPush();
   if (e.target.closest('[data-push-x]')) { keep('asalah_push_x', Date.now()); $('#push-bar')?.remove(); }
 });
 if (pushOk && standalone()) {
   // كل فتحة: نحدّث الاشتراك (يربطه بالحساب بعد الدخول)، وإذا ما قرر للحين نعرض الطلب بعد 25 ثانية استخدام
-  if (Notification.permission === 'granted') syncPush(false).then((ok) => { pushOnNow = ok; }).catch(() => {});
+  if (Notification.permission === 'granted') syncPush(true).then((ok) => { pushOnNow = ok; }).catch(() => {});
   else setTimeout(() => pushBar(), 25000);
 } else if (pushOk && Notification.permission === 'granted') {
   navigator.serviceWorker.ready.then((r) => r.pushManager.getSubscription()).then((s) => { pushOnNow = !!s; if (s) syncPush(false).catch(() => {}); }).catch(() => {});

@@ -1,6 +1,6 @@
 // تطبيق متاجر أصالة: نحفظ واجهة المتاجر عشان تفتح بسرعة وتشتغل حتى لو النت ضعيف.
 // البيانات (/api) والفيديو (/media) دائماً من الشبكة.
-const CACHE = 'asalah-stores-v3';
+const CACHE = 'asalah-stores-v4';
 const SHELL = ['/stores/', '/stores/market.css', '/stores/market.js', '/stores/theme.js', '/stores/clip.js', '/assets/common.js', '/stores/icons/icon-192.png'];
 
 self.addEventListener('install', (e) => {
@@ -48,6 +48,9 @@ self.addEventListener('push', (e) => {
       badge: '/stores/icons/badge-96.png',
       image: d.image,
       tag: d.tag,
+      renotify: !!d.tag,
+      silent: false,
+      vibrate: [200, 100, 200],
       dir: 'auto',
       data: { url: d.url, c: d.c },
     })
