@@ -1,4 +1,5 @@
 // لوحة التاجر: كل استعلام مقيّد بتاجر المستخدم.
+import { pushAlert } from '../lib/push.js';
 import { hashPassword, requireUser, validPassword } from '../lib/auth.js';
 import { ask, assistantEnabled, merchantContext, tips } from '../lib/assistant.js';
 import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
@@ -410,6 +411,7 @@ export async function handleMerchant(req, env, path) {
       .prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(?,'tag_request',?,?)")
       .bind(mid, `طلب ${count.toLocaleString('en-US')} ${qr ? 'ملصق QR جديد' : 'علامة NFC جديدة'} من ${name}${note ? ': ' + note : ''}`, now())
       .run();
+    await pushAlert(db, mid, 'tag_request', `طلب ${count.toLocaleString('en-US')} ${qr ? 'ملصق QR جديد' : 'علامة NFC جديدة'} من ${name}${note ? ': ' + note : ''}`);
     await audit(db, user, 'tags_requested', { count, note, kind: qr ? 'qr' : 'nfc' });
     return json({ ok: true, message: 'وصل طلبك لإدارة أصالة' });
   }

@@ -1,3 +1,4 @@
+import { initPanelApp } from '/assets/panel-app.js';
 import { api, bars, BATCH_STATUS, hbars, hotspotsTable, html, pickImage, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
@@ -8,6 +9,7 @@ if (me.user.role !== 'admin') location.href = '/merchant/';
 $('me').textContent = me.user.name;
 $('greet').textContent = `أهلاً ${me.user.name}`;
 $('logout').addEventListener('click', logout);
+initPanelApp({ scope: '/admin/', title: 'اللوحة الأم', what: 'لما يوصلك طلب انضمام تاجر، أو طلب علامات، أو طلب اشتراك متجر، أو تنبيه مخزون' });
 
 // ---------- النوافذ ----------
 document.addEventListener('click', (e) => {

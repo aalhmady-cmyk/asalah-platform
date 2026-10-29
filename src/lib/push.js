@@ -91,7 +91,7 @@ export async function sendPush(keys, sub, payload) {
 }
 
 // يرسل لمجموعة مشتركين بالتوازي (دفعات صغيرة) ويحذف المنتهية
-export async function sendMany(db, subs, payloadFor) {
+export async function sendMany(db, subs, payloadFor, table = 'push_subs') {
   if (!subs.length) return { sent: 0, failed: 0 };
   const keys = await vapidKeys(db);
   let sent = 0, failed = 0;
@@ -106,8 +106,8 @@ export async function sendMany(db, subs, payloadFor) {
   }
   const t = now();
   const stmts = [];
-  if (gone.length) stmts.push(db.prepare(`DELETE FROM push_subs WHERE id IN (${gone.map(() => '?').join(',')})`).bind(...gone));
-  if (ok.length) stmts.push(db.prepare(`UPDATE push_subs SET last_at=? WHERE id IN (${ok.map(() => '?').join(',')})`).bind(t, ...ok));
+  if (gone.length) stmts.push(db.prepare(`DELETE FROM ${table} WHERE id IN (${gone.map(() => '?').join(',')})`).bind(...gone));
+  if (ok.length) stmts.push(db.prepare(`UPDATE ${table} SET last_at=? WHERE id IN (${ok.map(() => '?').join(',')})`).bind(t, ...ok));
   if (stmts.length) await db.batch(stmts);
   return { sent, failed };
 }
@@ -121,6 +121,27 @@ export async function pushToCustomers(db, customerIds, payload) {
     await sendMany(db, subs, () => payload);
   } catch (e) {
     console.error('ASALAH_PUSH', e?.stack || e);
+  }
+}
+
+// تنبيهات اللوحات توصل جوال التاجر والمدير. التاجر ما يشوف طلباته للإدارة، والمدير ما يشوف رسائل التاجر الخاصة
+const MERCHANT_SKIP = ['tag_request', 'store_request'];
+const ADMIN_SKIP = ['store_blocked', 'staff_password'];
+export async function pushAlert(db, merchantId, kind, message) {
+  try {
+    const parts = [];
+    if (merchantId && !MERCHANT_SKIP.includes(kind)) {
+      const ownerOnly = kind === 'staff_password' ? " AND u.merchant_role='owner'" : '';
+      parts.push(['/merchant/', (await db.prepare(`SELECT p.id,p.endpoint,p.p256dh,p.auth FROM user_push p JOIN users u ON u.id=p.user_id WHERE u.role='merchant' AND u.merchant_id=? AND u.status='active'${ownerOnly} LIMIT 10`).bind(merchantId).all()).results]);
+    }
+    if (!ADMIN_SKIP.includes(kind)) {
+      parts.push(['/admin/', (await db.prepare("SELECT p.id,p.endpoint,p.p256dh,p.auth FROM user_push p JOIN users u ON u.id=p.user_id WHERE u.role='admin' AND u.status='active' LIMIT 10").all()).results]);
+    }
+    for (const [url, subs] of parts) {
+      await sendMany(db, subs, () => ({ title: url === '/admin/' ? 'اللوحة الأم · أصالة' : 'لوحة التاجر · أصالة', body: String(message).slice(0, 180), url, tag: 'a-' + kind }), 'user_push');
+    }
+  } catch (e) {
+    console.error('ASALAH_PUSH_ALERT', e?.stack || e);
   }
 }
 

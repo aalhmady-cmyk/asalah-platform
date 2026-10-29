@@ -847,3 +847,26 @@ test('ملصقات QR: دفعة وطباعة وتحقق مثل الشريحة', 
   assert.equal((await call('/scan/')).status, 200);
   assert.equal((await call('/print/')).status, 200);
 });
+
+test('تطبيق اللوحات: دخول داخل التطبيق وتنبيهات الجوال للتاجر والمدير', async () => {
+  for (const p of ['/merchant/login/', '/admin/login/']) {
+    const r = await call(p);
+    assert.equal(r.status, 200);
+    assert.match(r.data, /تسجيل الدخول/);
+  }
+  assert.equal((await call('/merchant/manifest.webmanifest')).status, 200);
+  assert.equal((await call('/admin/manifest.webmanifest')).status, 200);
+  const p256dh = Buffer.from(new Uint8Array(65).fill(4)).toString('base64url');
+  const auth = Buffer.from(new Uint8Array(16).fill(2)).toString('base64url');
+  assert.equal((await post('/api/u/push/subscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/m1', p256dh, auth })).status, 401);
+  assert.equal((await post('/api/u/push/subscribe', { endpoint: 'https://evil.test/m1', p256dh, auth }, S.merchant)).status, 400);
+  assert.equal((await post('/api/u/push/subscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/m1', p256dh, auth }, S.merchant)).status, 200);
+  assert.equal((await post('/api/u/push/subscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/a1', p256dh, auth }, S.admin)).status, 200);
+  // اشتراك اللوحة ما يدخل في حملات العملاء
+  assert.equal((await call('/api/admin/push', { cookie: S.admin })).data.stats.total, 0);
+  const t = await post('/api/u/push/test', { endpoint: 'https://fcm.googleapis.com/fcm/send/none' }, S.merchant);
+  assert.equal(t.data.sent, 0);
+  // طلب علامات يوصل المدير كإشعار بدون ما يكسر الطلب
+  assert.equal((await post('/api/m/request-tags', { kind: 'qr', count: 50 }, S.merchant)).status, 200);
+  assert.equal((await post('/api/u/push/unsubscribe', { endpoint: 'https://fcm.googleapis.com/fcm/send/m1' }, S.merchant)).status, 200);
+});

@@ -1,4 +1,5 @@
 // متاجر أصالة: لوحة "متجري" للتاجر، والواجهة العامة للمنتجات والريلز.
+import { pushAlert } from '../lib/push.js';
 import { assistantEnabled } from '../lib/assistant.js';
 import { deleteImage, imageUrl, ownsImage, saveImage, saveImageBytes } from '../lib/images.js';
 import { draftProduct, reelTitles, storeChat } from '../lib/shop.js';
@@ -87,7 +88,9 @@ export async function handleMerchantStore(req, env, path, user) {
   if (path === '/api/m/store/request' && m === 'POST') {
     if (merchant.store_enabled) return json({ ok: true, message: 'متجرك مفعّل' });
     await rateLimit(db, 'storereq:' + mid, 3, 86400);
-    await db.prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(?,'store_request',?,?)").bind(mid, `🛍️ ${merchant.name} يطلب الاشتراك في متاجر أصالة`, now()).run();
+    const sr = `🛍️ ${merchant.name} يطلب الاشتراك في متاجر أصالة`;
+    await db.prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(?,'store_request',?,?)").bind(mid, sr, now()).run();
+    await pushAlert(db, mid, 'store_request', sr);
     await audit(db, user, 'store_requested');
     return json({ ok: true, message: 'وصل طلبك لإدارة أصالة، وبنفعّل متجرك قريب' });
   }

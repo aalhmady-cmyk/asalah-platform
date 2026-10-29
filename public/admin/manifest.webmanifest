@@ -1,0 +1,23 @@
+{
+  "id": "/admin/",
+  "name": "اللوحة الأم · أصالة",
+  "short_name": "اللوحة الأم",
+  "description": "اللوحة الأم لأصالة: التجار والدفعات والإشعارات من جوالك.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/admin/?src=app",
+  "scope": "/admin/",
+  "display": "standalone",
+  "background_color": "#0F2A21",
+  "theme_color": "#0F2A21",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/admin/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/admin/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/admin/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "التجار", "url": "/admin/#merchants", "icons": [{ "src": "/admin/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "الإشعارات", "url": "/admin/#push", "icons": [{ "src": "/admin/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

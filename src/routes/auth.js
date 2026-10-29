@@ -1,4 +1,5 @@
 // الدخول والخروج وتغيير كلمة المرور، وإنشاء أول مدير عام.
+import { pushAlert } from '../lib/push.js';
 import { checkPassword, createSession, currentUser, destroySession, hashPassword, requireUser, sameOrigin, validPassword } from '../lib/auth.js';
 import { audit, fail, ipHash, json, now, randomHex, rateLimit, readJson, safeEqual, sha256, str } from '../lib/util.js';
 
@@ -69,6 +70,7 @@ export async function forgotPassword(req, env) {
       const staff = u.role === 'merchant' && u.merchant_role === 'staff';
       const who = staff ? `الموظف ${u.name} (${u.email}) يطلب إعادة كلمة المرور. صاحب الحساب يقدر يغيّرها من تبويب الحساب.` : `🔑 ${u.name} (${u.email}) يطلب إعادة كلمة المرور. طلّع له رابط من الحسابات.`;
       await db.prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(?,?,?,?)").bind(staff ? u.merchant_id : null, staff ? 'staff_password' : 'password_request', who, now()).run();
+      await pushAlert(db, staff ? u.merchant_id : null, staff ? 'staff_password' : 'password_request', who);
     } catch {}
   }
   return json({ ok: true, message: 'إذا البريد مسجّل عندنا، وصل طلبك لإدارة أصالة وبيوصلك رابط تغيير كلمة المرور على واتساب أو جوالك.' });

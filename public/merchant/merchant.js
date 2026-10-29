@@ -1,12 +1,13 @@
 import { api, hotspotsTable, initial, pickImage, bars, BATCH_STATUS, hbars, html, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 import { loadStore } from '/merchant/store.js';
-import '/merchant/app.js';
+import { initPanelApp } from '/assets/panel-app.js';
 
 const $ = (id) => document.getElementById(id);
 const me = await api('/api/auth/me');
 if (me.user.role !== 'merchant') location.href = '/admin/';
 $('me').textContent = me.user.name;
 $('logout').addEventListener('click', logout);
+initPanelApp({ scope: '/merchant/', title: 'لوحة التاجر', what: 'لما تقارب علاماتك تخلص، أو تطلع موجة تقليد، أو يوصلك تنبيه من إدارة أصالة' });
 
 let merchant = null;
 // الموظف: نخفي اللي لصاحب الحساب بس (المسابقة فيها أرقام العملاء، والإعدادات)

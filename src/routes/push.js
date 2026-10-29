@@ -1,4 +1,5 @@
 // إشعارات الجوال: اشتراك الأجهزة (عام) وحملات اللوحة الأم (الإدارة)
+import { requireUser } from '../lib/auth.js';
 import { currentCustomer } from '../lib/customers.js';
 import { imageUrl } from '../lib/images.js';
 import { continueCampaign, sendMany, unb64u, validEndpoint, vapidKeys } from '../lib/push.js';
@@ -62,6 +63,36 @@ export async function handlePublicPush(req, env, path) {
     try { await rateLimit(db, `pushclk:${id}:` + (await ipHash(req)), 1, 30 * 86400); } catch { return json({ ok: true }); }
     await db.prepare('UPDATE push_campaigns SET clicks=clicks+1 WHERE id=?').bind(id).run();
     return json({ ok: true });
+  }
+  fail(404, 'المسار غير موجود');
+}
+
+// اشتراك جوال حساب اللوحة (التاجر أو المدير) بتنبيهات لوحته
+export async function handleUserPush(req, env, path) {
+  const db = env.DB;
+  if (req.method !== 'POST') fail(404, 'المسار غير موجود');
+  const user = await requireUser(db, req);
+  const b = await readJson(req, 4000);
+  if (path === '/api/u/push/subscribe') {
+    if (!validEndpoint(b.endpoint) || !keyLen(b.p256dh, 65) || !keyLen(b.auth, 16)) fail(400, 'اشتراك غير صالح');
+    const t = now();
+    await db
+      .prepare('INSERT INTO user_push(endpoint,p256dh,auth,user_id,created_at,last_at) VALUES(?,?,?,?,?,?) ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh,auth=excluded.auth,user_id=excluded.user_id,last_at=excluded.last_at')
+      .bind(b.endpoint, b.p256dh, b.auth, user.id, t, t)
+      .run();
+    return json({ ok: true });
+  }
+  if (path === '/api/u/push/unsubscribe') {
+    if (typeof b.endpoint === 'string') await db.prepare('DELETE FROM user_push WHERE endpoint=? AND user_id=?').bind(b.endpoint, user.id).run();
+    return json({ ok: true });
+  }
+  if (path === '/api/u/push/test') {
+    await rateLimit(db, 'upushtest:' + user.id, 5, 3600);
+    const sub = await db.prepare('SELECT id,endpoint,p256dh,auth FROM user_push WHERE endpoint=? AND user_id=?').bind(String(b.endpoint || ''), user.id).first();
+    if (!sub) return json({ ok: true, sent: 0 });
+    const url = user.role === 'admin' ? '/admin/' : '/merchant/';
+    const r = await sendMany(db, [sub], () => ({ title: user.role === 'admin' ? 'اللوحة الأم · أصالة' : 'لوحة التاجر · أصالة', body: 'تنبيهات اللوحة شغالة على جوالك ✅', url, tag: 'utest' }), 'user_push');
+    return json({ ok: true, sent: r.sent });
   }
   fail(404, 'المسار غير موجود');
 }

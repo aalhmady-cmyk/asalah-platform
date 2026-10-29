@@ -1,4 +1,5 @@
 // المسارات العامة: التحقق من العلامة، المشاركة في المسابقة، بلاغ التقليد.
+import { pushAlert } from '../lib/push.js';
 import { assistantEnabled } from '../lib/assistant.js';
 import { guide } from '../lib/guide.js';
 import { shopForVerify } from './store.js';
@@ -394,6 +395,7 @@ export async function saveJoin(db, b) {
   };
   const msg = `طلب انضمام: ${f.brand} · ${f.name} · ${f.phone}${f.product ? ' · ' + f.product : ''}${f.qty ? ' · ' + f.qty + ' منتج شهرياً' : ''}`;
   await db.prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(NULL,'join_request',?,?)").bind(msg, now()).run();
+  await pushAlert(db, null, 'join_request', msg);
   return f;
 }
 

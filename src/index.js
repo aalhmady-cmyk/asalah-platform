@@ -9,7 +9,7 @@ import { handleAdmin } from './routes/admin.js';
 import { changePassword, forgotPassword, login, logout, me, resetPassword, setup } from './routes/auth.js';
 import { handleMerchant } from './routes/merchant.js';
 import { handleSeo } from './routes/seo.js';
-import { handlePublicPush } from './routes/push.js';
+import { handlePublicPush, handleUserPush } from './routes/push.js';
 import { runCampaigns } from './lib/push.js';
 import { handlePublicStore } from './routes/store.js';
 import { handleCustomer } from './lib/customers.js';
@@ -30,7 +30,7 @@ async function route(req, env) {
   if (path.startsWith('/img/') && (m === 'GET' || m === 'HEAD')) return serveImage(env, path);
   if (path.startsWith('/media/') && (m === 'GET' || m === 'HEAD')) return serveMedia(req, env, path);
   // صفحة الدخول داخل نطاق تطبيق لوحة التاجر (نفس صفحة /login/)
-  if ((m === 'GET' || m === 'HEAD') && (path === '/merchant/login/' || path === '/merchant/login')) {
+  if ((m === 'GET' || m === 'HEAD') && /^\/(merchant|admin)\/login\/?$/.test(path)) {
     const u = new URL(req.url);
     u.pathname = '/login/';
     return env.ASSETS.fetch(new Request(u, req));
@@ -42,6 +42,7 @@ async function route(req, env) {
   if (path === '/api/public/store' || path.startsWith('/api/public/store/')) return handlePublicStore(req, env, path);
   if (path.startsWith('/api/c/')) return handleCustomer(req, env, path);
   if (path.startsWith('/api/public/push/')) return handlePublicPush(req, env, path);
+  if (path.startsWith('/api/u/push/')) return handleUserPush(req, env, path);
   if (path === '/api/verify' && m === 'POST') return verify(req, env);
   if (path === '/api/loyalty/claim' && m === 'POST') return loyaltyClaim(req, env);
   if (path === '/api/loyalty/wallet' && m === 'POST') return loyaltyWallet(req, env);

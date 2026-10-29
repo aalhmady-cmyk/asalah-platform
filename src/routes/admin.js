@@ -1,4 +1,5 @@
 // اللوحة الأم: المدير العام يدير التجار والحسابات والدفعات وكل العلامات.
+import { pushAlert } from '../lib/push.js';
 import { hashPassword, requireUser, validPassword } from '../lib/auth.js';
 import { createResetLink } from './auth.js';
 import { adminPush } from './push.js';
@@ -350,7 +351,9 @@ async function adminStore(req, env, path, user) {
     const what = match[1] === 'products' ? 'المنتج' : 'الريل';
     if (b.blocked) {
       const reason = str(b.reason, 'السبب', { max: 200, optional: true });
-      await db.prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(?,'store_blocked',?,?)").bind(row.merchant_id, `🚫 إدارة أصالة أوقفت ${what} «${row.title}»${reason ? ': ' + reason : ''}`, now()).run();
+      const bm = `🚫 إدارة أصالة أوقفت ${what} «${row.title}»${reason ? ': ' + reason : ''}`;
+      await db.prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(?,'store_blocked',?,?)").bind(row.merchant_id, bm, now()).run();
+      await pushAlert(db, row.merchant_id, 'store_blocked', bm);
     }
     await audit(db, user, b.blocked ? 'store_item_blocked' : 'store_item_unblocked', { kind: match[1], id: row.id, title: row.title }, row.merchant_id);
     return json({ ok: true, blocked: !!b.blocked });

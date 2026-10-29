@@ -1,0 +1,8 @@
+/* بطاقة تثبيت التطبيق */
+.app-install { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border: 1px solid var(--gold, #D9B45A); }
+.app-install img { border-radius: 14px; flex: none; }
+.app-install-t { flex: 1; min-width: 200px; }
+.app-install-t p { margin: 4px 0 0; line-height: 1.7; }
+.app-install-a { display: flex; gap: 8px; align-items: center; }
+/* داخل التطبيق على الآيفون: مسافة تحت شريط الساعة وفوق شريط الرجوع */
+@media (display-mode: standalone) { body { padding-bottom: env(safe-area-inset-bottom); } }

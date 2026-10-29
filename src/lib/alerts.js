@@ -1,5 +1,6 @@
 // تنبيهات تلقائية كل ساعة: المخزون قارب يخلص أو خلص، وموجة أكواد مزيّفة.
 // كل نوع تنبيه يتكرر مرة كل 24 ساعة كحد أقصى لكل تاجر.
+import { pushAlert } from './push.js';
 import { stockFor } from './tags.js';
 import { now, riyadhDayStart } from './util.js';
 
@@ -10,6 +11,7 @@ async function raise(db, merchantId, kind, message) {
   const recent = await db.prepare('SELECT id FROM alerts WHERE merchant_id=? AND kind=? AND created_at>?').bind(merchantId, kind, t - 86400).first();
   if (recent) return false;
   await db.prepare('INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(?,?,?,?)').bind(merchantId, kind, message, t).run();
+  await pushAlert(db, merchantId, kind, message);
   return true;
 }
 
