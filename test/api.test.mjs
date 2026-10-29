@@ -905,7 +905,9 @@ test('مزايا الثقة: جواز السفر والمستوى والضمان
   assert.equal(rp.status, 200, JSON.stringify(rp.data));
   const rep = (await call('/api/m/reports', { cookie: S.merchant })).data.reports.find((x) => x.photo_key);
   assert.ok(rep.photo_key.startsWith('evidence/'));
-  assert.equal((await call('/api/m/evidence/' + rep.photo_key, { cookie: S.merchant })).status, 200);
+  const evr = await fetch(BASE + '/api/m/evidence/' + rep.photo_key, { headers: { Cookie: S.merchant } });
+  assert.equal(evr.status, 200);
+  assert.equal((await evr.arrayBuffer()).byteLength, 68);
   assert.equal((await call('/api/admin/evidence/' + rep.photo_key, { cookie: S.admin })).status, 200);
   assert.equal((await call('/img/' + rep.photo_key)).status, 404);
   assert.equal((await call('/api/m/evidence/' + rep.photo_key)).status, 401);
@@ -936,7 +938,9 @@ test('مزايا الثقة: جواز السفر والمستوى والضمان
   assert.equal(up.status, 200);
   const vu = (await up.json()).voice_url;
   assert.match(vu, /^\/media\/voice\/\d+\/[a-f0-9]{24}\.m4a$/);
-  assert.equal((await fetch(BASE + vu)).status, 200);
+  const vr = await fetch(BASE + vu);
+  assert.equal(vr.status, 200);
+  assert.ok((await vr.arrayBuffer()).byteLength > 100);
   const vv = (await post('/api/verify', { t: tokenOf(S.urls[42]), sid: sid('7') })).data;
   assert.equal(vv.result, 'original', JSON.stringify(vv));
   assert.equal(vv.voice_url, vu);

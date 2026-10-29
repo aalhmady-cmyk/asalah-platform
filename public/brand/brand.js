@@ -3,7 +3,7 @@ import { html, initial, render } from '/assets/common.js';
 
 const box = document.getElementById('brand-page');
 const slug = new URLSearchParams(location.search).get('s') || '';
-const res = await fetch('/api/public/brands/' + encodeURIComponent(slug)).catch(() => null);
+const res = slug ? await fetch('/api/public/brands/' + encodeURIComponent(slug)).catch(() => null) : null;
 const d = res ? await res.json().catch(() => null) : null;
 if (!d?.ok) {
   render(box, html`<section class="sec"><div class="empty">${d?.message || 'ما لقينا هذي العلامة التجارية'}</div><a class="btn" href="/">الرئيسية</a></section>`);

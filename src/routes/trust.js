@@ -14,7 +14,7 @@ export async function serveEvidence(env, key, merchantId) {
   if (!m || (merchantId != null && Number(m[1]) !== merchantId)) fail(404, 'الصورة غير موجودة');
   const row = await env.DB.prepare('SELECT content_type,data FROM images WHERE key=?').bind(key).first();
   if (!row) fail(404, 'الصورة غير موجودة');
-  return new Response(row.data, { headers: { 'Content-Type': row.content_type, 'Cache-Control': 'private, max-age=3600' } });
+  return new Response(new Uint8Array(row.data), { headers: { 'Content-Type': row.content_type, 'Cache-Control': 'private, max-age=3600' } });
 }
 export const saveEvidence = (env, photo, merchantId) => (photo ? saveImageBytes(env, photo.buf, photo.type, 'evidence', merchantId ?? 0) : null);
 
