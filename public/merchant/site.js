@@ -547,7 +547,7 @@ export async function loadOrders() {
 function orderCard(o) {
   const cart = o.status === 'cart';
   const items = o.items.map((it) => `${it.title} × ${it.qty}`).join('، ');
-  const waText = cart ? `هلا ${o.name || ''} 👋 لاحظنا إن عندك منتجات في سلتك في ${S?.draft?.name || 'متجرنا'}: ${items}. تحتاج مساعدة تكمل طلبك؟` : `هلا ${o.name || ''} 👋 بخصوص طلبك رقم ${o.number}: ${items}. المجموع ${sar(o.total)}.`;
+  const waText = cart ? `هلا ${o.name || ''} 👋 لاحظنا إن عندك منتجات في سلتك في ${S?.draft?.name || 'متجرنا'}: ${items}. تحتاج مساعدة تكمل طلبك؟` : `هلا ${o.name || ''} 👋 بخصوص طلبك رقم ${o.number}: ${items}. المجموع ${sar(o.total)}.${o.track ? `\nتتبع طلبك من هنا: ${location.origin}${o.track}` : ''}`;
   const wa = o.phone ? `https://wa.me/${o.phone}?text=${encodeURIComponent(waText)}` : null;
   return html`<div class="card or-card">
     <div class="or-head">

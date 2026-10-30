@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A21">
+<meta name="robots" content="noindex">
+<title>تتبع طلبك · أصالة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/o/o.css">
+</head>
+<body>
+<main class="wrap">
+  <header class="head">
+    <a id="store" class="store" href="/stores/"><span id="logo" class="logo">✦</span><span><b id="sname">أصالة</b><small>✅ متجر موثّق من أصالة</small></span></a>
+  </header>
+  <section id="loading" class="card center"><div class="spin"></div><p>نجيب حالة طلبك…</p></section>
+  <section id="err" class="card center" hidden><div class="big-ic">🔎</div><h1>ما لقينا الطلب</h1><p id="err-msg" class="muted">تأكد إنك فتحت الرابط كامل من رسالة الواتساب.</p></section>
+  <section id="order" hidden>
+    <div class="card center">
+      <p class="muted">طلب رقم</p>
+      <div class="no" id="no"></div>
+      <div class="status" id="status"></div>
+      <ol class="steps" id="steps"></ol>
+      <p class="muted small" id="updated"></p>
+    </div>
+    <div class="card">
+      <h2>محتويات الطلب</h2>
+      <ul class="items" id="items"></ul>
+      <div class="total"><span id="coupon"></span><b id="total"></b></div>
+    </div>
+    <div class="card note">💳 الدفع الإلكتروني عبر أصالة قريباً. حالياً يتأكد الدفع والتوصيل مع المتجر على واتساب.</div>
+    <a class="btn" id="back" href="/stores/">🛍️ رجوع للمتجر</a>
+  </section>
+  <footer class="foot">مدعوم من <a href="/">أصالة</a>: منتجات أصلية موثّقة</footer>
+</main>
+<script type="module" src="/o/o.js"></script>
+</body>
+</html>

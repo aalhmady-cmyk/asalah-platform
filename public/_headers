@@ -35,3 +35,5 @@
   Cache-Control: no-cache
 /site/*
   Cache-Control: no-cache
+/o/*
+  Cache-Control: no-cache

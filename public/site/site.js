@@ -119,6 +119,7 @@ function drawCart(done) {
       ${done.channel === 'whatsapp'
         ? html`<p>كمّل على واتساب عشان يأكد لك المتجر الطلب وطريقة الدفع والتوصيل.</p><a class="btn wa big" href="${done.whatsapp_url}" target="_blank" rel="noopener">💬 أكّد طلبي على واتساب</a>`
         : html`<p>كمّل الدفع في متجرنا على سلة:</p>${done.links.map((l) => html`<a class="btn big" href="${l.url}" target="_blank" rel="noopener">🛒 ${l.title} × ${l.qty} ↗</a>`)}`}
+      ${done.track ? html`<a class="btn ghost" href="${done.track}" target="_blank" rel="noopener">📦 تتبع طلبك</a>` : ''}
       <p class="note">💳 الدفع الإلكتروني عبر أصالة قريباً، حالياً يتم تأكيد الطلب مع المتجر.</p>
       <button type="button" class="btn ghost" data-close>رجوع للمتجر</button></div>`);
     return;

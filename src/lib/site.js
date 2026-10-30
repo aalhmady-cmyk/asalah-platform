@@ -381,7 +381,7 @@ export async function saveCart(db, slug, b) {
 
 const money = (h) => (h / 100).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ر.س';
 
-export async function placeOrder(db, slug, b) {
+export async function placeOrder(db, slug, b, origin = '') {
   const { merchant, config } = await siteForOrder(db, slug);
   const tk = token(b.token);
   const items = await pricedItems(db, merchant.id, b.items);
@@ -409,13 +409,15 @@ export async function placeOrder(db, slug, b) {
   await db.prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(?,'new_order',?,?)").bind(merchant.id, msg, t).run();
   await pushAlert(db, merchant.id, 'new_order', msg);
 
-  const out = { number, channel, total: sar(total), discount: sar(off) };
+  const out = { number, channel, total: sar(total), discount: sar(off), track: `/o/#${tk}` };
   if (channel === 'whatsapp') {
     const lines = [`السلام عليكم، أريد تأكيد طلبي رقم ${number}`, '', ...items.map((it) => `• ${it.title} × ${it.qty} = ${money(it.price * it.qty)}`)];
     if (off) lines.push(`كود الخصم ${coupon.code}: -${money(off)}`);
     lines.push(`المجموع: ${money(total)}`, '', `الاسم: ${c.name}`);
     if (c.city) lines.push(`المدينة: ${c.city}`);
     if (c.note) lines.push(`ملاحظة: ${c.note}`);
+    // رابط التتبع يبقى في محادثة العميل، ويقدر يرجع له أي وقت
+    lines.push('', `تتبع الطلب: ${origin}/o/#${tk}`);
     out.whatsapp_url = `https://wa.me/${wa}?text=${encodeURIComponent(lines.join('\n'))}`;
   } else {
     out.links = items.map((it) => ({ title: it.title, qty: it.qty, url: it.buy_url }));
@@ -430,7 +432,7 @@ export async function listOrders(db, mid, view) {
   const t = now();
   const where = view === 'carts' ? "status='cart' AND updated_at<?" : "status<>'cart'";
   const args = view === 'carts' ? [mid, t - ABANDON_AFTER] : [mid];
-  const rows = (await db.prepare(`SELECT id,number,status,items,total,name,phone,city,note,consent,channel,coupon,merchant_note,created_at,updated_at,ordered_at FROM orders WHERE merchant_id=? AND ${where} ORDER BY COALESCE(ordered_at,updated_at) DESC LIMIT 300`).bind(...args).all()).results;
+  const rows = (await db.prepare(`SELECT id,token,number,status,items,total,name,phone,city,note,consent,channel,coupon,merchant_note,created_at,updated_at,ordered_at FROM orders WHERE merchant_id=? AND ${where} ORDER BY COALESCE(ordered_at,updated_at) DESC LIMIT 300`).bind(...args).all()).results;
   const stats = await db
     .prepare(`SELECT SUM(status<>'cart') AS orders,SUM(status='new') AS new,SUM(status IN ('confirmed','shipped')) AS done,COALESCE(SUM(CASE WHEN status IN ('new','confirmed','shipped') THEN total END),0) AS revenue,SUM(status='cart' AND updated_at<?) AS abandoned,COALESCE(SUM(CASE WHEN status='cart' AND updated_at<? THEN total END),0) AS abandoned_value FROM orders WHERE merchant_id=?`)
     .bind(t - ABANDON_AFTER, t - ABANDON_AFTER, mid)
@@ -442,6 +444,8 @@ export async function listOrders(db, mid, view) {
       items: (parse(o.items) || []).map((it) => ({ ...it, price: sar(it.price) })),
       // للسلات: رقم الجوال يظهر بس لو العميل وافق على التواصل
       phone: o.status === 'cart' && !o.consent ? null : o.phone,
+      token: undefined,
+      track: o.status === 'cart' ? null : `/o/#${o.token}`,
     })),
     stats: { orders: stats.orders || 0, new: stats.new || 0, done: stats.done || 0, revenue: sar(stats.revenue), abandoned: stats.abandoned || 0, abandoned_value: sar(stats.abandoned_value) },
   };
@@ -473,4 +477,26 @@ export async function siteStats(db, mid) {
     db.prepare("SELECT SUM(status<>'cart') AS orders,SUM(status='new') AS new,SUM(status='cart' AND updated_at<?) AS abandoned FROM orders WHERE merchant_id=?").bind(t - ABANDON_AFTER, mid).first(),
   ]);
   return { views: s?.views || 0, orders: o.orders || 0, new: o.new || 0, abandoned: o.abandoned || 0 };
+}
+
+// صفحة تتبع الطلب للعميل: بالرمز السري حق الطلب بس، وبدون رقم الجوال
+export async function trackOrder(db, raw) {
+  const tk = token(raw);
+  const o = await db
+    .prepare("SELECT o.number,o.status,o.items,o.total,o.city,o.coupon,o.channel,o.ordered_at,o.updated_at,m.name AS merchant,m.slug,m.logo_key FROM orders o JOIN merchants m ON m.id=o.merchant_id WHERE o.token=? AND o.status<>'cart'")
+    .bind(tk)
+    .first();
+  if (!o) fail(404, 'ما لقينا الطلب. تأكد من الرابط');
+  return {
+    number: o.number,
+    status: o.status,
+    status_label: ORDER_STATUS[o.status],
+    items: (parse(o.items) || []).map((it) => ({ title: it.title, qty: it.qty, price: sar(it.price), image_url: it.image_url || null })),
+    total: sar(o.total),
+    city: o.city,
+    coupon: o.coupon,
+    ordered_at: o.ordered_at,
+    updated_at: o.updated_at,
+    merchant: { name: o.merchant, slug: o.slug, logo_url: imageUrl(o.logo_key), store_url: `/s/${o.slug}` },
+  };
 }

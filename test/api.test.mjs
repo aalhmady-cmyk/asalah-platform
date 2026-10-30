@@ -1130,6 +1130,13 @@ test('المتجر الخاص: البناء والمعاينة والنشر وا
   assert.equal(r.data.total, 54);
   assert.ok(decodeURIComponent(r.data.whatsapp_url).includes('أريد تأكيد طلبي رقم ' + r.data.number));
   assert.ok(r.data.whatsapp_url.startsWith('https://wa.me/966551234567?text='));
+  // رابط تتبع الطلب في رسالة الواتساب وفي الرد
+  assert.equal(r.data.track, '/o/#' + token);
+  assert.ok(decodeURIComponent(r.data.whatsapp_url).includes('/o/#' + token));
+  let tr = await call('/api/public/site-order/' + token);
+  assert.equal(tr.data.order.status, 'new');
+  assert.equal(tr.data.order.phone, undefined);
+  assert.equal((await call('/api/public/site-order/' + 'z'.repeat(24))).status, 404);
 
   // سلة: لما كل المنتجات لها رابط سلة، العميل يتحول لها
   await call('/api/m/site/draft', { method: 'PUT', body: { draft: { checkout: 'salla' } }, cookie: S.merchant });
@@ -1147,6 +1154,8 @@ test('المتجر الخاص: البناء والمعاينة والنشر وا
   assert.equal((await patch('/api/m/orders/' + o.id, { status: 'oops' }, S.merchant)).status, 400);
   assert.equal((await patch('/api/m/orders/' + o.id, { status: 'confirmed', merchant_note: 'تم التحويل' }, S.merchant)).status, 200);
   assert.equal((await call('/api/m/orders', { cookie: S.merchant })).data.stats.new, 1);
+  assert.equal((await call('/api/public/site-order/' + token)).data.order.status_label, 'مؤكد');
+  assert.equal(o.track, '/o/#' + token);
   assert.ok((await call('/api/m/overview', { cookie: S.merchant })).data.alerts.some((a) => a.kind === 'new_order'));
   assert.ok(!(await call('/api/admin/overview', { cookie: S.admin })).data.alerts.some((a) => a.kind === 'new_order'));
   assert.equal((await call('/api/m/orders', { cookie: S.admin })).status, 403);

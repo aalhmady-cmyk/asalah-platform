@@ -52,7 +52,7 @@ async function route(req, env) {
   if (path.startsWith('/s/') && (m === 'GET' || m === 'HEAD')) {
     return (await serveSitePage(req, env, path)) || env.ASSETS.fetch(req);
   }
-  if (path.startsWith('/api/public/site/')) return handlePublicSite(req, env, path);
+  if (path.startsWith('/api/public/site/') || path.startsWith('/api/public/site-order/')) return handlePublicSite(req, env, path);
   if (path === '/api/public/store' || path.startsWith('/api/public/store/')) return handlePublicStore(req, env, path);
   if (path.startsWith('/api/c/')) return handleCustomer(req, env, path);
   if (path.startsWith('/api/public/push/')) return handlePublicPush(req, env, path);

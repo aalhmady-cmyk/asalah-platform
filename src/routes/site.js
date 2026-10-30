@@ -5,7 +5,7 @@ import { currentUser } from '../lib/auth.js';
 import { pushAlert } from '../lib/push.js';
 import {
   addCredits, aiPlan, cleanLanding, credits, deleteCart, FONTS, landingAi, listOrders, ORDER_STATUS, placeOrder, publicSite,
-  saveAiPlan, saveCart, saveDraft, siteAi, siteProducts, siteRow, siteStats, siteUrl, THEMES, undoDraft, updateOrder,
+  saveAiPlan, saveCart, saveDraft, siteAi, siteProducts, siteRow, siteStats, siteUrl, THEMES, trackOrder, undoDraft, updateOrder,
 } from '../lib/site.js';
 import { audit, fail, int, ipHash, json, now, rateLimit, readJson, str } from '../lib/util.js';
 import { requireHuman } from '../lib/human.js';
@@ -161,6 +161,11 @@ export async function handleAdminSite(req, env, path, user) {
 export async function handlePublicSite(req, env, path) {
   const db = env.DB;
   const m = req.method;
+  const tr = path.match(/^\/api\/public\/site-order\/([a-zA-Z0-9_-]{16,64})$/);
+  if (tr && m === 'GET') {
+    await rateLimit(db, 'track:' + (await ipHash(req)), 60, 600);
+    return json({ ok: true, order: await trackOrder(db, tr[1]) }, 200, { 'Cache-Control': 'no-store' });
+  }
   const match = path.match(/^\/api\/public\/site\/([a-z0-9-]{2,40})(\/cart|\/order)?$/);
   if (!match) fail(404, 'المسار غير موجود');
   const slug = match[1];
@@ -183,7 +188,7 @@ export async function handlePublicSite(req, env, path) {
     await rateLimit(db, 'order:' + (await ipHash(req)), 10, 600);
     const body = await readJson(req, 20000);
     await requireHuman(env, req, body.cf_token);
-    return json({ ok: true, ...(await placeOrder(db, slug, body)) });
+    return json({ ok: true, ...(await placeOrder(db, slug, body, env.PUBLIC_ORIGIN || new URL(req.url).origin)) });
   }
   fail(404, 'المسار غير موجود');
 }
