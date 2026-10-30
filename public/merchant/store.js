@@ -163,6 +163,7 @@ const WAYS = [
   ['photo', '📸', 'صوّر المنتج', 'الذكاء يكتب الاسم والوصف'],
   ['link', '🔗', 'الصق رابطه من سلة', 'نسحب الصورة والسعر والوصف'],
   ['text', '✍️', 'اكتب عنه كلمتين', 'والذكاء يكمل الباقي'],
+  ['excel', '📥', 'استيراد من Excel', 'الصق الصفوف أو ارفع ملف CSV'],
 ];
 
 function renderCompose() {
@@ -207,7 +208,89 @@ function wayBody(way) {
     render(el, html`<form class="st-inline" id="st-link"><input name="url" type="url" required class="ltr" placeholder="https://your-store.salla.sa/p/..." aria-label="رابط المنتج"><button class="btn btn-primary" type="submit">اسحب البيانات</button></form>`);
   if (way === 'text')
     render(el, html`<form id="st-text" class="st-text"><textarea name="text" rows="3" required maxlength="1500" placeholder="اكتب عن المنتج مثل ما تكلم عميل. مثال: عطر عود كمبودي 50 مل، ثباته عالي، سعره 289 بدل 349، ورابطه في سلة https://..." aria-label="وصف المنتج"></textarea><p class="small muted" style="margin:0">✨ لو كتبت السعر أو الرابط، الذكاء يحطهم في البطاقة لحاله.</p><div><button class="btn btn-primary" type="submit">${S.ai ? '✨ جهّز البطاقة' : 'التالي'}</button></div></form>`);
+  if (way === 'excel')
+    render(el, html`<form id="st-excel" class="st-text">
+      <p class="small" style="margin:0">رتّب الأعمدة في Excel بهذا الترتيب: <b>الاسم، السعر، السعر قبل الخصم، الفئة، الوصف، رابط الشراء، رابط الصورة</b>. الاسم والسعر بس إجبارية. حدد الصفوف وانسخها (Ctrl+C) والصقها هنا، أو ارفع الملف محفوظ CSV.</p>
+      <textarea name="rows" rows="6" placeholder="عطر عود كمبودي	289	349	عطور وبخور	ثبات عالي" aria-label="صفوف المنتجات" class="ltr" style="direction:rtl"></textarea>
+      <div class="actions"><button class="btn btn-primary" type="submit">استورد</button><button class="btn" type="button" data-st="excel-file">📄 ارفع ملف CSV</button><button class="btn" type="button" data-st="excel-template">⬇️ نزّل النموذج</button></div>
+      <div id="st-excel-out"></div>
+    </form>`);
   el.querySelector('input,textarea')?.focus();
+}
+
+// ---------- استيراد من Excel: لصق مباشر (أعمدة بفاصل Tab) أو ملف CSV ----------
+const XL_HEAD = ['الاسم', 'السعر', 'السعر قبل الخصم', 'الفئة', 'الوصف', 'رابط الشراء', 'رابط الصورة'];
+function parseRows(text) {
+  text = text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+  const first = text.split('\n', 1)[0];
+  const sep = first.includes('\t') ? '\t' : first.split(';').length > first.split(',').length ? ';' : ',';
+  const rows = [];
+  let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; } else if (c === '"') q = false; else cell += c;
+    } else if (c === '"' && !cell) q = true;
+    else if (c === sep) { row.push(cell); cell = ''; }
+    else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.map((r) => r.map((x) => x.trim())).filter((r) => r.some(Boolean));
+}
+const toNum = (v) => {
+  const n = Number(String(v || '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[^\d.]/g, ''));
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+function catOf(v) {
+  v = String(v || '').trim();
+  if (!v) return 'other';
+  if (S.categories?.[v]) return v;
+  const hit = Object.entries(S.categories || {}).find(([, l]) => l === v || l.includes(v) || v.includes(l.split(' ')[0]));
+  return hit ? hit[0] : 'other';
+}
+async function importRows(text) {
+  let rows = parseRows(text);
+  if (rows.length && !toNum(rows[0][1])) rows = rows.slice(1); // سطر العناوين
+  const out = $('st-excel-out');
+  if (!rows.length) return toast('ما لقينا صفوف. تأكد إنك نسخت الخلايا من Excel', true);
+  if (rows.length > 200) return toast('أقصى 200 منتج في المرة الوحدة', true);
+  let done = 0;
+  const errors = [];
+  const step = () => render(out, html`<div class="st-progress"><div class="bar"><i style="width:${Math.round(((done + errors.length) / rows.length) * 100)}%"></i></div><span>${done + errors.length} من ${rows.length}${errors.length ? ` (تعذر ${errors.length})` : ''}</span></div>`);
+  step();
+  for (const [i, r] of rows.entries()) {
+    const [title, price, old, cat, desc, buy, image] = r;
+    try {
+      if (!toNum(price)) throw new Error('السعر ناقص أو مو رقم');
+      let img = {};
+      if (/^https?:\/\//.test(image || '')) {
+        try {
+          const res = await fetch('/api/m/store/fetch-image?u=' + encodeURIComponent(image), { credentials: 'same-origin' });
+          if (res.ok) img = await uploadImage(await shrink(await res.blob()));
+        } catch { /* المنتج ينضاف بدون صورة */ }
+      }
+      await api('/api/m/store/products', { method: 'POST', body: { title, price: toNum(price), old_price: toNum(old), category: catOf(cat), description: desc || null, buy_url: buy || null, image_key: img.image_key ?? null, status: 'active', imported: true } });
+      done++;
+    } catch (e) {
+      errors.push(`سطر ${i + 1}: ${title || '؟'} · ${e.message}`);
+    }
+    step();
+  }
+  toast(`انضاف ${done} منتج لمتجرك 🎉`);
+  await loadStore();
+  // نرجع لنفس الخطوة ونوري النتيجة والصفوف اللي ما انضافت
+  wayBody('excel');
+  render($('st-excel-out'), html`<p class="tip info" style="margin:0">✅ انضاف ${done} منتج${errors.length ? html`<br>تعذّر ${errors.length}:<br>${errors.slice(0, 10).map((x) => html`${x}<br>`)}` : ''}</p>`);
+}
+function excelTemplate() {
+  const rows = [XL_HEAD, ['عطر عود كمبودي 50 مل', '289', '349', 'عطور وبخور', 'ثبات عالي وفوحان قوي', '', '']];
+  const csv = rows.map((r) => r.map((x) => `"${x.replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'asalah-products.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function thinking(label) {
@@ -727,6 +810,11 @@ document.addEventListener('click', async (e) => {
       await loadStore();
     }
     else if (act === 'way') wayBody(b.dataset.way);
+    else if (act === 'excel-template') excelTemplate();
+    else if (act === 'excel-file') {
+      const file = await pickFile('.csv,text/csv,text/plain');
+      if (file) await importRows(await file.text());
+    }
     else if (act === 'cancel') { draft = null; renderCompose(); }
     else if (act === 'img') {
       const file = await pickFile('image/*');
@@ -814,6 +902,7 @@ document.addEventListener('submit', async (e) => {
     } else if (form.id === 'st-sync') await discover(form.store_url.value);
     else if (form.id === 'st-link') await fromLink(form.url.value);
     else if (form.id === 'st-text') await fromText(form.text.value);
+    else if (form.id === 'st-excel') await importRows(form.rows.value);
     else if (form.id === 'st-form') await saveDraft(form);
   } catch (err) {
     toast(err.message, true);
