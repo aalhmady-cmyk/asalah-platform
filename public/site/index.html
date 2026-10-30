@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F2A21">
+<title>متجر · أصالة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site/site.css">
+</head>
+<body>
+<div id="boot" class="boot"><div class="boot-logo">✦</div><p>جاري فتح المتجر…</p></div>
+
+<div id="doors" class="doors" hidden aria-hidden="true">
+  <div class="door l"></div><div class="door r"></div>
+  <div class="door-sign"><div id="door-logo" class="door-logo"></div><b id="door-name"></b><small>اضغط للدخول ✨</small></div>
+</div>
+
+<header class="top" id="top" hidden>
+  <a class="brand" id="brand" href="#"><span id="logo" class="logo"></span><span><b id="sname"></b><small>✅ موثّق من أصالة</small></span></a>
+  <div class="top-act">
+    <div class="viewsw" role="group" aria-label="طريقة العرض"><button type="button" data-v="3d">🕶️ المعرض</button><button type="button" data-v="grid">▦ عادي</button></div>
+    <button type="button" class="cart-btn" id="cart-btn" aria-label="السلة">🛒<span id="cart-n" hidden>0</span></button>
+  </div>
+</header>
+<div class="announce" id="announce" hidden></div>
+<div class="preview-bar" id="preview-bar" hidden>👀 معاينة المسودة، العملاء ما يشوفونها لين تنشر</div>
+
+<main id="grid-view" hidden></main>
+
+<section id="show" class="show" hidden>
+  <canvas id="show-canvas"></canvas>
+  <div class="show-hint" id="show-hint">👆 اسحب للتجول · اضغط على أي منتج</div>
+  <nav class="show-secs" id="show-secs" aria-label="أقسام المعرض"></nav>
+  <div class="show-near" id="show-near" hidden></div>
+  <div class="show-card" id="show-card" hidden></div>
+</section>
+
+<div class="drawer" id="cart" hidden>
+  <div class="drawer-bg" data-close></div>
+  <aside class="drawer-pane" role="dialog" aria-modal="true" aria-label="سلة المشتريات">
+    <header><b>🛒 سلتك</b><button type="button" class="x" data-close aria-label="إغلاق">✕</button></header>
+    <div id="cart-body" class="drawer-body"></div>
+  </aside>
+</div>
+<div class="toast" id="toast" hidden></div>
+<script type="module" src="/site/site.js"></script>
+</body>
+</html>

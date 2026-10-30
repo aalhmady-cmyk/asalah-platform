@@ -439,7 +439,7 @@ test('متجر التاجر: الاشتراك والمنتجات والريلز 
   assert.equal(r.status, 201, JSON.stringify(r.data));
   const pid = r.data.product.id;
   assert.equal(r.data.product.price, 49.5);
-  assert.equal((await post('/api/m/store/products', { title: 'بدون رابط', price: 10 }, S.merchant)).status, 400);
+  assert.equal((await post('/api/m/store/products', { title: 'بدون سعر' }, S.merchant)).status, 400);
   assert.equal((await post('/api/m/store/products', { title: 'رابط http', price: 10, buy_url: 'http://x.sa' }, S.merchant)).status, 400);
 
   // يظهر للعامة، والبحث يلقاه
@@ -1039,4 +1039,126 @@ test('النمو: صفحة التجار وطلبات الانضمام وصحة �
   assert.equal(typeof rep.prev_sold, 'number');
   assert.ok(rep.ratings && rep.guarantee);
   assert.ok(rep.guarantee.claims >= 1);
+});
+
+test('المتجر الخاص: البناء والمعاينة والنشر والسلة والطلبات والنقاط', async () => {
+  // البداية: مسودة افتراضية ونقاط مجانية، والمتجر غير منشور
+  let r = await call('/api/m/site', { cookie: S.merchant });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.enabled, true);
+  assert.equal(r.data.published, false);
+  assert.equal(r.data.credits.balance, 20);
+  assert.equal(r.data.draft.name, 'الكيف الأخضر');
+  assert.equal((await call('/api/public/site/green-kif')).status, 404);
+  assert.equal((await fetch(BASE + '/s/green-kif')).status, 404);
+
+  // المسودة والتراجع
+  assert.equal((await call('/api/m/site/draft', { method: 'PUT', body: { draft: { whatsapp: '123' } }, cookie: S.merchant })).status, 400);
+  r = await call('/api/m/site/draft', { method: 'PUT', body: { draft: { name: 'دار الكيف', theme: 'perfume', colors: { primary: '#112233', accent: '#D9B45A', bg: 'red' }, checkout: 'whatsapp', whatsapp: '0551234567', coupon: { code: 'open10', percent: 10 }, view: '3d', sections: [{ title: 'الشاي', category: 'coffee' }, { title: '', category: 'x' }] } }, cookie: S.merchant });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.draft.colors.accent, '#d9b45a');
+  assert.equal(r.data.draft.colors.bg, '#0f2a21');
+  assert.equal(r.data.draft.coupon.code, 'OPEN10');
+  assert.equal(r.data.draft.whatsapp, '966551234567');
+  assert.equal(r.data.draft.sections.length, 1);
+  await call('/api/m/site/draft', { method: 'PUT', body: { draft: { name: 'اسم غلط' } }, cookie: S.merchant });
+  r = await post('/api/m/site/undo', {}, S.merchant);
+  assert.equal(r.data.draft.name, 'دار الكيف');
+
+  // المعاينة لصاحب المتجر بس
+  assert.equal((await call('/api/public/site/green-kif?preview=1')).status, 404);
+  r = await call('/api/public/site/green-kif?preview=1', { cookie: S.merchant });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.preview, true);
+  assert.equal(r.data.config.name, 'دار الكيف');
+
+  // النشر: الصفحة بعنوان المتجر ومعاينة المشاركة، وتقدر تنعرض داخل اللوحة
+  assert.equal((await post('/api/m/site/publish', {}, S.merchant)).status, 200);
+  const page = await fetch(BASE + '/s/green-kif');
+  assert.equal(page.status, 200);
+  assert.equal(page.headers.get('X-Frame-Options'), 'SAMEORIGIN');
+  const htmlText = await page.text();
+  assert.ok(htmlText.includes('og:title') && htmlText.includes('دار الكيف'));
+  assert.ok(htmlText.includes('/site/site.js'));
+  assert.equal((await fetch(BASE + '/s/no-such-shop')).status, 404);
+  const pub = await call('/api/public/site/green-kif');
+  assert.equal(pub.status, 200);
+  assert.equal(pub.data.config.whatsapp, undefined);
+  assert.equal(pub.data.config.has_whatsapp, true);
+  assert.ok(pub.data.products.length >= 1);
+  const p1 = pub.data.products[0];
+  assert.ok((await (await fetch(`${BASE}/s/green-kif/p/${p1.id}`)).text()).includes(p1.title.slice(0, 10)));
+
+  // منتج بدون رابط سلة: الشراء في متاجر أصالة يودّي للمتجر الخاص
+  r = await post('/api/m/store/products', { title: 'بخور فاخر', price: 30, category: 'perfume' }, S.merchant);
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  const own = r.data.product.id;
+  assert.equal((await call('/api/public/store/products/' + own)).data.product.buy_url, `/s/green-kif/p/${own}`);
+
+  // صفحة الهبوط يدوياً، والذكاء الاصطناعي يحتاج مفتاح
+  assert.equal((await call(`/api/m/site/landing/${own}`, { method: 'PUT', body: { landing: { headline: '' } }, cookie: S.merchant })).status, 400);
+  r = await call(`/api/m/site/landing/${own}`, { method: 'PUT', body: { landing: { headline: 'بخور يملا البيت', bullets: ['🔥 يدوم', ''], faq: [{ q: 'أصلي؟', a: 'إي' }] } }, cookie: S.merchant });
+  assert.deepEqual(r.data.landing.bullets, ['🔥 يدوم']);
+  assert.equal((await call('/api/public/site/green-kif')).data.products.find((p) => p.id === own).landing.headline, 'بخور يملا البيت');
+  assert.equal((await post(`/api/m/site/landing/${own}/ai`, {}, S.merchant)).status, 503);
+  assert.equal((await post('/api/m/site/ai', { message: 'غيّر الألوان' }, S.merchant)).status, 503);
+
+  // السلة: تنحفظ عند التاجر بالأسعار من القاعدة
+  const token = 'tok_' + 'a'.repeat(24);
+  assert.equal((await post('/api/public/site/green-kif/cart', { token: 'x', items: [] })).status, 400);
+  r = await post('/api/public/site/green-kif/cart', { token, items: [{ id: own, qty: 2 }, { id: 999999, qty: 1 }], name: 'سارة' });
+  assert.equal(r.data.saved, true);
+  assert.equal((await call('/api/m/orders?view=carts', { cookie: S.merchant })).data.orders.length, 0); // ما صارت متروكة للحين
+
+  // الطلب: يحتاج اسم وجوال وموافقة، ويطلع برقم ورابط واتساب
+  assert.equal((await post('/api/public/site/green-kif/order', { token, items: [{ id: own, qty: 2 }], name: 'سارة', phone: '0551112223' })).status, 400);
+  assert.equal((await post('/api/public/site/green-kif/order', { token, items: [{ id: own, qty: 2 }], name: 'سارة', phone: '12', consent: true })).status, 400);
+  r = await post('/api/public/site/green-kif/order', { token, items: [{ id: own, qty: 2 }], name: 'سارة', phone: '0551112223', city: 'الرياض', consent: true, coupon: 'open10' });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.match(r.data.number, /^A-\d{5,}$/);
+  assert.equal(r.data.channel, 'whatsapp');
+  assert.equal(r.data.total, 54);
+  assert.ok(decodeURIComponent(r.data.whatsapp_url).includes('أريد تأكيد طلبي رقم ' + r.data.number));
+  assert.ok(r.data.whatsapp_url.startsWith('https://wa.me/966551234567?text='));
+
+  // سلة: لما كل المنتجات لها رابط سلة، العميل يتحول لها
+  await call('/api/m/site/draft', { method: 'PUT', body: { draft: { checkout: 'salla' } }, cookie: S.merchant });
+  await post('/api/m/site/publish', {}, S.merchant);
+  r = await post('/api/public/site/green-kif/order', { token: 'tok_' + 'b'.repeat(24), items: [{ id: p1.id, qty: 1 }], name: 'علي', phone: '0551112224', consent: true });
+  assert.equal(r.data.channel, p1.buy_url ? 'salla' : 'whatsapp');
+  if (p1.buy_url) assert.equal(r.data.links[0].url, p1.buy_url);
+
+  // التاجر يشوف الطلبات ويغيّر حالتها، ويوصله تنبيه
+  const list = (await call('/api/m/orders', { cookie: S.merchant })).data;
+  assert.equal(list.orders.length, 2);
+  assert.equal(list.stats.new, 2);
+  const o = list.orders.find((x) => x.name === 'سارة');
+  assert.equal(o.items[0].qty, 2);
+  assert.equal((await patch('/api/m/orders/' + o.id, { status: 'oops' }, S.merchant)).status, 400);
+  assert.equal((await patch('/api/m/orders/' + o.id, { status: 'confirmed', merchant_note: 'تم التحويل' }, S.merchant)).status, 200);
+  assert.equal((await call('/api/m/orders', { cookie: S.merchant })).data.stats.new, 1);
+  assert.ok((await call('/api/m/overview', { cookie: S.merchant })).data.alerts.some((a) => a.kind === 'new_order'));
+  assert.ok(!(await call('/api/admin/overview', { cookie: S.admin })).data.alerts.some((a) => a.kind === 'new_order'));
+  assert.equal((await call('/api/m/orders', { cookie: S.admin })).status, 403);
+
+  // النقاط: طلب شحن من التاجر، والمدير يضيف ويعدّل الباقات
+  r = await post('/api/m/site/credits/request', { pack: 1 }, S.merchant);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  let ad = (await call('/api/admin/ai-credits', { cookie: S.admin })).data;
+  const req = ad.requests.find((x) => !x.read_at);
+  assert.ok(req && req.merchant_id === S.mid);
+  r = await post(`/api/admin/ai-credits/${S.mid}`, { delta: 150, request_id: req.id }, S.admin);
+  assert.equal(r.data.balance, 170);
+  ad = (await call('/api/admin/ai-credits', { cookie: S.admin })).data;
+  assert.ok(ad.requests.every((x) => x.read_at));
+  assert.equal(ad.merchants.find((m) => m.id === S.mid).ai_credits, 170);
+  assert.equal((await call('/api/admin/ai-credits/plan', { method: 'PUT', body: { free: 5, cost: 0.2, packs: [] }, cookie: S.admin })).status, 200);
+  assert.equal((await call('/api/admin/ai-credits/plan', { method: 'PUT', body: { free: -1, cost: 0.2, packs: [] }, cookie: S.admin })).status, 400);
+  r = await call('/api/admin/ai-credits/plan', { method: 'PUT', body: { free: 10, cost: 0.12, packs: [{ points: 100, price: 49 }] }, cookie: S.admin });
+  assert.equal(r.data.plan.packs[0].points, 100);
+  assert.equal((await call('/api/admin/ai-credits', { cookie: S.merchant })).status, 403);
+
+  // إيقاف المتجر
+  assert.equal((await post('/api/m/site/unpublish', {}, S.merchant)).status, 200);
+  assert.equal((await call('/api/public/site/green-kif')).status, 404);
 });

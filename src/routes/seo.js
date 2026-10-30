@@ -73,6 +73,7 @@ async function productPage(env, origin, id) {
   const price = p.price != null ? `${sar(p.price)} ر.س` : '';
   const rating = p.rating_n ? Math.round((p.rating_sum / p.rating_n) * 10) / 10 : null;
   const desc = short(`${p.title}${price ? ' بسعر ' + price : ''} من ${p.merchant_name}. أصلي وموثّق في متاجر أصالة. ${p.description || ''}`, 200);
+  const buy = p.buy_url || `/s/${p.merchant_slug}/p/${p.id}`;
   const jsonld = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -82,7 +83,7 @@ async function productPage(env, origin, id) {
     brand: { '@type': 'Brand', name: p.merchant_name },
     category: CATEGORIES[p.category] || undefined,
     url: origin + '/stores/p/' + p.id,
-    offers: p.price != null ? { '@type': 'Offer', price: (p.price / 100).toFixed(2), priceCurrency: 'SAR', availability: 'https://schema.org/InStock', url: p.buy_url } : undefined,
+    offers: p.price != null ? { '@type': 'Offer', price: (p.price / 100).toFixed(2), priceCurrency: 'SAR', availability: 'https://schema.org/InStock', url: buy.startsWith('/') ? origin + buy : buy } : undefined,
     aggregateRating: rating ? { '@type': 'AggregateRating', ratingValue: rating, reviewCount: p.rating_n } : undefined,
   };
   const body = `<article class="p">
@@ -93,7 +94,7 @@ async function productPage(env, origin, id) {
     ${price ? `<div class="price">${price}${p.old_price && p.old_price > p.price ? `<s>${sar(p.old_price)} ر.س</s>` : ''}</div>` : ''}
     ${rating ? `<div class="stars">★ ${rating} <small>(${p.rating_n} تقييم)</small></div>` : ''}
     <div class="badge">🛡️ أصلي موثّق من أصالة</div>
-    <div class="btns"><a class="btn gold" href="/stores/?p=${p.id}">افتح في متاجر أصالة</a><a class="btn dark" href="${e(p.buy_url)}" rel="noopener">اشتر الآن من ${e(p.merchant_name)} ↗</a></div>
+    <div class="btns"><a class="btn gold" href="/stores/?p=${p.id}">افتح في متاجر أصالة</a><a class="btn dark" href="${e(buy)}" rel="noopener">اشتر الآن من ${e(p.merchant_name)} ↗</a></div>
     ${p.description ? `<p class="desc">${e(p.description)}</p>` : ''}
   </div></article>
   ${more.length ? `<h2>منتجات أصلية ممكن تعجبك</h2><div class="grid">${more.map(cardHtml).join('')}</div>` : ''}`;

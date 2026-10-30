@@ -1,5 +1,6 @@
 import { api, raw, hotspotsTable, initial, pickImage, bars, BATCH_STATUS, hbars, html, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 import { loadStore } from '/merchant/store.js';
+import { loadSite, loadOrders, ordersBadge } from '/merchant/site.js';
 import { initPanelApp } from '/assets/panel-app.js';
 import { playResult } from '/assets/sound.js';
 
@@ -81,7 +82,7 @@ async function loadHome() {
   render($('daily'), bars(o.daily));
   render($('recent'), !o.recent.length ? html`<div class="empty">ما فيه عمليات تحقق للحين</div>` : html`<table style="min-width:520px"><thead><tr><th>رقم العلامة</th><th>النتيجة</th><th>المدينة</th><th>الفحص</th><th>الوقت</th></tr></thead><tbody>${o.recent.slice(0, 10).map((r) => html`<tr><td class="mono">${r.public_id || 'غير معروف'}</td><td>${pill(RESULT, r.result)}</td><td>${r.city || '-'}</td><td>${r.check_no ? `${r.check_no} من ${merchant.max_checks}` : '-'}</td><td class="muted">${when(r.created_at)}</td></tr>`)}</tbody></table>`);
   const unread = d.alerts.filter((a) => !a.read_at && a.kind !== 'tag_request');
-  render($('alerts'), html`${unread.map((a) => html`<div class="alert ${a.kind === 'low_stock' ? 'warn' : 'err'}"><div>${a.message} <span class="small">· ${when(a.created_at)}</span></div></div>`)}${unread.length ? html`<div><button class="btn" type="button" id="alerts-read">تم الاطلاع</button></div>` : ''}`);
+  render($('alerts'), html`${unread.map((a) => html`<div class="alert ${a.kind === 'low_stock' ? 'warn' : ['new_order', 'credits_added', 'weekly_summary', 'monthly_report'].includes(a.kind) ? 'info' : 'err'}"><div>${a.message} <span class="small">· ${when(a.created_at)}</span></div></div>`)}${unread.length ? html`<div><button class="btn" type="button" id="alerts-read">تم الاطلاع</button></div>` : ''}`);
   $('alerts-read')?.addEventListener('click', async () => { await api('/api/m/alerts/read', { method: 'POST', body: {} }); loadHome(); });
 }
 
@@ -603,9 +604,10 @@ onSubmit($('password-form'), async (f) => {
   setTimeout(() => (location.href = '/merchant/login/'), 1200);
 });
 
-const loaders = { home: loadHome, store: loadStore, assistant: async () => { if (!merchant) merchant = (await api('/api/m/overview')).merchant; return loadAssistant(); }, tags: loadTags, loyalty: loadLoyalty, contest: async () => { await loadContest(); await loadContestData(); }, reports: loadReports, monthly: async () => {}, sellers: loadSellers, account: loadAccount, trust: loadTrust };
+const loaders = { home: loadHome, store: loadStore, site: loadSite, orders: loadOrders, assistant: async () => { if (!merchant) merchant = (await api('/api/m/overview')).merchant; return loadAssistant(); }, tags: loadTags, loyalty: loadLoyalty, contest: async () => { await loadContest(); await loadContestData(); }, reports: loadReports, monthly: async () => {}, sellers: loadSellers, account: loadAccount, trust: loadTrust };
 // هوية التاجر في القائمة الجانبية حتى لو فتح اللوحة على غير الرئيسية
 api('/api/m/overview').then((d) => { merchant = merchant || d.merchant; brandHeader(d.merchant); }).catch(() => {});
+ordersBadge();
 // الشريط السفلي في الجوال: أهم 4 أقسام، و«المزيد» يفتح القائمة كاملة
 const BAR = ['home', 'tags', 'reports', 'store'];
 function markBar(id) {

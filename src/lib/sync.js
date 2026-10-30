@@ -13,7 +13,7 @@ export async function runStoreSync(env) {
     await db
       .prepare(
         `SELECT p.id,p.title,p.buy_url,p.price,p.old_price FROM store_products p JOIN merchants m ON m.id=p.merchant_id
-         WHERE m.store_enabled=1 AND m.store_auto_sync=1 AND m.status='active' AND (p.synced_at IS NULL OR p.synced_at<?)
+         WHERE m.store_enabled=1 AND m.store_auto_sync=1 AND m.status='active' AND p.buy_url<>'' AND (p.synced_at IS NULL OR p.synced_at<?)
          ORDER BY COALESCE(p.synced_at,0) LIMIT ?`
       )
       .bind(t - EVERY, PER_RUN)

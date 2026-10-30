@@ -362,6 +362,8 @@ const PRODUCT_COLS = 'p.id,p.comments,p.rating_sum,p.rating_n,p.title,p.descript
 function publicProduct(p) {
   const { merchant_logo, store_coupon, store_coupon_note, rating_sum, rating_n, ...rest } = productOut(p);
   const rating = rating_n ? { avg: Math.round((rating_sum / rating_n) * 10) / 10, n: rating_n } : null;
+  // منتج بدون رابط سلة: الشراء من متجر التاجر الخاص في أصالة
+  if (!rest.buy_url) rest.buy_url = `/s/${rest.merchant_slug}/p/${rest.id}`;
   return { ...rest, rating, merchant_logo: imageUrl(merchant_logo), coupon: store_coupon ? { code: store_coupon, note: store_coupon_note } : null };
 }
 
@@ -454,6 +456,7 @@ async function listReels(db, { merchant, product, sort, limit = 20, offset = 0 }
     .all();
   return r.results.map(({ merchant_logo, product_price, product_image, ...x }) => ({
     ...reelOut(x),
+    product_buy_url: x.product_id && !x.product_buy_url ? `/s/${x.merchant_slug}/p/${x.product_id}` : x.product_buy_url,
     merchant_logo: imageUrl(merchant_logo),
     product_price: sar(product_price),
     product_image: imageUrl(product_image),

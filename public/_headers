@@ -32,3 +32,5 @@
   Cache-Control: no-cache
 /seller/*
   Cache-Control: no-cache
+/site/*
+  Cache-Control: no-cache

@@ -190,7 +190,7 @@ function renderCompose() {
           <label class="field">قبل الخصم (اختياري)<input name="old_price" inputmode="decimal" class="ltr" value="${d.old_price ?? ''}" placeholder="199"></label>
         </div>
         <label class="field">الفئة<select name="category">${Object.entries(S.categories).map(([k, v]) => html`<option value="${k}" ${k === (d.category || 'other') ? 'selected' : ''}>${v}</option>`)}</select></label>
-        <label class="field">رابط المنتج في متجرك (سلة)<input name="buy_url" type="url" required class="ltr" value="${d.buy_url || ''}" placeholder="https://your-store.salla.sa/p/..."><small class="muted">لما يضغط العميل "اشتر الآن" يروح لهذا الرابط ويدفع في سلة.</small></label>
+        <label class="field">رابط المنتج في متجرك (سلة) - اختياري<input name="buy_url" type="url" class="ltr" value="${d.buy_url || ''}" placeholder="https://your-store.salla.sa/p/..."><small class="muted">لو حطيته، "اشتر الآن" يودّي العميل لسلة. لو تركته فاضي، الطلب ينحفظ في متجرك الخاص 🏪 ويتأكد معك على واتساب.</small></label>
         <label class="field">الوصف<textarea name="description" rows="4" maxlength="1500">${d.description || ''}</textarea></label>
         <label class="check"><input type="checkbox" name="active" ${d.status === 'hidden' ? '' : 'checked'}> يظهر للعملاء</label>
         <div class="actions"><button class="btn btn-primary" type="submit">${d.id ? 'حفظ التعديل' : 'انشر المنتج 🚀'}</button></div>

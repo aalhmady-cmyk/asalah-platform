@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="/merchant/store.css">
 <link rel="stylesheet" href="/assets/panel-app.css">
 <link rel="stylesheet" href="/assets/trust.css">
+<link rel="stylesheet" href="/merchant/site.css">
 </head>
 <body>
 <div class="shell">
@@ -38,6 +39,8 @@
       <button type="button" data-tab="contest">المسابقة</button>
       <span class="nav-group">البيع والتقارير</span>
       <button type="button" data-tab="store">متجري 🛍️</button>
+      <button type="button" data-tab="site">متجري الخاص 🏪</button>
+      <button type="button" data-tab="orders">طلبات العملاء 🧾 <span class="nav-badge" id="orders-badge" hidden></span></button>
       <button type="button" data-tab="monthly">التقارير</button>
       <span class="nav-group">الإعدادات</span>
       <button type="button" data-tab="account">الحساب</button>
@@ -72,6 +75,8 @@
     </section>
 
     <section id="store" hidden></section>
+    <section id="site" hidden></section>
+    <section id="orders" hidden></section>
 
     <section id="tags" hidden>
       <div class="page-head"><div><h1>العلامات</h1><p>دفعاتك، والبحث عن أي علامة، وإيقافها أو تفعيلها</p></div></div>

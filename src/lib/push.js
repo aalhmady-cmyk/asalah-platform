@@ -125,8 +125,8 @@ export async function pushToCustomers(db, customerIds, payload) {
 }
 
 // تنبيهات اللوحات توصل جوال التاجر والمدير. التاجر ما يشوف طلباته للإدارة، والمدير ما يشوف رسائل التاجر الخاصة
-const MERCHANT_SKIP = ['tag_request', 'store_request'];
-const ADMIN_SKIP = ['store_blocked', 'staff_password', 'weekly_summary', 'monthly_report'];
+const MERCHANT_SKIP = ['tag_request', 'store_request', 'credit_request'];
+const ADMIN_SKIP = ['store_blocked', 'staff_password', 'weekly_summary', 'monthly_report', 'new_order', 'credits_added'];
 export async function pushAlert(db, merchantId, kind, message) {
   try {
     const parts = [];

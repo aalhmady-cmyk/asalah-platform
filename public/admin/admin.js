@@ -1,5 +1,6 @@
 import { initPanelApp } from '/assets/panel-app.js';
 import { playResult } from '/assets/sound.js';
+import { loadCredits, creditsBadge } from '/admin/credits.js';
 import { api, raw, bars, BATCH_STATUS, hbars, hotspotsTable, html, pickImage, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
@@ -127,7 +128,7 @@ async function loadHome() {
     <div class="kpi"><span class="label">تجار نشطون</span><span class="value">${num(d.totals.active_merchants)} من ${num(merchants.length)}</span><span class="note">نسبة الأصلي ${o.original_ratio ?? '-'}%</span></div>
     <div class="kpi"><span class="label">أكواد مزيّفة اليوم</span><span class="value">${num(o.unknown_today)}</span><span class="note bad">${num(o.reports_7d)} بلاغ خلال 7 أيام</span></div>`);
   const unread = d.alerts.filter((a) => !a.read_at);
-  render($('home-alerts'), html`${unread.map((a) => html`<div class="alert ${['tag_request', 'join_request', 'store_request', 'password_request'].includes(a.kind) ? 'info' : a.kind === 'low_stock' ? 'warn' : 'err'}"><div><b>${a.merchant_name || 'المنصة'}</b><div class="small">${a.message} · ${when(a.created_at)}</div></div></div>`)}${unread.length ? html`<div><button class="btn" type="button" id="alerts-read">تم الاطلاع على التنبيهات</button></div>` : ''}`);
+  render($('home-alerts'), html`${unread.map((a) => html`<div class="alert ${['tag_request', 'join_request', 'store_request', 'password_request', 'credit_request'].includes(a.kind) ? 'info' : a.kind === 'low_stock' ? 'warn' : 'err'}"><div><b>${a.merchant_name || 'المنصة'}</b><div class="small">${a.message} · ${when(a.created_at)}</div></div></div>`)}${unread.length ? html`<div><button class="btn" type="button" id="alerts-read">تم الاطلاع على التنبيهات</button></div>` : ''}`);
   $('alerts-read')?.addEventListener('click', async () => { await api('/api/admin/alerts/read', { method: 'POST', body: {} }); loadHome(); });
   render($('home-bars'), bars(o.daily));
   render($('home-cities'), hbars(o.cities_7d));
@@ -639,7 +640,9 @@ onSubmit($('story-form'), async (f) => {
   toast(f.merchant_id ? 'انحفظت القصة، تطلع الحين في صفحة التجار ✅' : 'انشالت القصة من الصفحة');
 });
 
-const loaders = { home: loadHome, leads: loadLeads, site: loadSite, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, push: loadPush, reports: loadReports, users: loadUsers, audit: loadAudit };
+const loaders = { credits: loadCredits, home: loadHome, leads: loadLeads, site: loadSite, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, push: loadPush, reports: loadReports, users: loadUsers, audit: loadAudit };
 let current = 'home';
 const refresh = () => loaders[current]().catch((e) => toast(e.message, true));
 const showTab = tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => { current = id; refresh(); });
+
+creditsBadge();

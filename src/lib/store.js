@@ -44,7 +44,8 @@ export function productFields(b, partial) {
   }
   if (has('price')) f.price = halalas(b.price, 'السعر');
   if (has('old_price')) f.old_price = halalas(b.old_price, 'السعر قبل الخصم', { optional: true });
-  if (has('buy_url')) f.buy_url = url(b.buy_url, 'المنتج في متجرك', { optional: false });
+  // فاضي = الشراء من متجر التاجر الخاص في أصالة (/s/slug)
+  if (has('buy_url')) f.buy_url = url(b.buy_url, 'المنتج في متجرك') || '';
   if (has('status')) {
     f.status = b.status || 'active';
     if (!['active', 'hidden'].includes(f.status)) fail(400, 'الحالة غير معروفة');

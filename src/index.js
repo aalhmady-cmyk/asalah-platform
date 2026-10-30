@@ -16,6 +16,7 @@ import { handlePublicTrust } from './routes/trust.js';
 import { handlePublicGrowth } from './routes/growth.js';
 import { runMonthly } from './lib/growth.js';
 import { handlePublicStore } from './routes/store.js';
+import { handlePublicSite, serveSitePage } from './routes/site.js';
 import { handleCustomer } from './lib/customers.js';
 import { serveMedia } from './lib/store.js';
 import { brandPage, brands, enter, guideChat, guideInfo, joinRequest, shopAiRoute, stats, loyaltyClaim, loyaltyRedeem, loyaltyWallet, rate, report, verify, guarantee } from './routes/public.js';
@@ -25,6 +26,8 @@ const SECURITY_HEADERS = {
   'Referrer-Policy': 'no-referrer',
   'X-Frame-Options': 'DENY',
 };
+
+const SITE_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'";
 
 async function route(req, env) {
   const path = new URL(req.url).pathname;
@@ -43,6 +46,10 @@ async function route(req, env) {
     const r = await handleSeo(req, env, path);
     if (r) return r;
   }
+  if (path.startsWith('/s/') && (m === 'GET' || m === 'HEAD')) {
+    return (await serveSitePage(req, env, path)) || env.ASSETS.fetch(req);
+  }
+  if (path.startsWith('/api/public/site/')) return handlePublicSite(req, env, path);
   if (path === '/api/public/store' || path.startsWith('/api/public/store/')) return handlePublicStore(req, env, path);
   if (path.startsWith('/api/c/')) return handleCustomer(req, env, path);
   if (path.startsWith('/api/public/push/')) return handlePublicPush(req, env, path);
@@ -91,6 +98,11 @@ export default {
     }
     const out = new Response(res.body, res);
     for (const [k, v] of Object.entries(SECURITY_HEADERS)) out.headers.set(k, v);
+    // المتجر الخاص يقدر يظهر داخل لوحة التاجر للمعاينة (نفس الموقع بس)
+    if (new URL(req.url).pathname.startsWith('/s/')) {
+      out.headers.set('X-Frame-Options', 'SAMEORIGIN');
+      out.headers.set('Content-Security-Policy', SITE_CSP);
+    }
     return out;
   },
   async scheduled(_event, env, ctx) {
