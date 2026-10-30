@@ -34,7 +34,11 @@ export function html(strings, ...vals) {
   });
   return raw(out);
 }
-export const render = (el, tpl) => { el.innerHTML = tpl[RAW]; };
+export const render = (el, tpl) => {
+  el.innerHTML = tpl[RAW];
+  // الصور تحت الشاشة ما تتحمّل إلا لما العميل يوصلها
+  for (const img of el.querySelectorAll('img:not([loading])')) { img.loading = 'lazy'; img.decoding = 'async'; }
+};
 
 export const num = (n) => (n == null ? '-' : Number(n).toLocaleString('en-US'));
 export function when(sec) {

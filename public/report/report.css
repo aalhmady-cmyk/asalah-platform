@@ -31,3 +31,6 @@ body { background: #E9E7E1; }
 .r-kpi small { display: block; font-size: 11px; margin-top: 2px; }
 .r-kpi small.up { color: #1F8A5B; } .r-kpi small.down { color: #C0392B; }
 .r-kpi.gold small.up { color: #9FE3BE; } .r-kpi.gold small.down { color: #FFB4A8; }
+
+/* تقليل الحركة لمن طلبها من إعدادات الجوال */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }

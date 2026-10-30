@@ -311,3 +311,6 @@ dialog form { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .todo-item span { font-size: 20px; }
 .todo-item i { font-style: normal; color: var(--muted); }
 .todo-item:hover { border-color: var(--green, #0E6B4E); }
+
+/* تقليل الحركة لمن طلبها من إعدادات الجوال */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }

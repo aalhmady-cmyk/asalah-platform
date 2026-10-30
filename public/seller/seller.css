@@ -22,3 +22,6 @@ body { background: var(--ground); }
 @keyframes spin { to { transform: rotate(360deg); } }
 .sl-foot { text-align: center; color: var(--muted); font-size: 13px; margin-top: auto; }
 .sl-foot a { color: inherit; }
+
+/* تقليل الحركة لمن طلبها من إعدادات الجوال */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }

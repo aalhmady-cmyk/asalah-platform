@@ -24,3 +24,6 @@ html, body { margin: 0; height: 100%; background: #08130F; color: #fff; font-fam
 .sc-btn[hidden] { display: none; }
 .sc-note { font-size: 13px; }
 .sc.bad h1 { color: #FF8A8D; }
+
+/* تقليل الحركة لمن طلبها من إعدادات الجوال */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
