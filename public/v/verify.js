@@ -27,7 +27,7 @@ function deviceId() {
 const params = new URLSearchParams(location.search);
 const hashParams = new URLSearchParams(location.hash.slice(1));
 // صفحة تجريبية للتجار (?demo=ok أو ?demo=fake): نفس الصفحة ببيانات ثابتة وبدون أي طلب للخادم
-const DEMO = ['ok', 'fake'].includes(params.get('demo')) ? params.get('demo') : null;
+const DEMO = ['ok', 'fake', 'copy'].includes(params.get('demo')) ? params.get('demo') : null;
 let token = DEMO ? 'demo' : params.get('t') || hashParams.get('t') || session?.getItem('asalah_t') || '';
 if (!DEMO && (params.has('t') || hashParams.has('t'))) {
   session?.setItem('asalah_t', token);
@@ -38,10 +38,24 @@ const sid = deviceId();
 function demoResult() {
   const t = Math.floor(Date.now() / 1000);
   if (DEMO === 'fake') return { ok: false, result: 'unknown', message: 'هذي العلامة غير مسجلة عندنا. لا تستخدم المنتج قبل ما تتأكد من البائع.', brand: null, sound: true };
+  const brand = { name: tx('علامتك التجارية', 'Your brand'), logo_url: null, brand_color: '#0E6B4E', store_url: null, whatsapp: null };
+  // نسخة من علامة اشتراها عميل وسجّلها باسمه: كذا يشوفها المقلّد أو اللي شرى النسخة
+  if (DEMO === 'copy') return { ok: false, result: 'other_device', message: '', brand, sound: true, sound_clips: {}, report_allowed: true,
+    history: { total: 4, devices: 3, flagged: true, first: { at: t - 3 * 86400, city: tx('الرياض', 'Riyadh'), kind: 'iphone', mine: false },
+      owner: { you: false, name: tx('إبراهيم ع', 'Ibrahim A'), phone: '05xxxxx223', at: t - 3 * 86400 + 600, city: tx('الرياض', 'Riyadh') },
+      recent: [
+        { at: t, city: tx('جدة', 'Jeddah'), kind: 'samsung', mine: true, result: 'other_device' },
+        { at: t - 2 * 3600, city: tx('جدة', 'Jeddah'), kind: 'android', mine: false, result: 'other_device' },
+        { at: t - 3 * 86400 + 600, city: tx('الرياض', 'Riyadh'), kind: 'iphone', mine: false, result: 'claimed' },
+        { at: t - 3 * 86400, city: tx('الرياض', 'Riyadh'), kind: 'iphone', mine: false, result: 'original' },
+      ] } };
   return {
     ok: true, result: 'original', message: '', sound: true, sound_clips: {}, voice_url: null, shop: null, contest: null,
-    brand: { name: tx('علامتك التجارية', 'Your brand'), logo_url: null, brand_color: '#0E6B4E', store_url: null, whatsapp: null },
-    tag: { public_id: 'DEMO-000001', batch: 'DEMO', product_name: tx('منتجك', 'Your product'), produced_on: '2026-09', image_url: null, expires_on: null, expired: false, details: null, is_test: false, check_no: 1, checks_left: 4 },
+    brand,
+    tag: { public_id: 'DEMO-000001', batch: 'DEMO', product_name: tx('منتجك', 'Your product'), produced_on: '2026-09', image_url: null, expires_on: null, expired: false, details: null, is_test: false, check_no: 2, devices: 2, max_devices: 5, checks_left: 3 },
+    owner: { you: false, claimable: true },
+    history: { total: 2, devices: 2, flagged: false, owner: null, first: { at: t - 3600, city: tx('الرياض', 'Riyadh'), kind: 'iphone', mine: false },
+      recent: [{ at: t, city: tx('الرياض', 'Riyadh'), kind: 'samsung', mine: true, result: 'original' }, { at: t - 3600, city: tx('الرياض', 'Riyadh'), kind: 'iphone', mine: false, result: 'original' }] },
     loyalty: { mode: 'points', per_tag: 10, min_redeem: 100, reward: tx('خصم 20 ريال', '20 SAR off'), claimed: false },
     rating: { done: false, stars: null },
     passport: { produced_on: '2026-09', issued_at: t - 20 * 86400, shipped_at: t - 9 * 86400, first_check_at: t, batch_verified: 128, batch_size: 500 },
@@ -53,6 +67,8 @@ function demoResult() {
 async function post(path, body) {
   if (DEMO) {
     if (path === '/api/verify') return demoResult();
+    if (path === '/api/claim') return { ok: true };
+    if (path === '/api/loyalty/claim') return { ok: true, added: 10, wallet: { mode: 'points', per_tag: 10, min_redeem: 100, reward: tx('خصم 20 ريال', '20 SAR off'), phone: body.phone, balance: 10, earned_total: 10, tags_count: 1, can_redeem: false, codes: [] } };
     throw new Error(tx('هذي صفحة تجريبية 🙂 في منتجك الحقيقي يوصل هذا الطلب لك مباشرة.', 'This is a demo page 🙂 On your real product this goes straight to you.'));
   }
   const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -155,6 +171,7 @@ async function run() {
     show('other');
     if (d.history) setupHistory(d.history);
     show('report');
+    resultSound('fake');
     return;
   }
   bad(d.result, resultMsg(d));
@@ -204,6 +221,13 @@ function setupOwn(d) {
       show('owned');
       if (pts && phone) await claim(phone, true);
       resultSound('original');
+      // في التجربة: نوري التاجر وش يطلع لو أحد نسخ العلامة بعد ما انسجلت
+      if (DEMO) {
+        const bar = $('demo-bar');
+        bar.href = '/v/?demo=copy';
+        bar.textContent = tx('🧪 تسجّل باسمك. شوف الحين وش يطلع لو أحد نسخ هذي العلامة ←', '🧪 Registered. Now see what a copy of this tag shows ←');
+        bar.classList.add('pulse');
+      }
     } catch (err) { alertBox(err.message); }
   });
 }
@@ -254,7 +278,7 @@ function ok(d) {
   $('f-product').textContent = t.product_name || (t.produced_on ? tx('إنتاج ', 'Made ') + t.produced_on : '-');
   $('f-checks').textContent = t.max_devices && t.devices != null ? tx(`${t.devices} من ${t.max_devices} جوالات`, `${t.devices} of ${t.max_devices} phones`) : String(t.check_no);
   if (d.owner?.you) { show('owned'); $('f-checks').textContent = tx(`${t.check_no} مسحة`, `${t.check_no} scans`); }
-  if (d.owner?.claimable && !DEMO) setupOwn(d);
+  if (d.owner?.claimable) setupOwn(d);
   show('test-note', t.is_test);
   // صورة المنتج للدفعة، وإذا ما فيه، شعار التاجر
   const pic = t.image_url || d.brand.logo_url;

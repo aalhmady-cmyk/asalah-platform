@@ -424,6 +424,10 @@ export async function handleMerchant(req, env, path) {
     return json({ ok: true, message: 'وصل طلبك لإدارة أصالة' });
   }
 
+  if (path === '/api/m/alerts' && m === 'GET') {
+    const r = await db.prepare("SELECT id,kind,message,created_at,read_at FROM alerts WHERE merchant_id=? AND kind NOT IN ('tag_request','store_request','credit_request') ORDER BY id DESC LIMIT 40").bind(mid).all();
+    return json({ ok: true, alerts: r.results, unread: r.results.filter((a) => !a.read_at).length });
+  }
   if (path === '/api/m/alerts/read' && m === 'POST') {
     await db.prepare('UPDATE alerts SET read_at=? WHERE merchant_id=? AND read_at IS NULL').bind(now(), mid).run();
     return json({ ok: true });

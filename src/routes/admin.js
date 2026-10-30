@@ -262,6 +262,10 @@ export async function handleAdmin(req, env, path) {
   }
 
   // ---------- التنبيهات والسجل ----------
+  if (path === '/api/admin/alerts' && m === 'GET') {
+    const r = await db.prepare("SELECT a.id,a.kind,a.message,a.created_at,a.read_at,m.name AS merchant_name FROM alerts a LEFT JOIN merchants m ON m.id=a.merchant_id WHERE a.kind NOT IN ('store_blocked','staff_password','weekly_summary','monthly_report','new_order','credits_added') AND NOT (a.kind='new_login' AND a.merchant_id IS NOT NULL) ORDER BY a.id DESC LIMIT 40").all();
+    return json({ ok: true, alerts: r.results, unread: r.results.filter((a) => !a.read_at).length });
+  }
   if (path === '/api/admin/alerts/read' && m === 'POST') {
     await db.prepare('UPDATE alerts SET read_at=? WHERE read_at IS NULL').bind(now()).run();
     return json({ ok: true });

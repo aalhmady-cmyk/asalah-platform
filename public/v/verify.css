@@ -192,3 +192,6 @@
 
 .owned { margin: 6px auto 0; display: inline-block; padding: 6px 14px; border-radius: 99px; background: var(--green-tint); color: var(--green-ink); font-weight: 700; font-size: 14px; }
 .own .big-btn { width: 100%; margin-top: 12px; }
+.demo-bar.pulse { animation: dpulse 1.6s ease-in-out 3; }
+@keyframes dpulse { 50% { filter: brightness(1.25); transform: scale(1.02); } }
+@media (prefers-reduced-motion: reduce) { .demo-bar.pulse { animation: none; } }

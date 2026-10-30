@@ -2,6 +2,7 @@ import { initPanelApp } from '/assets/panel-app.js';
 import { playResult } from '/assets/sound.js';
 import { loadCredits, creditsBadge } from '/admin/credits.js';
 import { mountSecurity } from '/assets/security.js';
+import { mountBell } from '/assets/bell.js';
 import { api, raw, bars, BATCH_STATUS, hbars, hotspotsTable, html, pickImage, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 import { confirmBox, promptBox } from '/assets/dialog.js';
 
@@ -661,5 +662,6 @@ onSubmit($('password-form'), async (f) => {
 let current = 'home';
 const refresh = () => loaders[current]().catch((e) => toast(e.message, true));
 const showTab = tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => { current = id; refresh(); });
+mountBell({ list: '/api/admin/alerts', read: '/api/admin/alerts/read', go: showTab, routes: { join_request: 'leads', credit_request: 'credits', report: 'reports', tag_anomaly: 'reports', unknown_wave: 'reports', password_request: 'users', new_login: 'security', tag_request: 'batches', store_request: 'store' } });
 
 creditsBadge();
