@@ -29,8 +29,13 @@ const hashParams = new URLSearchParams(location.hash.slice(1));
 // صفحة تجريبية للتجار (?demo=ok أو ?demo=fake): نفس الصفحة ببيانات ثابتة وبدون أي طلب للخادم
 const DEMO = ['ok', 'fake', 'copy'].includes(params.get('demo')) ? params.get('demo') : null;
 let token = DEMO ? 'demo' : params.get('t') || hashParams.get('t') || session?.getItem('asalah_t') || '';
-if (!DEMO && (params.has('t') || hashParams.has('t'))) {
+// شرائح 424 DNA: كل لمسة فيها عدّاد مشفّر (e) وتوقيع (c)
+const fresh = params.has('t') || hashParams.has('t');
+const sunE = (fresh ? params.get('e') : session?.getItem('asalah_e')) || undefined;
+const sunC = (fresh ? params.get('c') : session?.getItem('asalah_c')) || undefined;
+if (!DEMO && fresh) {
   session?.setItem('asalah_t', token);
+  if (sunE) { session?.setItem('asalah_e', sunE); session?.setItem('asalah_c', sunC || ''); } else { session?.removeItem('asalah_e'); session?.removeItem('asalah_c'); }
   history.replaceState(null, '', location.pathname);
 }
 const sid = deviceId();
@@ -119,6 +124,8 @@ const RESULT_EN = {
   not_activated: 'This tag has not been activated yet. Check with the seller before using the product.',
   locked: 'This tag has passed its allowed number of checks and was locked. The product may be counterfeit.',
   other_device: 'This product may be counterfeit or registered to someone else. Check with the seller.',
+  copied: 'This is a copied link, not a tap on the chip itself. Tap the chip with your phone directly; if you see this again the product may be counterfeit.',
+  cloned: 'This chip does not match the original tag. The product may be counterfeit, check with the seller.',
 };
 const resultMsg = (d) => (EN && RESULT_EN[d.result] ? RESULT_EN[d.result] : d.message);
 function enError(data) {
@@ -152,7 +159,7 @@ async function run() {
   if (!token && !cached) { await steps; return bad('unknown', tx('ما لقينا رمز العلامة في الرابط. امسح العلامة مرة ثانية.', 'We could not find the tag code in the link. Scan the tag again.')); }
   let d;
   try {
-    [d] = cached ? [cached] : await Promise.all([post('/api/verify', { t: token, sid }), steps]);
+    [d] = cached ? [cached] : await Promise.all([post('/api/verify', { t: token, sid, e: sunE, c: sunC }), steps]);
   } catch (e) {
     await steps;
     show('loading', false);
@@ -636,7 +643,7 @@ $('rate-form').addEventListener('submit', async (e) => {
 
 function bad(result, message) {
   show('loading', false);
-  $('bad-title').textContent = result === 'not_activated' ? tx('علامة غير مفعّلة', 'Tag not activated') : tx('قد يكون المنتج مقلّداً', 'This product may be counterfeit');
+  $('bad-title').textContent = result === 'not_activated' ? tx('علامة غير مفعّلة', 'Tag not activated') : result === 'copied' ? tx('المس الشريحة نفسها', 'Tap the chip itself') : tx('قد يكون المنتج مقلّداً', 'This product may be counterfeit');
   $('bad-msg').textContent = message;
   show('bad');
   show('report');

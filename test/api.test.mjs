@@ -1272,3 +1272,48 @@ test('موظف الطلبات يشوف الطلبات بس', async () => {
   assert.equal((await call('/api/m/staff', { cookie: ck })).status, 403);
   assert.equal((await call('/api/m/site', { cookie: ck })).status, 403);
 });
+
+test('شرائح NTAG 424 DNA: كل لمسة رابط جديد، والمنسوخ والمستنسخ ينكشف', async () => {
+  const { makeSun } = await import('../src/lib/sun.js');
+  let r = await post('/api/admin/batches', { merchant_id: S.mid, code: 'DNA2610', size: 5, kind: 'nfc424', product_name: 'شاي 424' }, S.admin);
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  const b = r.data.batch;
+  assert.equal(b.kind, 'nfc424');
+  await patch(`/api/admin/batches/${b.id}`, { status: 'active' }, S.admin);
+  r = await call(`/api/admin/batches/${b.id}/factory.csv?from=1&to=2`, { cookie: S.admin });
+  const url = r.data.replace(/^﻿/, '').trim().split('\r\n')[1].split(',')[2].replace(/"/g, '');
+  assert.match(url, /&e=0{32}&c=0{16}$/);
+  const t = tokenOf(url);
+  assert.equal((await call(`/api/admin/batches/${S.batch.id}/sun-keys`, { cookie: S.admin })).status, 400);
+  assert.equal((await call(`/api/admin/batches/${b.id}/sun-keys`, { cookie: S.merchant })).status, 403);
+  const k = (await call(`/api/admin/batches/${b.id}/sun-keys`, { cookie: S.admin })).data;
+  const keys = { meta: k.meta_key, file: k.file_key };
+  const UID = '04A1B2C3D4E5F6';
+
+  // بدون e و c (رابط منسوخ من المتصفح أو شريحة عادية)
+  r = await post('/api/verify', { t, sid: sid('1') });
+  assert.equal(r.data.result, 'copied', JSON.stringify(r.data));
+  // لمسة صحيحة
+  let tap = await makeSun(keys, UID, 5);
+  r = await post('/api/verify', { t, sid: sid('1'), ...tap });
+  assert.equal(r.data.result, 'original', JSON.stringify(r.data));
+  // تحديث الصفحة من نفس الجوال مسموح، ونفس الرابط من جوال ثاني = منسوخ
+  assert.equal((await post('/api/verify', { t, sid: sid('1'), ...tap })).data.result, 'original');
+  assert.equal((await post('/api/verify', { t, sid: sid('2'), ...tap })).data.result, 'copied');
+  // الجوال الثاني ما يقدر يسجّلها باسمه بدون لمسة
+  assert.equal((await post('/api/claim', { t, sid: sid('2') })).status, 403);
+  assert.equal((await post('/api/claim', { t, sid: sid('1') })).status, 200);
+  // عدّاد أقدم = رابط قديم
+  assert.equal((await post('/api/verify', { t, sid: sid('1'), ...(await makeSun(keys, UID, 4)) })).data.result, 'copied');
+  // توقيع غلط أو مفاتيح ثانية = مستنسخة
+  assert.equal((await post('/api/verify', { t, sid: sid('1'), e: tap.e, c: '0011223344556677' })).data.result, 'cloned');
+  assert.equal((await post('/api/verify', { t, sid: sid('1'), ...(await makeSun({ meta: '00'.repeat(16), file: '00'.repeat(16) }, UID, 9)) })).data.result, 'cloned');
+  // شريحة ثانية بنفس الرابط (UID مختلف) = مستنسخة
+  assert.equal((await post('/api/verify', { t, sid: sid('1'), ...(await makeSun(keys, '04FFFFFFFFFF01', 9)) })).data.result, 'cloned');
+  // نفس الشريحة على علامة ثانية = مستنسخة
+  r = await call(`/api/admin/batches/${b.id}/factory.csv?from=2&to=2`, { cookie: S.admin });
+  const tok2 = tokenOf(r.data.replace(/^﻿/, '').trim().split('\r\n')[1].split(',')[2].replace(/"/g, ''));
+  assert.equal((await post('/api/verify', { t: tok2, sid: sid('3'), ...(await makeSun(keys, UID, 10)) })).data.result, 'cloned');
+  // لمسة جديدة من صاحبها تشتغل
+  assert.equal((await post('/api/verify', { t, sid: sid('1'), ...(await makeSun(keys, UID, 11)) })).data.result, 'original');
+});

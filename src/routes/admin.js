@@ -10,6 +10,7 @@ import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
 import { hotspots, monthlyReport } from '../lib/insights.js';
 import { lookupTag, overviewFor, setTagStatus } from '../lib/ops.js';
 import { printLinks, publicId, stockFor, tokenFor } from '../lib/tags.js';
+import { batchKeys, toHex } from '../lib/sun.js';
 import { audit, csvResponse, fail, int, json, now, randomHex, readJson, str, url } from '../lib/util.js';
 import { getBackup, listBackups, makeBackup } from '../lib/backup.js';
 
@@ -194,7 +195,7 @@ export async function handleAdmin(req, env, path) {
     const code = str(b.code, 'رمز الدفعة', { min: 2, max: 16 }).toUpperCase();
     if (!/^[A-Z0-9]+$/.test(code)) fail(400, 'رمز الدفعة: أحرف إنجليزية وأرقام فقط، مثل GK2610');
     if (await db.prepare('SELECT id FROM batches WHERE code=?').bind(code).first()) fail(409, 'رمز الدفعة مستخدم مسبقاً');
-    const kind = b.kind === 'qr' ? 'qr' : 'nfc';
+    const kind = ['qr', 'nfc424'].includes(b.kind) ? b.kind : 'nfc';
     const size = int(b.size, 'عدد العلامات', { min: 1, max: kind === 'qr' ? 20000 : 1000000 });
     const produced = str(b.produced_on, 'تاريخ الإنتاج', { max: 20, optional: true });
     if (produced && !/^\d{4}-\d{2}(-\d{2})?$/.test(produced)) fail(400, 'تاريخ الإنتاج بصيغة 2026-10 أو 2026-10-15');
@@ -236,9 +237,21 @@ export async function handleAdmin(req, env, path) {
     if (to - from + 1 > FACTORY_CHUNK) fail(400, `أقصى ${FACTORY_CHUNK} علامة في الملف الواحد`);
     const origin = env.VERIFY_ORIGIN || new URL(req.url).origin;
     const rows = [];
-    for (let s = from; s <= to; s++) rows.push({ serial: s, public_id: publicId(batch, s), url: `${origin}/v/?t=${await tokenFor(env, batch, s)}` });
+    // شرائح 424: الرابط فيه أماكن فاضية تعبّيها الشريحة بنفسها مع كل لمسة (e = 32 خانة، c = 16 خانة)
+    const sun = batch.kind === 'nfc424' ? `&e=${'0'.repeat(32)}&c=${'0'.repeat(16)}` : '';
+    for (let s = from; s <= to; s++) rows.push({ serial: s, public_id: publicId(batch, s), url: `${origin}/v/?t=${await tokenFor(env, batch, s)}${sun}` });
     await audit(db, user, 'factory_file_downloaded', { code: batch.code, from, to }, batch.merchant_id);
     return csvResponse(rows, ['serial', 'public_id', 'url'], `${batch.code}-${from}-${to}.csv`);
+  }
+
+  // مفاتيح برمجة شرائح 424 DNA للمصنع (لكل دفعة). تنعرض للمدير بس وتنسجل في السجل
+  if ((match = path.match(/^\/api\/admin\/batches\/(\d+)\/sun-keys$/)) && m === 'GET') {
+    const batch = await db.prepare('SELECT id,code,salt,kind,merchant_id FROM batches WHERE id=?').bind(Number(match[1])).first();
+    if (!batch) fail(404, 'ما لقينا الدفعة');
+    if (batch.kind !== 'nfc424') fail(400, 'هذي الدفعة مو شرائح 424 DNA');
+    const k = await batchKeys(env, batch);
+    await audit(db, user, 'sun_keys_viewed', { code: batch.code }, batch.merchant_id);
+    return json({ ok: true, meta_key: toHex(k.meta), file_key: toHex(k.file) });
   }
 
   // روابط جاهزة للطباعة كـ QR (أي دفعة، للمدير)

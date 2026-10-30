@@ -4,7 +4,7 @@ import { loadCredits, creditsBadge } from '/admin/credits.js';
 import { mountSecurity } from '/assets/security.js';
 import { mountBell } from '/assets/bell.js';
 import { api, raw, bars, BATCH_STATUS, hbars, hotspotsTable, html, pickImage, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
-import { confirmBox, promptBox } from '/assets/dialog.js';
+import { alertBox, confirmBox, promptBox } from '/assets/dialog.js';
 
 const $ = (id) => document.getElementById(id);
 let merchants = [];
@@ -226,13 +226,14 @@ async function loadBatches() {
   render($('batches-table'), !batches.length ? html`<div class="empty">ما فيه دفعات للحين.</div>` : html`<table style="min-width:860px"><thead><tr>
     <th>الدفعة</th><th>التاجر</th><th>العدد</th><th>المنتج</th><th>الحالة</th><th>أُنشئت</th><th><span class="sr-only">إجراءات</span></th>
   </tr></thead><tbody>${batches.map((b) => html`<tr>
-    <td><b class="ltr">${b.code}</b>${b.is_test ? html` <span class="pill warn">تجريبية</span>` : ''}${b.kind === 'qr' ? html` <span class="pill ok">QR</span>` : ''}</td>
+    <td><b class="ltr">${b.code}</b>${b.is_test ? html` <span class="pill warn">تجريبية</span>` : ''}${b.kind === 'qr' ? html` <span class="pill ok">QR</span>` : b.kind === 'nfc424' ? html` <span class="pill ok">424 DNA</span>` : ''}</td>
     <td>${b.merchant_name}</td><td>${num(b.size)}</td><td>${b.product_name || '-'}</td>
     <td>${pill(BATCH_STATUS, b.status)}</td><td>${when(b.created_at)}</td>
     <td><div class="actions">
       ${b.image_url ? html`<img src="${b.image_url}" alt="" class="thumb" style="width:36px;height:36px">` : ''}
       <button class="btn btn-sm" type="button" data-batch-image="${b.id}">${b.image_url ? 'تغيير الصورة' : 'صورة المنتج'}</button>
       ${b.kind === 'qr' ? html`<a class="btn btn-gold" href="/print/?b=${b.id}" target="_blank" rel="noopener">🖨️ اطبع QR</a>` : html`<button class="btn" type="button" data-factory="${b.id}" data-code="${b.code}" data-size="${b.size}">ملف المصنع</button>`}
+      ${b.kind === 'nfc424' ? html`<button class="btn" type="button" data-sun-keys="${b.id}">🔑 مفاتيح الشريحة</button>` : ''}
       ${b.status === 'active' ? html`<button class="btn btn-danger" type="button" data-batch-status="blocked" data-id="${b.id}">إيقاف</button>` : html`<button class="btn btn-primary" type="button" data-batch-status="active" data-id="${b.id}">تفعيل</button>`}
     </div></td>
   </tr>`)}</tbody></table>`);
@@ -250,7 +251,25 @@ document.addEventListener('click', async (e) => {
   }
   const fb = e.target.closest('[data-factory]');
   if (fb) downloadFactory(fb);
+  const sk = e.target.closest('[data-sun-keys]');
+  if (sk) sunKeys(sk.dataset.sunKeys);
 });
+
+// إعدادات برمجة شرائح 424 DNA: نفس المفتاحين لكل شرائح الدفعة، والرابط لكل شريحة من ملف المصنع
+async function sunKeys(id) {
+  if (!await confirmBox('المفاتيح هذي سرية. اعرضها بس وقت ترسلها للمصنع، ولا ترسلها في قروب أو إيميل مفتوح. تكمل؟')) return;
+  try {
+    const k = await api(`/api/admin/batches/${id}/sun-keys`);
+    await alertBox(`فعّل SUN / SDM على ملف NDEF، وخلّ:
+• PICC Data مشفّرة (UID + العداد) في مكان e=
+• SDM MAC في مكان c= (MAC input = MAC offset)
+• SDM Meta Read key (المفتاح 1):
+${k.meta_key}
+• SDM File Read key (المفتاح 2):
+${k.file_key}
+وغيّر المفتاح الرئيسي (المفتاح 0) عن الافتراضي. الرابط لكل شريحة من «ملف المصنع».`, { title: '🔑 برمجة شرائح NTAG 424 DNA' });
+  } catch (err) { toast(err.message, true); }
+}
 
 // ملف المصنع ينزل على أجزاء من 10 آلاف ويتجمّع في ملف واحد
 async function downloadFactory(btn) {

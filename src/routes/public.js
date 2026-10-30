@@ -9,6 +9,7 @@ import { shopForVerify } from './store.js';
 import { shopAI } from '../lib/shop.js';
 import { imageUrl } from '../lib/images.js';
 import { checkAnomaly, logScan, scanHistory } from '../lib/scans.js';
+import { readSun } from '../lib/sun.js';
 import { requireHuman, turnstileKey } from '../lib/human.js';
 import { checkSignature, parseToken, publicId } from '../lib/tags.js';
 import { fail, geo, int, ipHash, json, now, rateLimit, readJson, saPhone, sha256, str } from '../lib/util.js';
@@ -23,6 +24,8 @@ const MESSAGES = {
   not_activated: 'هذي العلامة لم تُفعَّل بعد. تأكد من البائع قبل استخدام المنتج.',
   locked: 'تجاوزت هذي العلامة عدد مرات التحقق المسموح، وتم إيقافها. قد يكون المنتج مقلّداً.',
   other_device: 'قد يكون هذا المنتج مقلّداً أو مسجّلاً لشخص آخر. تأكد من البائع.',
+  copied: 'هذا رابط منسوخ، مو من لمسة الشريحة نفسها. المس الشريحة بجوالك مباشرة، ولو طلعت نفس الرسالة قد يكون المنتج مقلّداً.',
+  cloned: 'هذي الشريحة ما تطابق العلامة الأصلية. قد يكون المنتج مقلّداً، تأكد من البائع.',
 };
 
 function brand(m) {
@@ -48,7 +51,7 @@ async function resolve(env, db, raw) {
   if (!p) return { state: 'unknown' };
   const b = await db
     .prepare(
-      `SELECT b.id,b.code,b.size,b.salt,b.status,b.is_test,b.product_name,b.produced_on,b.merchant_id,b.image_key,
+      `SELECT b.id,b.code,b.size,b.salt,b.kind,b.status,b.is_test,b.product_name,b.produced_on,b.merchant_id,b.image_key,
               m.name,m.logo_url,m.logo_key,m.brand_color,m.store_url,m.whatsapp,m.status AS merchant_status,m.max_checks,
               m.contest_enabled,m.contest_title,m.contest_ends_at,m.contest_terms_url,b.expires_on,b.details,
               m.loyalty_enabled,m.loyalty_mode,m.loyalty_per_tag,m.loyalty_min_redeem,m.loyalty_reward,m.ratings_enabled,
@@ -85,7 +88,7 @@ async function boundTag(env, db, body, req, phone = null) {
 
 // العلامة لهذا الجوال: إذا ما أحد سجّلها، تتسجّل باسمه الحين (المسابقة والنقاط والتقييم تعتبر شراء)
 async function ownTag(db, req, b, serial, device, phone = null) {
-  const tag = await db.prepare('SELECT id,status,loyalty_claimed,entry_done,first_device,second_device,owner_phone FROM tags WHERE batch_id=? AND serial=?').bind(b.id, serial).first();
+  const tag = await db.prepare('SELECT id,status,loyalty_claimed,entry_done,first_device,second_device,owner_phone,sun_device FROM tags WHERE batch_id=? AND serial=?').bind(b.id, serial).first();
   if (!tag || tag.status === 'blocked_merchant' || tag.status === 'blocked_admin') fail(403, MESSAGES.blocked, 'blocked');
   if (tag.first_device === device || tag.second_device === device) {
     if (phone && !tag.owner_phone) await db.prepare('UPDATE tags SET owner_phone=? WHERE id=?').bind(phone, tag.id).run();
@@ -93,11 +96,35 @@ async function ownTag(db, req, b, serial, device, phone = null) {
   }
   if (tag.first_device) fail(409, 'هذا المنتج مسجّل لشخص آخر', 'other_device');
   if (tag.status !== 'active') fail(403, MESSAGES.locked, 'locked');
+  // شريحة 424: يسجّلها بس الجوال اللي لمس الشريحة نفسها آخر مرة
+  if (b.kind === 'nfc424' && tag.sun_device !== device) fail(403, MESSAGES.copied, 'copied');
   const city = geo(req).city;
   const won = await db.prepare('UPDATE tags SET first_device=?,owner_at=?,owner_city=?,owner_phone=? WHERE id=? AND first_device IS NULL RETURNING id').bind(device, now(), city, phone, tag.id).first();
   if (!won) fail(409, 'هذا المنتج مسجّل لشخص آخر', 'other_device');
   await logScan(db, req, tag.id, b.merchant_id, 'claimed', null, device);
   return { ...tag, first_device: device };
+}
+
+// يرجع null لو اللمسة صحيحة، أو سبب الرفض: copied (رابط قديم/منسوخ) أو cloned (شريحة ثانية)
+async function sunCheck(env, db, b, serial, body, device) {
+  const sun = await readSun(env, b, body.e, body.c);
+  if (!sun) return body.e || body.c ? 'cloned' : 'copied';
+  let ok;
+  try {
+    // نفس العدّاد مسموح لنفس الجوال (تحديث الصفحة)، غير كذا لازم يكون أكبر
+    ok = await db
+      .prepare(
+        `UPDATE tags SET chip_uid=COALESCE(chip_uid,?),sun_ctr=?,sun_device=?
+         WHERE batch_id=? AND serial=? AND (chip_uid IS NULL OR chip_uid=?) AND (sun_ctr IS NULL OR sun_ctr<? OR (sun_ctr=? AND sun_device=?)) RETURNING id`
+      )
+      .bind(sun.uid, sun.ctr, device, b.id, serial, sun.uid, sun.ctr, sun.ctr, device)
+      .first();
+  } catch {
+    return 'cloned'; // رقم الشريحة مربوط بعلامة ثانية
+  }
+  if (ok) return null;
+  const row = await db.prepare('SELECT chip_uid FROM tags WHERE batch_id=? AND serial=?').bind(b.id, serial).first();
+  return row?.chip_uid && row.chip_uid !== sun.uid ? 'cloned' : 'copied';
 }
 
 // «اشتريت المنتج؟ سجّله باسمك»: رقم الجوال اختياري
@@ -256,6 +283,11 @@ export async function verify(req, env) {
   const t = now();
   // سجل العلامة ينشأ أول ما تنمسح
   await db.prepare('INSERT INTO tags(batch_id,merchant_id,serial) VALUES(?,?,?) ON CONFLICT(batch_id,serial) DO NOTHING').bind(b.id, b.merchant_id, r.serial).run();
+  // شريحة 424 DNA: لازم الرابط يجي من لمسة الشريحة نفسها (عدّاد أكبر من آخر مرة وتوقيع صحيح)
+  if (b.kind === 'nfc424') {
+    const bad = await sunCheck(env, db, b, r.serial, body, device);
+    if (bad) return reject(bad, await db.prepare('SELECT id,status,first_device,second_device,flagged_at,owner_at,owner_city,owner_phone FROM tags WHERE batch_id=? AND serial=?').bind(b.id, r.serial).first());
+  }
   // كل فتح للرابط ينحسب في السجل. الملكية تنحسم بزر «اشتريت المنتج»، والقفل بعدد الجوالات المختلفة مو المسحات
   const tag = await db
     .prepare(

@@ -114,7 +114,7 @@ export async function hotspots(db, merchantId, days = 30) {
       db.prepare(
         `SELECT COALESCE(city,'غير معروف') AS city,
                 SUM(result='unknown') AS unknown, SUM(result IN ('blocked','locked')) AS blocked,
-                SUM(result='other_device') AS other_device, SUM(result='original') AS original
+                SUM(result IN ('other_device','copied','cloned')) AS other_device, SUM(result='original') AS original
          FROM scans WHERE ${where} AND created_at>=? GROUP BY 1`
       )
     ),
