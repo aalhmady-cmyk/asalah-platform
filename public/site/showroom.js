@@ -242,8 +242,8 @@ export async function mountShowroom({ canvas, products, config: c, merchant, sec
   }
   // لوحة العروض عند المدخل
   if (c.coupon) {
-    const board = new THREE.Mesh(new THREE.PlaneGeometry(PORTRAIT ? 1.5 : 2.2, PORTRAIT ? 0.51 : 0.75), new THREE.MeshBasicMaterial({ map: signTexture([`🎁 خصم ${c.coupon.percent}٪`, `بكود ${c.coupon.code}`], colors, font, { size: 100 }), transparent: true }));
-    board.position.set(0, 3.3, z0 + 1.2);
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(PORTRAIT ? 2.4 : 2.8, PORTRAIT ? 0.82 : 0.95), new THREE.MeshBasicMaterial({ map: signTexture([`🎁 خصم ${c.coupon.percent}٪`, `بكود ${c.coupon.code}`], colors, font, { size: 100 }), transparent: true }));
+    board.position.set(0, 1.15, zEnd - 2.94); // تحت لوحة اسم المتجر في آخر الممر
     scene.add(board);
   }
   // لافتات الأقسام معلّقة من السقف

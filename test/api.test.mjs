@@ -1081,6 +1081,9 @@ test('المتجر الخاص: البناء والمعاينة والنشر وا
   assert.ok(htmlText.includes('og:title') && htmlText.includes('دار الكيف'));
   assert.ok(htmlText.includes('/site/site.js'));
   assert.equal((await fetch(BASE + '/s/no-such-shop')).status, 404);
+  const demo = await fetch(BASE + '/s/demo');
+  assert.equal(demo.status, 200);
+  assert.ok((await demo.text()).includes('متجر تجريبي'));
   const pub = await call('/api/public/site/green-kif');
   assert.equal(pub.status, 200);
   assert.equal(pub.data.config.whatsapp, undefined);

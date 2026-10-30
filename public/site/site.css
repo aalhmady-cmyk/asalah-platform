@@ -56,6 +56,14 @@ body[data-view="3d"] .top { position: fixed; inset-inline: 0; background: linear
 body[data-view="3d"] .announce { display: none; }
 .preview-bar { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 40; background: #111; color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 13px; white-space: nowrap; }
 
+/* ---------- شريط المتجر التجريبي ---------- */
+.demo-bar { position: sticky; top: calc(64px + env(safe-area-inset-top)); z-index: 29; display: flex; align-items: center; gap: 6px; overflow-x: auto; padding: 8px 14px; background: #111; color: #fff; font-size: 13px; white-space: nowrap; scrollbar-width: none; }
+.demo-bar a { color: #fff; text-decoration: none; padding: 5px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.25); font-weight: 600; }
+.demo-bar a[aria-current] { background: var(--a); color: var(--bg); border-color: var(--a); }
+.demo-bar .demo-cta { background: #1fa855; border-color: #1fa855; margin-inline-start: auto; }
+body.demo[data-view="3d"] .demo-bar { position: fixed; inset-inline: 0; top: calc(64px + env(safe-area-inset-top)); background: rgba(0,0,0,.55); backdrop-filter: blur(6px); }
+body.demo .show-hint { top: calc(124px + env(safe-area-inset-top)); }
+
 /* ---------- العرض العادي ---------- */
 main { max-width: 1180px; margin: 0 auto; padding: 20px 20px 48px; }
 .hero { position: relative; min-height: 300px; padding: 36px; border-radius: 28px; color: #fff; overflow: hidden; background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--p) 75%, var(--bg)) 0%, var(--bg) 60%); display: flex; align-items: center; }

@@ -7,6 +7,10 @@ const qs = new URLSearchParams(location.search);
 const PREVIEW = qs.get('preview') === '1';
 const EMBED = qs.get('embed') === '1';
 const slug = location.pathname.split('/')[2];
+// متجر تجريبي للتجار: بيانات ثابتة بدون خادم
+const DEMO = slug === 'demo';
+const KIND = qs.get('t') || 'perfume';
+const keep = () => (PREVIEW ? `?preview=1${EMBED ? '&embed=1' : ''}` : DEMO ? `?t=${KIND}` : '');
 let D = null; // بيانات المتجر
 let C = null; // إعدادات المتجر
 let show = null; // المعرض ثلاثي الأبعاد لو انفتح
@@ -32,7 +36,7 @@ function toast(msg) {
 }
 
 // ---------- السلة ----------
-const CART_KEY = 'asalah_cart_' + slug;
+const CART_KEY = 'asalah_cart_' + slug + (DEMO ? '_' + KIND : '');
 const rnd = () => Array.from(crypto.getRandomValues(new Uint8Array(18)), (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 28);
 let cart = { token: rnd(), items: [], name: '', phone: '', city: '', note: '', coupon: '', consent: false };
 try { const s = JSON.parse(store?.getItem(CART_KEY) || 'null'); if (s?.token) cart = { ...cart, ...s }; } catch { /* سلة تالفة */ }
@@ -43,7 +47,7 @@ function saveCart(sync = true) {
   const n = cart.items.reduce((s, it) => s + it.qty, 0);
   $('cart-n').textContent = n;
   $('cart-n').hidden = !n;
-  if (sync && !PREVIEW) {
+  if (sync && !PREVIEW && !DEMO) {
     clearTimeout(saveCart.t);
     saveCart.t = setTimeout(() => {
       fetch(`/api/public/site/${slug}/cart`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: cart.token, items: cart.items, name: cart.name || null, phone: validPhone(cart.phone) ? cart.phone : null, city: cart.city || null, consent: cart.consent }) }).catch(() => {});
@@ -100,6 +104,14 @@ function closeCart() {
 
 function drawCart(done) {
   const body = $('cart-body');
+  if (done?.demo) {
+    render(body, html`<div class="done">
+      <div class="done-ic">✅</div><h2>كذا يوصل طلب عميلك</h2><p>رقم الطلب</p><div class="done-no">${done.number}</div>
+      <p>في متجرك الحقيقي: العميل ينفتح له واتساب برسالة «أريد تأكيد طلبي رقم ${done.number}»، والطلب يظهر لك في لوحتك في «طلبات العملاء» مع إشعار على جوالك 🔔</p>
+      <a class="btn gold big" href="/merchants/">🏪 أبي متجر مثله</a>
+      <button type="button" class="btn ghost" data-close>رجوع للمتجر</button></div>`);
+    return;
+  }
   if (done) {
     render(body, html`<div class="done">
       <div class="done-ic">✅</div><h2>انحفظ طلبك</h2><p>رقم طلبك</p><div class="done-no">${done.number}</div>
@@ -145,6 +157,11 @@ function drawCart(done) {
     if (!validPhone(cart.phone)) return toast('اكتب رقم جوال صحيح');
     if (!cart.consent) return toast('وافق على تواصل المتجر معك');
     if (PREVIEW) return toast('هذي معاينة، الطلب يشتغل بعد النشر');
+    if (DEMO) {
+      cart = { ...cart, items: [], note: '', coupon: '' };
+      saveCart(false);
+      return drawCart({ demo: true, number: 'A-10234' });
+    }
     const btn = f.querySelector('button[type=submit]');
     btn.disabled = true;
     try {
@@ -190,7 +207,7 @@ function applyTheme() {
   document.body.dataset.theme = C.theme;
   $('sname').textContent = C.name;
   render($('logo'), D.merchant.logo_url ? html`<img src="${D.merchant.logo_url}" alt="">` : html`${C.name.trim().charAt(0)}`);
-  $('brand').href = `/s/${slug}${PREVIEW ? '?preview=1' : ''}`;
+  $('brand').href = `/s/${slug}${keep()}`;
   if (C.announcement) { $('announce').textContent = C.announcement; $('announce').hidden = false; }
   $('preview-bar').hidden = !PREVIEW || EMBED;
 }
@@ -247,7 +264,7 @@ function drawLanding(p) {
   const more = D.products.filter((x) => x.id !== p.id).slice(0, 8);
   render($('grid-view'), html`
     <article class="lp">
-      <a class="back" href="/s/${slug}${PREVIEW ? '?preview=1' : ''}" data-home>→ ${C.name}</a>
+      <a class="back" href="/s/${slug}${keep()}" data-home>→ ${C.name}</a>
       <div class="lp-top">
         <div class="lp-img">${p.image_url ? html`<img src="${p.image_url}" alt="${p.title}">` : raw('<span>🛍️</span>')}<i class="pc-ok">✅ أصلي موثّق</i></div>
         <div class="lp-copy">
@@ -282,7 +299,7 @@ function route() {
   drawGrid();
 }
 function go(path) {
-  history.pushState(null, '', path + (PREVIEW ? `?preview=1${EMBED ? '&embed=1' : ''}` : ''));
+  history.pushState(null, '', path + keep());
   route();
 }
 addEventListener('popstate', route);
@@ -364,11 +381,21 @@ $('show-card').addEventListener('click', (e) => {
 // ---------- البداية ----------
 async function boot() {
   try {
+    if (DEMO) {
+      const { demoData, DEMO_KINDS } = await import('/site/demo.js');
+      D = demoData(KIND);
+      C = D.config;
+      document.body.classList.add('demo');
+      render($('demo-bar'), html`<span>🕶️ تجريبي:</span>${DEMO_KINDS.map(([k, l]) => html`<a href="/s/demo?t=${k}" ${raw(k === KIND ? 'aria-current="true"' : '')}>${l}</a>`)}<a class="demo-cta" href="/merchants/">أبي متجر مثله ←</a>`);
+      $('demo-bar').hidden = false;
+      try { sessionStorage.removeItem('asalah_view_demo'); } catch { /* تخزين مقفل */ }
+    } else {
     const r = await fetch(`/api/public/site/${slug}${PREVIEW ? '?preview=1' : ''}`, { credentials: 'same-origin' });
     const d = await r.json();
     if (!r.ok) throw new Error(d.message || 'المتجر غير متاح');
     D = d;
     C = d.config;
+    }
   } catch (e) {
     render($('boot'), html`<div class="boot-logo">🏪</div><h1>${e.message}</h1><p><a href="/stores/">تسوّق في متاجر أصالة ←</a></p>`);
     return;

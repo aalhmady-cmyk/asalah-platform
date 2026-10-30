@@ -198,3 +198,23 @@ body.site { background: var(--ground); }
 .biz-cta small { color: var(--forest-ink); }
 @media (max-width: 860px) { .site-nav nav a.nav-biz { display: inline; } .biz-band { padding: 24px; } }
 @media (max-width: 420px) { .site-nav nav { gap: 10px; } .site-nav nav a.nav-shop { font-size: 13px; } }
+
+/* شريط المتجر الخاص ثلاثي الأبعاد في الرئيسية */
+.site-nav nav a.nav-3d { color: var(--gold, #D9B45A); }
+.store-band { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 28px; align-items: center; padding: 32px; border-radius: 28px; text-decoration: none; color: #fff; background: radial-gradient(120% 140% at 0% 0%, #3a2a12 0%, #15110c 60%); overflow: hidden; transition: transform .2s; }
+.store-band:hover { transform: translateY(-3px); color: #fff; }
+.store-band h2 { margin: 6px 0 8px; font-size: clamp(24px, 4vw, 34px); line-height: 1.25; color: #fff; }
+.store-band p { margin: 0 0 18px; color: #e6dccb; }
+.store-band .kicker { color: #D9B45A; }
+.sb3-hall { position: relative; height: 230px; perspective: 420px; perspective-origin: 50% 40%; }
+.sb3-hall::before { content: ''; position: absolute; inset: 0; background: linear-gradient(#1b140b 0 55%, #0e0a06 55%); border-radius: 18px; }
+.sb3-hall i { position: absolute; bottom: 38%; width: 34px; height: 44px; border-radius: 4px; background: linear-gradient(#fff 0 70%, #15110c 70%); box-shadow: 0 0 0 2px #D9B45A, 0 0 18px rgba(217,180,90,.5); animation: sb3 3.2s ease-in-out infinite; }
+.sb3-hall i:nth-child(odd) { left: 8%; transform: rotateY(55deg); }
+.sb3-hall i:nth-child(even) { right: 8%; transform: rotateY(-55deg); }
+.sb3-hall i:nth-child(1), .sb3-hall i:nth-child(2) { bottom: 22%; width: 54px; height: 70px; }
+.sb3-hall i:nth-child(3) { left: 22%; } .sb3-hall i:nth-child(4) { right: 22%; }
+.sb3-hall i:nth-child(5) { left: 33%; bottom: 46%; width: 22px; height: 28px; } .sb3-hall i:nth-child(6) { right: 33%; bottom: 46%; width: 22px; height: 28px; }
+.sb3-hall i:nth-child(2n) { animation-delay: -1.6s; }
+.sb3-hall b { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); width: 46%; height: 30px; border: 3px solid #D9B45A; border-radius: 10px; box-shadow: 0 0 24px rgba(217,180,90,.45); }
+@keyframes sb3 { 50% { filter: brightness(1.25); translate: 0 -4px; } }
+@media (max-width: 860px) { .store-band { grid-template-columns: 1fr; padding: 22px; } .sb3-hall { height: 170px; } .site-nav nav a.nav-3d { display: inline; } }

@@ -195,8 +195,10 @@ export async function serveSitePage(req, env, path) {
   const page = await env.ASSETS.fetch(new Request(u, { headers: req.headers }));
   if (!page.ok) return page;
   const merchant = await env.DB.prepare("SELECT m.id,m.name,m.logo_key,s.config FROM merchants m LEFT JOIN merchant_sites s ON s.merchant_id=m.id WHERE m.slug=? AND m.status='active' AND m.store_enabled=1").bind(mm[1]).first();
-  let title = 'متجر غير متاح · أصالة';
-  let desc = 'متاجر أصالة للمنتجات الأصلية';
+  // /s/demo: متجر تجريبي للتجار (لو ما فيه تاجر حقيقي بنفس الاسم)
+  const demo = mm[1] === 'demo' && !merchant;
+  let title = demo ? 'جرّب متجرك الخاص بمعرض ثلاثي الأبعاد · أصالة' : 'متجر غير متاح · أصالة';
+  let desc = demo ? 'متجر تجريبي: معرض ثلاثي الأبعاد، طلبات على واتساب، ومنتجات أصلية موثّقة' : 'متاجر أصالة للمنتجات الأصلية';
   let image = null;
   let theme = '#0F2A21';
   if (merchant?.config) {
@@ -225,5 +227,5 @@ export async function serveSitePage(req, env, path) {
     .on('title', { element: (el) => el.remove() })
     .on('meta[name="theme-color"]', { element: (el) => el.remove() })
     .on('head', { element: (el) => el.append(head, { html: true }) })
-    .transform(new Response(page.body, { status: merchant?.config ? 200 : 404, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' } }));
+    .transform(new Response(page.body, { status: merchant?.config || demo ? 200 : 404, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' } }));
 }
