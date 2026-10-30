@@ -2,7 +2,7 @@
 // ومعاينة حية، ونشر وتراجع، ورابط وQR، وصفحات هبوط. وتبويب "طلبات العملاء" والسلات المتروكة.
 import { api, html, num, raw, render, toast, when } from '/assets/common.js';
 import qrcode from '/assets/vendor/qrcode.mjs';
-import { confirmBox, promptBox } from '/assets/dialog.js';
+import { confirmBox, formBox, promptBox } from '/assets/dialog.js';
 
 const $ = (id) => document.getElementById(id);
 let S = null; // بيانات المتجر من الخادم
@@ -530,6 +530,10 @@ export async function loadOrders() {
     try { await api('/api/m/orders/' + sel.dataset.orStatus, { method: 'PATCH', body: { status: sel.value } }); toast('تم تحديث الحالة'); loadOrders(); ordersBadge(); } catch (err) { toast(err.message, true); }
   };
   $('or-list').onclick = async (e) => {
+    const wa = e.target.closest('[data-or-wa]');
+    if (wa) return waReply(O.orders.find((x) => x.id === Number(wa.dataset.orWa)));
+    const pr = e.target.closest('[data-or-print]');
+    if (pr) return printOrder(O.orders.find((x) => x.id === Number(pr.dataset.orPrint)));
     const note = e.target.closest('[data-or-note]');
     const del = e.target.closest('[data-or-del]');
     if (note) {
@@ -542,6 +546,81 @@ export async function loadOrders() {
       try { await api('/api/m/orders/' + del.dataset.orDel, { method: 'DELETE' }); loadOrders(); } catch (err) { toast(err.message, true); }
     }
   };
+}
+
+// ردود واتساب جاهزة حسب حالة الطلب، والتاجر يعدّل النص قبل الإرسال
+const WA_TEMPLATES = [
+  ['confirm', '✅ تأكيد الطلب', (o, x) => `هلا ${x.name} 👋\nتم تأكيد طلبك رقم ${o.number} من ${x.store} ✅\n${x.items}\nالمجموع: ${x.total}\nبنجهّزه ونرسل لك رقم الشحنة أول ما يطلع.${x.track}`],
+  ['address', '📍 طلب العنوان', (o, x) => `هلا ${x.name} 👋\nعشان نشحن طلبك رقم ${o.number}، أرسل لنا موقعك على الخريطة (📎 ← الموقع) أو العنوان الوطني المختصر.`],
+  ['shipped', '🚚 تم الشحن', (o, x) => `هلا ${x.name} 👋\nطلبك رقم ${o.number} انشحن 🚚\nرقم الشحنة: \nيوصلك خلال 2 إلى 5 أيام عمل بإذن الله.${x.track}`],
+  ['delay', '⏳ اعتذار عن تأخير', (o, x) => `هلا ${x.name} 🙏\nنعتذر منك، طلبك رقم ${o.number} بيتأخر شوي عن الموعد. بنحدّثك أول ما ينشحن، وشكراً على صبرك.`],
+  ['thanks', '⭐ شكر بعد الاستلام', (o, x) => `هلا ${x.name} 🌟\nإن شاء الله وصلك طلبك رقم ${o.number} وعجبك.\nامسح شريحة أصالة على المنتج تتأكد إنه أصلي وتجمع نقاطك 🎁\nونسعد برأيك!`],
+  ['cancel', '❌ إلغاء الطلب', (o, x) => `هلا ${x.name}\nحسب طلبك، تم إلغاء طلبك رقم ${o.number}. إذا تحتاج أي شي ثاني إحنا موجودين 🤍`],
+];
+const WA_DEFAULT = { new: 'confirm', confirmed: 'shipped', shipped: 'thanks', cancelled: 'cancel' };
+async function waReply(o) {
+  const x = {
+    name: o.name || '',
+    store: S?.draft?.name || 'متجرنا',
+    items: o.items.map((it) => `• ${it.title} × ${it.qty}`).join('\n'),
+    total: sar(o.total),
+    track: o.track ? `\nتتبع طلبك من هنا: ${location.origin}${o.track}` : '',
+  };
+  const textOf = (k) => WA_TEMPLATES.find((t) => t[0] === k)[2](o, x);
+  const first = WA_DEFAULT[o.status] || 'confirm';
+  const f = await formBox({
+    title: `رد على ${o.number}`,
+    icon: '💬',
+    ok: 'افتح واتساب',
+    fields: [
+      { name: 'tpl', options: WA_TEMPLATES.map(([k, l]) => [k, l]), value: first },
+      { name: 'text', multiline: true, rows: 8, value: textOf(first) },
+    ],
+    onChange: (name, v, f) => { if (name === 'tpl') f.text.value = textOf(v); },
+  });
+  if (!f) return;
+  window.open(`https://wa.me/${o.phone}?text=${encodeURIComponent(f.text)}`, '_blank', 'noopener');
+}
+
+// فاتورة A4 مبسطة وتحتها ملصق شحن بحجم 10×15 سم يتقص، فيه QR لتتبع الطلب
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+function printOrder(o) {
+  const store = S?.draft?.name || document.getElementById('merchant-name')?.textContent || 'متجرنا';
+  const phone = o.phone ? '0' + String(o.phone).replace(/^966/, '') : '';
+  const date = new Date((o.ordered_at || o.updated_at) * 1000).toLocaleDateString('ar-SA-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
+  const track = o.track ? location.origin + o.track : '';
+  const rows = o.items.map((it) => `<tr><td>${esc(it.title)}</td><td>${it.qty}</td><td>${esc(sar(it.price))}</td><td>${esc(sar(it.price * it.qty))}</td></tr>`).join('');
+  const w = window.open('', '_blank');
+  if (!w) return toast('اسمح بالنوافذ المنبثقة عشان تطبع', true);
+  w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(o.number)}</title><style>
+    body{font-family:'IBM Plex Sans Arabic',system-ui,sans-serif;color:#15211C;margin:0;padding:24px}
+    h1{font-size:22px;margin:0}.muted{color:#5B6660}.row{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+    table{width:100%;border-collapse:collapse;margin:18px 0}th,td{padding:8px;border-bottom:1px solid #E3E1DA;text-align:start}th{color:#5B6660;font-weight:500}
+    .total{font-size:20px;font-weight:700}.cut{border-top:2px dashed #999;margin:28px 0 18px;text-align:center;color:#999;font-size:12px}
+    .label{width:10cm;height:15cm;border:2px solid #15211C;border-radius:8px;padding:14px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px;margin:auto}
+    .label .to{font-size:24px;font-weight:700}.label .big{font-size:20px;direction:ltr;text-align:right}.label svg{width:3.2cm;height:3.2cm}
+    .label .num{font-family:ui-monospace,monospace;font-size:22px;font-weight:700}
+    @media print{body{padding:0}.label{page-break-inside:avoid;break-inside:avoid}}
+  </style></head><body>
+  <section class="page">
+    <div class="row"><div><h1>${esc(store)}</h1><div class="muted">فاتورة طلب</div></div><div style="text-align:left"><div class="num" style="font-family:monospace;font-size:18px;font-weight:700">${esc(o.number)}</div><div class="muted">${esc(date)}</div></div></div>
+    <p><b>العميل:</b> ${esc(o.name || '-')} · <span dir="ltr">${esc(phone)}</span> · ${esc(o.city || '')}</p>
+    <table><thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>المجموع</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="row"><div class="muted">${o.coupon ? 'كود الخصم: ' + esc(o.coupon) : ''}</div><div class="total">الإجمالي: ${esc(sar(o.total))}</div></div>
+    ${o.note ? `<p><b>ملاحظة العميل:</b> ${esc(o.note)}</p>` : ''}
+    <p class="muted" style="margin-top:24px">✅ منتجاتنا أصلية وموثّقة بشريحة أصالة. امسحها بجوالك تتأكد وتجمع نقاطك.</p>
+  </section>
+  <div class="cut">✂️ ملصق الشحن</div>
+  <section class="label">
+    <div class="muted">إلى:</div>
+    <div class="to">${esc(o.name || '-')}</div>
+    <div class="big">${esc(phone)}</div>
+    <div style="font-size:20px">📍 ${esc(o.city || '')}</div>
+    <div class="row" style="margin-top:auto;align-items:flex-end"><div><div class="muted">رقم الطلب</div><div class="num">${esc(o.number)}</div><div class="muted" style="margin-top:6px">من: ${esc(store)}</div></div>${track ? qrSvg(track) : ''}</div>
+  </section>
+  </body></html>`);
+  w.document.close();
+  setTimeout(() => w.print(), 300);
 }
 
 function orderCard(o) {
@@ -559,6 +638,6 @@ function orderCard(o) {
     <div class="or-cust"><span>👤 ${o.name || 'بدون اسم'}</span>${o.city ? html`<span>📍 ${o.city}</span>` : ''}${o.phone ? html`<span class="ltr">📱 ${o.phone}</span>` : cart ? html`<span class="muted">ما ترك رقمه</span>` : ''}</div>
     ${o.note ? html`<p class="small" style="margin:0">📝 ${o.note}</p>` : ''}
     ${o.merchant_note ? html`<p class="small muted" style="margin:0">🔒 ${o.merchant_note}</p>` : ''}
-    <div class="actions">${wa ? html`<a class="btn btn-sm btn-primary" href="${wa}" target="_blank" rel="noopener">💬 ${cart ? 'ذكّره يكمل طلبه' : 'تواصل واتساب'}</a>` : ''}<button type="button" class="btn btn-sm" data-or-note="${o.id}">🔒 ملاحظة</button>${cart ? html`<button type="button" class="btn btn-sm btn-danger" data-or-del="${o.id}">حذف</button>` : ''}</div>
+    <div class="actions">${wa ? (cart ? html`<a class="btn btn-sm btn-primary" href="${wa}" target="_blank" rel="noopener">💬 ذكّره يكمل طلبه</a>` : html`<button type="button" class="btn btn-sm btn-primary" data-or-wa="${o.id}">💬 رد واتساب جاهز</button>`) : ''}<button type="button" class="btn btn-sm" data-or-note="${o.id}">🔒 ملاحظة</button>${cart ? '' : html`<button type="button" class="btn btn-sm" data-or-print="${o.id}">🖨️ فاتورة وملصق</button>`}${cart ? html`<button type="button" class="btn btn-sm btn-danger" data-or-del="${o.id}">حذف</button>` : ''}</div>
   </div>`;
 }

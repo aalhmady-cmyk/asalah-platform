@@ -5,14 +5,14 @@ const STYLE = `
 .adlg form{padding:22px;display:flex;flex-direction:column;gap:14px}
 .adlg h3{margin:0;font-size:18px}
 .adlg p{margin:0;color:var(--muted,#5b6b64);line-height:1.7;white-space:pre-line}
-.adlg input,.adlg textarea{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid var(--line,#dfe6e2);border-radius:12px;font:inherit;background:transparent;color:inherit}
+.adlg input,.adlg textarea,.adlg select{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid var(--line,#dfe6e2);border-radius:12px;font:inherit;background:transparent;color:inherit}
 .adlg .adlg-act{display:flex;gap:10px;justify-content:flex-start;flex-wrap:wrap}
 .adlg .adlg-ic{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;background:var(--green-tint,#E6F2EC)}
 .adlg.danger .adlg-ic{background:#FDECEA}
 .adlg .btn-danger{background:#B42318;color:#fff;border-color:#B42318}`;
 
 let styled = false;
-function open({ title, message, icon, ok = 'تمام', cancel = 'إلغاء', danger = false, fields = [] }) {
+function open({ title, message, icon, ok = 'تمام', cancel = 'إلغاء', danger = false, fields = [], onChange }) {
   if (!styled) { const s = document.createElement('style'); s.textContent = STYLE; document.head.append(s); styled = true; }
   return new Promise((resolve) => {
     const d = document.createElement('dialog');
@@ -30,10 +30,12 @@ function open({ title, message, icon, ok = 'تمام', cancel = 'إلغاء', da
     f.append(head);
     if (message) { const p = document.createElement('p'); p.textContent = message; f.append(p); }
     const inputs = fields.map((x) => {
-      const i = document.createElement(x.multiline ? 'textarea' : 'input');
-      if (!x.multiline) i.type = x.type || 'text';
+      const i = document.createElement(x.options ? 'select' : x.multiline ? 'textarea' : 'input');
+      if (x.options) for (const [v, l] of x.options) i.append(new Option(l, v));
+      else if (!x.multiline) i.type = x.type || 'text';
+      if (x.rows) i.rows = x.rows;
       i.name = x.name;
-      i.placeholder = x.placeholder || '';
+      if (!x.options) i.placeholder = x.placeholder || '';
       i.value = x.value ?? '';
       if (x.required) i.required = true;
       if (x.ltr) i.dir = 'ltr';
@@ -41,6 +43,11 @@ function open({ title, message, icon, ok = 'تمام', cancel = 'إلغاء', da
       if (x.label) { const l = document.createElement('label'); l.className = 'field'; l.append(x.label, i); f.append(l); } else f.append(i);
       return i;
     });
+    // حقل يغيّر حقل ثاني (مثل اختيار قالب رسالة يعبّي النص)
+    if (onChange) {
+      const byName = Object.fromEntries(inputs.map((i) => [i.name, i]));
+      f.addEventListener('input', (e) => { if (e.target.name) onChange(e.target.name, e.target.value, byName); });
+    }
     const act = document.createElement('div');
     act.className = 'adlg-act';
     const yes = document.createElement('button');
