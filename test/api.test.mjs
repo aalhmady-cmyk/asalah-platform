@@ -1220,3 +1220,20 @@ test('التحقق بخطوتين والأجهزة', async () => {
   assert.equal((await post('/api/auth/2fa/disable', { password: cred.password, code: backups[1] }, S.admin)).status, 200);
   assert.equal((await postFrom('10.20.30.40', '/api/auth/login', cred)).status, 200);
 });
+
+test('النسخ الاحتياطية للمدير بس', async () => {
+  assert.equal((await call('/api/admin/backups', { cookie: S.merchant })).status, 403);
+  let r = await post('/api/admin/backups', {}, S.admin);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.ok(r.data.backup.rows > 0);
+  r = await call('/api/admin/backups', { cookie: S.admin });
+  const b = r.data.backups[0];
+  assert.ok(b && b.size > 0);
+  const res = await fetch(BASE + '/api/admin/backups/' + b.name, { headers: { Cookie: S.admin } });
+  assert.equal(res.status, 200);
+  const { gunzipSync } = await import('node:zlib');
+  const dump = JSON.parse(gunzipSync(Buffer.from(await res.arrayBuffer())).toString());
+  assert.ok(dump.tables.merchants.length >= 1);
+  assert.equal(dump.tables.sessions, undefined);
+  assert.equal((await call('/api/admin/backups/..%2Fsecret', { cookie: S.admin })).status, 404);
+});

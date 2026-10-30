@@ -8,6 +8,7 @@ import {
   saveAiPlan, saveCart, saveDraft, siteAi, siteProducts, siteRow, siteStats, siteUrl, THEMES, undoDraft, updateOrder,
 } from '../lib/site.js';
 import { audit, fail, int, ipHash, json, now, rateLimit, readJson, str } from '../lib/util.js';
+import { requireHuman } from '../lib/human.js';
 
 const MERCHANT_COLS = 'id,name,slug,logo_key,whatsapp,store_url,store_enabled';
 
@@ -180,7 +181,9 @@ export async function handlePublicSite(req, env, path) {
   }
   if (match[2] === '/order' && m === 'POST') {
     await rateLimit(db, 'order:' + (await ipHash(req)), 10, 600);
-    return json({ ok: true, ...(await placeOrder(db, slug, await readJson(req, 20000))) });
+    const body = await readJson(req, 20000);
+    await requireHuman(env, req, body.cf_token);
+    return json({ ok: true, ...(await placeOrder(db, slug, body)) });
   }
   fail(404, 'المسار غير موجود');
 }

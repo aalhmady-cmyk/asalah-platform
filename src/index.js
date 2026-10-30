@@ -6,6 +6,7 @@ import { serveImage } from './lib/images.js';
 import { prepare } from './lib/schema.js';
 import { HttpError, json } from './lib/util.js';
 import { handleAdmin } from './routes/admin.js';
+import { runBackup } from './lib/backup.js';
 import { changePassword, endSessions, forgotPassword, login, login2fa, logout, me, resetPassword, security, setup, totpDisable, totpEnable, totpSetup } from './routes/auth.js';
 import { handleMerchant } from './routes/merchant.js';
 import { handleSeo } from './routes/seo.js';
@@ -19,7 +20,7 @@ import { handlePublicStore } from './routes/store.js';
 import { handlePublicSite, serveSitePage } from './routes/site.js';
 import { handleCustomer } from './lib/customers.js';
 import { serveMedia } from './lib/store.js';
-import { brandPage, brands, enter, guideChat, guideInfo, joinRequest, shopAiRoute, stats, loyaltyClaim, loyaltyRedeem, loyaltyWallet, rate, report, verify, guarantee } from './routes/public.js';
+import { brandPage, brands, enter, guideChat, guideInfo, joinRequest, shopAiRoute, stats, loyaltyClaim, loyaltyRedeem, loyaltyWallet, rate, report, verify, guarantee, humanConfig } from './routes/public.js';
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
@@ -29,7 +30,7 @@ const SECURITY_HEADERS = {
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
 };
 
-const SITE_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'";
+const SITE_CSP = "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'";
 
 async function route(req, env) {
   const path = new URL(req.url).pathname;
@@ -63,6 +64,7 @@ async function route(req, env) {
   if (path === '/api/rate' && m === 'POST') return rate(req, env);
   if (path === '/api/public/brands' && m === 'GET') return brands(env);
   if (path === '/api/public/stats' && m === 'GET') return stats(env);
+  if (path === '/api/public/human' && m === 'GET') return humanConfig(env);
   if (path === '/api/public/join' && m === 'POST') return joinRequest(req, env);
   if (path === '/api/public/shop-ai' && (m === 'GET' || m === 'POST')) return shopAiRoute(req, env);
   if (path === '/api/public/assistant' && m === 'GET') return guideInfo(env);
@@ -122,6 +124,7 @@ export default {
         await runCampaigns(e.DB).catch((err) => console.error('ASALAH_PUSH', err?.stack || err));
         await runWeekly(e).catch((err) => console.error('ASALAH_WEEKLY', err?.stack || err));
         await runMonthly(e).catch((err) => console.error('ASALAH_MONTHLY', err?.stack || err));
+        await runBackup(e).catch((err) => console.error('ASALAH_BACKUP', err?.stack || err));
       })
     );
   },

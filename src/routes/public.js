@@ -9,6 +9,7 @@ import { shopForVerify } from './store.js';
 import { shopAI } from '../lib/shop.js';
 import { imageUrl } from '../lib/images.js';
 import { checkAnomaly, logScan, scanHistory } from '../lib/scans.js';
+import { requireHuman, turnstileKey } from '../lib/human.js';
 import { checkSignature, parseToken, publicId } from '../lib/tags.js';
 import { fail, geo, int, ipHash, json, now, rateLimit, readJson, saPhone, sha256, str } from '../lib/util.js';
 
@@ -305,6 +306,7 @@ export async function enter(req, env) {
   const db = env.DB;
   await rateLimit(db, 'enter:' + (await ipHash(req)), 20, 3600);
   const body = await readJson(req);
+  await requireHuman(env, req, body.cf_token);
   if (typeof body.sid !== 'string' || !SID_RE.test(body.sid)) fail(400, 'أعد فتح الرابط من جديد');
   if (body.consent !== true) fail(400, 'لازم توافق على الشروط وسياسة الخصوصية');
   const f = {
@@ -340,6 +342,7 @@ export async function report(req, env) {
   const ih = await ipHash(req);
   await rateLimit(db, 'report:' + ih, 5, 3600);
   const body = await readJson(req, 1_500_000);
+  await requireHuman(env, req, body.cf_token);
   const city = str(body.city, 'المدينة', { min: 2, max: 100 });
   const photo = evidencePhoto(body.photo);
   const pos = str(body.point_of_sale, 'اسم المحل', { min: 2, max: 150 });
@@ -458,3 +461,6 @@ export async function shopAiRoute(req, env) {
 }
 
 export const guarantee = (req, env) => guaranteeClaim(req, env, boundTag);
+
+// مفتاح Turnstile العام للواجهات (null = الفحص غير مفعّل)
+export const humanConfig = (env) => json({ ok: true, site_key: turnstileKey(env) }, 200, { 'Cache-Control': 'public, max-age=300' });

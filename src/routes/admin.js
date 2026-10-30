@@ -11,6 +11,7 @@ import { hotspots, monthlyReport } from '../lib/insights.js';
 import { lookupTag, overviewFor, setTagStatus } from '../lib/ops.js';
 import { printLinks, publicId, stockFor, tokenFor } from '../lib/tags.js';
 import { audit, csvResponse, fail, int, json, now, randomHex, readJson, str, url } from '../lib/util.js';
+import { getBackup, listBackups, makeBackup } from '../lib/backup.js';
 
 const COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
 const FACTORY_CHUNK = 10000;
@@ -264,6 +265,19 @@ export async function handleAdmin(req, env, path) {
   if (path === '/api/admin/alerts/read' && m === 'POST') {
     await db.prepare('UPDATE alerts SET read_at=? WHERE read_at IS NULL').bind(now()).run();
     return json({ ok: true });
+  }
+  // النسخ الاحتياطية: القائمة، نسخة الحين، والتحميل
+  if (path === '/api/admin/backups' && m === 'GET') return json({ ok: true, backups: await listBackups(env) });
+  if (path === '/api/admin/backups' && m === 'POST') {
+    const b = await makeBackup(env);
+    await audit(db, user, 'backup_created', b.name);
+    return json({ ok: true, backup: b, message: 'تم أخذ نسخة احتياطية' });
+  }
+  if ((match = path.match(/^\/api\/admin\/backups\/([A-Za-z0-9.-]+)$/)) && m === 'GET') {
+    const obj = await getBackup(env, match[1]);
+    if (!obj) fail(404, 'النسخة غير موجودة');
+    await audit(db, user, 'backup_downloaded', match[1]);
+    return new Response(obj.body, { headers: { 'Content-Type': 'application/gzip', 'Content-Disposition': `attachment; filename="${match[1]}"`, 'Cache-Control': 'no-store' } });
   }
   if (path === '/api/admin/audit' && m === 'GET') {
     const r = await db.prepare('SELECT a.*,u.email FROM audit_log a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT 200').all();

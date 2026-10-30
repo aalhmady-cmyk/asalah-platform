@@ -215,6 +215,12 @@
     <section id="security" hidden>
       <div class="page-head"><div><h1>الأمان</h1><p>كلمة المرور، التحقق بخطوتين، والأجهزة المسجّل منها الدخول</p></div></div>
       <div id="security-box" style="margin-top:24px;max-width:640px"></div>
+      <div class="card" style="margin-top:16px;max-width:640px">
+        <h2>النسخ الاحتياطية 💾</h2>
+        <p class="muted">نسخة كاملة من قاعدة البيانات تنحفظ تلقائياً كل أسبوع (آخر 8 نسخ). حمّل نسخة واحفظها عندك بين فترة وثانية. الملف فيه بيانات حساسة، لا ترسله لأحد.</p>
+        <div id="backups-list"></div>
+        <div><button class="btn btn-primary" type="button" id="backup-now">خذ نسخة الحين</button></div>
+      </div>
       <form class="card" id="password-form" style="margin-top:16px;max-width:640px">
         <h2>تغيير كلمة المرور</h2>
         <label class="field">كلمة المرور الحالية<input name="current" type="password" autocomplete="current-password" required class="ltr"></label>

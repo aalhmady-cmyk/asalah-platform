@@ -1,4 +1,5 @@
 import { api, onSubmit, toast } from '/assets/common.js';
+import { humanToken } from '/assets/human.js';
 
 const home = (role) => (role === 'admin' ? '/admin/' : '/merchant/');
 const login = document.getElementById('login');
@@ -24,7 +25,7 @@ if (resetToken) {
 }
 onSubmit(forgot, async (f, form) => {
   if (!form.reportValidity()) return;
-  const d = await scanning(form, 'نرسل…', () => api('/api/auth/forgot', { method: 'POST', body: { email: f.email } }));
+  const d = await scanning(form, 'نرسل…', async () => api('/api/auth/forgot', { method: 'POST', body: { email: f.email, cf_token: await humanToken() } }));
   const done = document.getElementById('forgot-done');
   done.textContent = d.message;
   done.hidden = false;
@@ -74,7 +75,7 @@ let ticket = null;
 const otp = document.getElementById('otp');
 onSubmit(login, async (f, form) => {
   if (!form.reportValidity()) return;
-  const d = await scanning(form, 'جاري التحقق…', () => api('/api/auth/login', { method: 'POST', body: f }));
+  const d = await scanning(form, 'جاري التحقق…', async () => api('/api/auth/login', { method: 'POST', body: { ...f, cf_token: await humanToken() } }));
   // الحساب عليه تحقق بخطوتين: نطلب رمز التطبيق
   if (d.need_2fa) {
     ticket = d.ticket;

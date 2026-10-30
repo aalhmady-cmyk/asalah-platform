@@ -1,6 +1,7 @@
 // متجر التاجر الخاص /s/slug: العرض العادي، صفحة الهبوط لكل منتج /s/slug/p/id، المعرض ثلاثي الأبعاد،
 // والسلة اللي تنحفظ عند التاجر (سلة متروكة) وتتحول لطلب برقم يتأكد على واتساب أو يكمل في سلة.
 import { html, raw, render } from '/assets/common.js';
+import { humanToken } from '/assets/human.js';
 
 const $ = (id) => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
@@ -165,7 +166,7 @@ function drawCart(done) {
     const btn = f.querySelector('button[type=submit]');
     btn.disabled = true;
     try {
-      const r = await fetch(`/api/public/site/${slug}/order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...cart }) });
+      const r = await fetch(`/api/public/site/${slug}/order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...cart, cf_token: await humanToken() }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.message || 'تعذر حفظ الطلب');
       cart = { ...cart, token: rnd(), items: [], note: '', coupon: '' };

@@ -1,6 +1,7 @@
 // صفحة التحقق: تقرأ رمز العلامة من الرابط، تشيله من شريط العنوان، وتسأل الخادم.
 import { EN, onLangToggle, takeCachedResult, translatePage, tx } from '/v/i18n.js';
 import { playResult, preload } from '/assets/sound.js';
+import { humanToken } from '/assets/human.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => ($(id).hidden = !on);
@@ -604,7 +605,7 @@ $('entry-form').addEventListener('submit', async (e) => {
   const btn = e.target.querySelector('[type=submit]');
   btn.disabled = true;
   try {
-    await post('/api/enter', { t: token, sid, name: f.name, phone: f.phone, city: f.city, point_of_sale: f.point_of_sale, consent: f.consent === 'on' });
+    await post('/api/enter', { cf_token: DEMO ? null : await humanToken(), t: token, sid, name: f.name, phone: f.phone, city: f.city, point_of_sale: f.point_of_sale, consent: f.consent === 'on' });
     show('contest', false);
     show('entered');
   } catch (err) {
@@ -624,7 +625,7 @@ $('report-form').addEventListener('submit', async (e) => {
   try {
     const photo = await photoB64(f.photo);
     if (photo) btn.textContent = tx('نحلل الصورة بالذكاء الصناعي…', 'Analysing the photo with AI…');
-    const r = await post('/api/report', { t: token, reason: lastResult, city: f.city, point_of_sale: f.point_of_sale, phone: f.phone || null, note: f.note || null, photo });
+    const r = await post('/api/report', { cf_token: DEMO ? null : await humanToken(), t: token, reason: lastResult, city: f.city, point_of_sale: f.point_of_sale, phone: f.phone || null, note: f.note || null, photo });
     show('report', false);
     show('reported');
     if (r.ai?.verdict) {

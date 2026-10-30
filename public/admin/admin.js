@@ -641,7 +641,17 @@ onSubmit($('story-form'), async (f) => {
   toast(f.merchant_id ? 'انحفظت القصة، تطلع الحين في صفحة التجار ✅' : 'انشالت القصة من الصفحة');
 });
 
-const loaders = { credits: loadCredits, home: loadHome, leads: loadLeads, site: loadSite, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, push: loadPush, reports: loadReports, users: loadUsers, audit: loadAudit, security: () => mountSecurity($('security-box')) };
+const loaders = { credits: loadCredits, home: loadHome, leads: loadLeads, site: loadSite, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, push: loadPush, reports: loadReports, users: loadUsers, audit: loadAudit, security: async () => { mountSecurity($('security-box')).catch((e) => toast(e.message, true)); await loadBackups(); } };
+async function loadBackups() {
+  const { backups } = await api('/api/admin/backups');
+  render($('backups-list'), backups.length
+    ? html`<ul class="sec-list">${backups.map((b) => html`<li><span class="sec-ic">💾</span><div><b>${when(b.at)}</b><small>${(b.size / 1024 / 1024).toFixed(2)} ميجا${b.rows ? ' · ' + num(b.rows) + ' سجل' : ''}</small></div><a class="btn small" href="/api/admin/backups/${b.name}" download>تحميل</a></li>`)}</ul>`
+    : html`<p class="muted small">ما فيه نسخ للحين. أول نسخة تنحفظ تلقائياً خلال ساعة، أو اضغط الزر.</p>`);
+}
+$('backup-now').addEventListener('click', async (e) => {
+  e.target.disabled = true;
+  try { toast((await api('/api/admin/backups', { method: 'POST', body: {} })).message); await loadBackups(); } catch (err) { toast(err.message, true); } finally { e.target.disabled = false; }
+});
 onSubmit($('password-form'), async (f) => {
   const d = await api('/api/auth/password', { method: 'POST', body: f });
   toast(d.message);

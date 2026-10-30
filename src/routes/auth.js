@@ -2,6 +2,7 @@
 import { pushAlert } from '../lib/push.js';
 import { checkPassword, createSession, currentTokenHash, currentUser, destroySession, hashPassword, requireUser, sameOrigin, validPassword } from '../lib/auth.js';
 import { checkCode, newSecret, otpauthUrl } from '../lib/totp.js';
+import { requireHuman } from '../lib/human.js';
 import { deviceKind } from '../lib/scans.js';
 import { cityAr } from '../lib/trust.js';
 import { audit, fail, geo, ipHash, json, now, randomHex, rateLimit, readJson, safeEqual, sha256, str } from '../lib/util.js';
@@ -15,6 +16,7 @@ export async function login(req, env) {
   const b = await readJson(req);
   const email = str(b.email, 'البريد', { max: 200 }).toLowerCase();
   const password = str(b.password, 'كلمة المرور', { max: 200 });
+  await requireHuman(env, req, b.cf_token);
   // حد لكل حساب كمان، عشان التخمين من أجهزة كثيرة ما ينفع
   await rateLimit(db, 'loginu:' + (await sha256(email)), 8, 900);
   const u = await db
@@ -197,6 +199,7 @@ export async function forgotPassword(req, env) {
   const db = env.DB;
   await rateLimit(db, 'forgot:' + (await ipHash(req)), 5, 3600);
   const b = await readJson(req);
+  await requireHuman(env, req, b.cf_token);
   const email = str(b.email, 'البريد', { max: 200 }).toLowerCase();
   const u = await db.prepare("SELECT u.id,u.name,u.email,u.role,u.merchant_id,u.merchant_role FROM users u WHERE u.email=? AND u.status='active'").bind(email).first();
   if (u) {
