@@ -20,7 +20,7 @@ import { handlePublicStore } from './routes/store.js';
 import { handlePublicSite, serveSitePage } from './routes/site.js';
 import { handleCustomer } from './lib/customers.js';
 import { serveMedia } from './lib/store.js';
-import { brandPage, brands, enter, guideChat, guideInfo, joinRequest, shopAiRoute, stats, loyaltyClaim, loyaltyRedeem, loyaltyWallet, rate, report, verify, guarantee, humanConfig } from './routes/public.js';
+import { brandPage, brands, enter, guideChat, guideInfo, joinRequest, shopAiRoute, stats, loyaltyClaim, loyaltyRedeem, loyaltyWallet, rate, report, verify, guarantee, humanConfig, claimOwnership } from './routes/public.js';
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
@@ -58,6 +58,7 @@ async function route(req, env) {
   if (path.startsWith('/api/public/push/')) return handlePublicPush(req, env, path);
   if (path.startsWith('/api/u/push/')) return handleUserPush(req, env, path);
   if (path === '/api/verify' && m === 'POST') return verify(req, env);
+  if (path === '/api/claim' && m === 'POST') return claimOwnership(req, env);
   if (path === '/api/loyalty/claim' && m === 'POST') return loyaltyClaim(req, env);
   if (path === '/api/loyalty/wallet' && m === 'POST') return loyaltyWallet(req, env);
   if (path === '/api/loyalty/redeem' && m === 'POST') return loyaltyRedeem(req, env);

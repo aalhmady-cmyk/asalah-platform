@@ -189,3 +189,6 @@
 .history .h-owner.other { background: #FFF4E0; color: #8A5300; }
 .history .h-flag { background: #FDECEA; color: #B42318; }
 .pp-steps li.warn .pp-dot { background: #FDECEA; color: #B42318; }
+
+.owned { margin: 6px auto 0; display: inline-block; padding: 6px 14px; border-radius: 99px; background: var(--green-tint); color: var(--green-ink); font-weight: 700; font-size: 14px; }
+.own .big-btn { width: 100%; margin-top: 12px; }

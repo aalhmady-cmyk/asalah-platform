@@ -2,6 +2,7 @@
 import { EN, onLangToggle, takeCachedResult, translatePage, tx } from '/v/i18n.js';
 import { playResult, preload } from '/assets/sound.js';
 import { humanToken } from '/assets/human.js';
+import { formBox } from '/assets/dialog.js';
 import { alertBox, confirmBox } from '/assets/dialog.js';
 
 const $ = (id) => document.getElementById(id);
@@ -101,7 +102,7 @@ const RESULT_EN = {
   blocked: 'This tag has been blocked. The product may be counterfeit, check with the seller.',
   not_activated: 'This tag has not been activated yet. Check with the seller before using the product.',
   locked: 'This tag has passed its allowed number of checks and was locked. The product may be counterfeit.',
-  other_device: 'This tag was already verified on another device. Continue on the device that scanned it first.',
+  other_device: 'This product may be counterfeit or registered to someone else. Check with the seller.',
 };
 const resultMsg = (d) => (EN && RESULT_EN[d.result] ? RESULT_EN[d.result] : d.message);
 function enError(data) {
@@ -171,15 +172,40 @@ const where = (city) => (city ? tx(` في ${city}`, ` in ${city}`) : '');
 
 // رسالة "مرتبطة بجوال آخر" بالتفاصيل: أي جوال، متى، وين، وكم مسحة
 function otherMsg(d) {
-  const h = d.history, f = h?.first;
+  const h = d.history, f = h?.first, o = h?.owner;
   if (!f) return null;
-  let m = tx(
-    `هذي العلامة مرتبطة بجوال ${kindName(f.kind)} آخر مسحها أول مرة ${when(f.at)}${where(f.city)}. هذي المسحة رقم ${h.total}.`,
-    `This tag is linked to another ${kindName(f.kind)} that first scanned it ${when(f.at)}${where(f.city)}. This is scan #${h.total}.`
-  );
-  if (h.owner?.name) m += tx(` والمنتج مسجّل باسم ${h.owner.name}.`, ` The product is registered to ${h.owner.name}.`);
-  m += tx(' إذا اشتريت المنتج جديد ومقفول، بلّغنا تحت.', ' If you bought it new and sealed, report it below.');
+  const who = [o?.name, o?.phone && `\u2066${o.phone}\u2069`].filter(Boolean).join(' · ');
+  let m = tx('قد يكون هذا المنتج مقلّداً أو مسجّلاً لشخص آخر.', 'This product may be counterfeit or registered to someone else.');
+  if (o) m += ' ' + tx(`المنتج الأصلي ملك ${who || 'عميل آخر'}، تسجّل باسمه${o.at ? ' ' + when(o.at) : ''}${where(o.city)}.`, `The original belongs to ${who || 'another customer'}, registered${o.at ? ' ' + when(o.at) : ''}${where(o.city)}.`);
+  m += ' ' + tx(`أول مسحة كانت ${when(f.at)}${where(f.city)}، وهذي المسحة رقم ${h.total}.`, `First scanned ${when(f.at)}${where(f.city)}. This is scan #${h.total}.`);
+  m += ' ' + tx('إذا اشتريته جديد ومقفول، بلّغنا تحت.', 'If you bought it new and sealed, report it below.');
   return m;
+}
+
+// «اشتريت المنتج»: رقم الجوال اختياري، ولو النقاط مفعّلة تنضاف له بنفس الخطوة
+function setupOwn(d) {
+  show('own');
+  $('own-btn').addEventListener('click', async () => {
+    const pts = d.loyalty && !d.loyalty.claimed;
+    const f = await formBox({
+      title: pts ? tx('سجّل رقمك عشان تنحفظ نقاطك 🪙', 'Add your number to save your points 🪙') : tx('نسجّل المنتج باسمك', 'Register the product to you'),
+      icon: '🛍️',
+      message: pts
+        ? tx(`بتحصل على ${fmt(d.loyalty.per_tag)} لهذا المنتج. رقمك اختياري، بس بدونه ما تنحفظ النقاط.`, `You get ${fmt(d.loyalty.per_tag)} for this product. Your number is optional, but points need it.`)
+        : tx('رقمك اختياري، ويظهر مخفي (05xxxxx123) لو أحد مسح نسخة من هذي العلامة.', 'Your number is optional and shows masked if anyone scans a copy of this tag.'),
+      ok: tx('سجّله باسمي', 'Register it'),
+      fields: [{ name: 'phone', type: 'tel', inputmode: 'numeric', ltr: true, placeholder: '05xxxxxxxx', value: savedPhone() || '' }],
+    });
+    if (!f) return;
+    const phone = f.phone.trim() || null;
+    try {
+      await post('/api/claim', { cf_token: await humanToken(), t: token, sid, phone });
+      show('own', false);
+      show('owned');
+      if (pts && phone) await claim(phone, true);
+      resultSound('original');
+    } catch (err) { alertBox(err.message); }
+  });
 }
 
 function setupHistory(h) {
@@ -188,7 +214,10 @@ function setupHistory(h) {
   if (h.owner) {
     $('h-owner').textContent = h.owner.you
       ? tx('✅ هذا المنتج مسجّل باسمك', '✅ This product is registered to you')
-      : tx(`👤 هذا المنتج مسجّل باسم ${h.owner.name}، ولو ما هو أنت فالمنتج اللي بيدك غالباً منسوخ.`, `👤 This product is registered to ${h.owner.name}. If that is not you, the one in your hand is probably a copy.`);
+      : (() => {
+        const who = [h.owner.name, h.owner.phone && `\u2066${h.owner.phone}\u2069`].filter(Boolean).join(' · ') || tx('عميل آخر', 'another customer');
+        return tx(`👤 هذا المنتج مسجّل باسم ${who}، ولو ما هو أنت فالمنتج اللي بيدك غالباً منسوخ.`, `👤 This product is registered to ${who}. If that is not you, the one in your hand is probably a copy.`);
+      })();
     $('h-owner').classList.toggle('other', !h.owner.you);
     show('h-owner');
   }
@@ -197,11 +226,11 @@ function setupHistory(h) {
     show('h-flag');
   }
   const items = h.recent.map((r) => {
-    const bad = r.result && r.result !== 'original';
+    const bad = r.result && !['original', 'claimed'].includes(r.result);
     const li = el('li', r.mine ? 'you' : bad ? 'warn' : '');
     const box = el('div');
     const who = r.mine ? tx(`${kindName(r.kind)} (جهازك)`, `${kindName(r.kind)} (your device)`) : tx(`${kindName(r.kind)} آخر`, `another ${kindName(r.kind)}`);
-    const note = r.result === 'other_device' ? tx(' · رفضناه لأنه جهاز آخر', ' · refused, another device') : r.result === 'locked' ? tx(' · وقفت العلامة', ' · tag locked') : '';
+    const note = r.result === 'claimed' ? tx(' · سجّله باسمه (اشترى المنتج)', ' · registered it (bought)') : r.result === 'other_device' ? tx(' · مسجّل لغيره', ' · registered to someone else') : r.result === 'locked' ? tx(' · وقفت العلامة', ' · tag locked') : '';
     box.append(el('b', '', who), el('small', '', when(r.at) + where(r.city) + note));
     li.append(el('span', 'pp-dot', r.mine ? '📱' : bad ? '⛔' : '📲'), box);
     return li;
@@ -223,7 +252,9 @@ function ok(d) {
   $('f-id').textContent = t.public_id;
   $('f-batch').textContent = t.batch;
   $('f-product').textContent = t.product_name || (t.produced_on ? tx('إنتاج ', 'Made ') + t.produced_on : '-');
-  $('f-checks').textContent = t.checks_left == null ? String(t.check_no) : `${t.check_no} ${tx('من', 'of')} ${t.check_no + t.checks_left}`;
+  $('f-checks').textContent = t.max_devices && t.devices != null ? tx(`${t.devices} من ${t.max_devices} جوالات`, `${t.devices} of ${t.max_devices} phones`) : String(t.check_no);
+  if (d.owner?.you) { show('owned'); $('f-checks').textContent = tx(`${t.check_no} مسحة`, `${t.check_no} scans`); }
+  if (d.owner?.claimable && !DEMO) setupOwn(d);
   show('test-note', t.is_test);
   // صورة المنتج للدفعة، وإذا ما فيه، شعار التاجر
   const pic = t.image_url || d.brand.logo_url;

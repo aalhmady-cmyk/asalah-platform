@@ -14,7 +14,8 @@ export const LEVELS = [
   { key: 'diamond', min: 40, name: 'ماسي', name_en: 'Diamond', icon: '💎' },
 ];
 export async function levelFor(db, device) {
-  const r = await db.prepare('SELECT COUNT(*) AS n FROM tags WHERE first_device=? OR second_device=?').bind(device, device).first();
+  // كم منتج أصلي تحقق منه هذا الجوال (أو سجّله باسمه)
+  const r = await db.prepare("SELECT COUNT(DISTINCT tag_id) AS n FROM scans WHERE device=? AND result IN ('original','claimed')").bind(device).first();
   const n = r?.n || 0;
   let cur = LEVELS[0];
   for (const l of LEVELS) if (n >= l.min) cur = l;

@@ -33,23 +33,29 @@ export function maskName(name) {
   return second ? `${first} ${second[0]}` : first;
 }
 
+// "966551112223" ← "05xxxxx223"
+export const maskPhone = (p) => (p ? '05xxxxx' + String(p).slice(-3) : null);
+
 // اللي يشوفه العميل: أول مسحة، آخر المسحات، كم جوال، ومن سجّل المنتج باسمه
 export async function scanHistory(db, tag, device) {
   const [first, recent, stats, entry] = await db.batch([
     db.prepare("SELECT created_at,city,device,device_kind FROM scans WHERE tag_id=? AND device IS NOT NULL ORDER BY id LIMIT 1").bind(tag.id),
     db.prepare("SELECT created_at,city,device,device_kind,result FROM scans WHERE tag_id=? AND device IS NOT NULL ORDER BY id DESC LIMIT 8").bind(tag.id),
     db.prepare("SELECT COUNT(*) AS n, COUNT(DISTINCT device) AS devices FROM scans WHERE tag_id=? AND device IS NOT NULL").bind(tag.id),
-    db.prepare('SELECT customer_name FROM entries WHERE tag_id=?').bind(tag.id),
+    db.prepare('SELECT customer_name,phone FROM entries WHERE tag_id=?').bind(tag.id),
   ]);
   const row = (s) => s && { at: s.created_at, city: cityAr(s.city), kind: s.device_kind, mine: s.device === device, result: s.result || null };
-  const owned = entry.results[0];
-  const you = device === tag.first_device || device === tag.second_device;
+  const e = entry.results[0];
+  const you = Boolean(tag.first_device) && (device === tag.first_device || device === tag.second_device);
   return {
     total: stats.results[0]?.n || 0,
     devices: stats.results[0]?.devices || 0,
     first: row(first.results[0]),
     recent: recent.results.map(row),
-    owner: owned ? { name: you ? null : maskName(owned.customer_name), you } : null,
+    // المالك = اللي ضغط «اشتريت المنتج» (أو شارك في المسابقة أو أضاف النقاط). لغيره نعرض اسمه ورقمه مخفيين
+    owner: tag.first_device
+      ? { you, name: you ? null : maskName(e?.customer_name), phone: you ? null : maskPhone(tag.owner_phone || e?.phone), at: tag.owner_at || null, city: cityAr(tag.owner_city) }
+      : null,
     flagged: Boolean(tag.flagged_at),
   };
 }

@@ -22,7 +22,7 @@ const MESSAGES = {
   blocked: 'هذي العلامة موقوفة. قد يكون المنتج مقلّداً، تأكد من البائع.',
   not_activated: 'هذي العلامة لم تُفعَّل بعد. تأكد من البائع قبل استخدام المنتج.',
   locked: 'تجاوزت هذي العلامة عدد مرات التحقق المسموح، وتم إيقافها. قد يكون المنتج مقلّداً.',
-  other_device: 'تم التحقق من هذي العلامة من جهاز آخر. أكمل من الجهاز اللي مسحتها فيه أول مرة.',
+  other_device: 'قد يكون هذا المنتج مقلّداً أو مسجّلاً لشخص آخر. تأكد من البائع.',
 };
 
 function brand(m) {
@@ -72,19 +72,47 @@ function expired(expiresOn) {
 const loyaltyInfo = (b) => ({ mode: b.loyalty_mode, per_tag: b.loyalty_per_tag, min_redeem: b.loyalty_min_redeem, reward: b.loyalty_reward });
 
 // العلامة لازم تكون أصلية ومفعّلة ومربوطة بهذا الجهاز (نفس شروط المسابقة)
-async function boundTag(env, db, body) {
+async function boundTag(env, db, body, req, phone = null) {
   if (typeof body.sid !== 'string' || !SID_RE.test(body.sid)) fail(400, 'أعد فتح الرابط من جديد');
   const r = await resolve(env, db, body.t);
   if (r.state !== 'found') fail(403, MESSAGES.unknown, 'unknown');
   const b = r.batch;
   if (b.status !== 'active' || b.merchant_status !== 'active') fail(403, MESSAGES.blocked, 'blocked');
   const device = await sha256('device:' + body.sid);
-  const tag = await db
-    .prepare("SELECT id,loyalty_claimed FROM tags WHERE batch_id=? AND serial=? AND status='active' AND (first_device=? OR second_device=?)")
-    .bind(b.id, r.serial, device, device)
-    .first();
-  if (!tag) fail(403, MESSAGES.other_device, 'other_device');
+  const tag = await ownTag(db, req, b, r.serial, device, phone);
   return { b, tag, device };
+}
+
+// العلامة لهذا الجوال: إذا ما أحد سجّلها، تتسجّل باسمه الحين (المسابقة والنقاط والتقييم تعتبر شراء)
+async function ownTag(db, req, b, serial, device, phone = null) {
+  const tag = await db.prepare('SELECT id,status,loyalty_claimed,entry_done,first_device,second_device,owner_phone FROM tags WHERE batch_id=? AND serial=?').bind(b.id, serial).first();
+  if (!tag || tag.status === 'blocked_merchant' || tag.status === 'blocked_admin') fail(403, MESSAGES.blocked, 'blocked');
+  if (tag.first_device === device || tag.second_device === device) {
+    if (phone && !tag.owner_phone) await db.prepare('UPDATE tags SET owner_phone=? WHERE id=?').bind(phone, tag.id).run();
+    return tag;
+  }
+  if (tag.first_device) fail(409, 'هذا المنتج مسجّل لشخص آخر', 'other_device');
+  if (tag.status !== 'active') fail(403, MESSAGES.locked, 'locked');
+  const city = geo(req).city;
+  const won = await db.prepare('UPDATE tags SET first_device=?,owner_at=?,owner_city=?,owner_phone=? WHERE id=? AND first_device IS NULL RETURNING id').bind(device, now(), city, phone, tag.id).first();
+  if (!won) fail(409, 'هذا المنتج مسجّل لشخص آخر', 'other_device');
+  await logScan(db, req, tag.id, b.merchant_id, 'claimed', null, device);
+  return { ...tag, first_device: device };
+}
+
+// «اشتريت المنتج؟ سجّله باسمك»: رقم الجوال اختياري
+export async function claimOwnership(req, env) {
+  const db = env.DB;
+  await rateLimit(db, 'claim:' + (await ipHash(req)), 30, 3600);
+  const body = await readJson(req);
+  if (typeof body.sid !== 'string' || !SID_RE.test(body.sid)) fail(400, 'أعد فتح الرابط من جديد');
+  const phone = saPhone(body.phone, { optional: true });
+  const r = await resolve(env, db, body.t);
+  if (r.state !== 'found') fail(403, MESSAGES.unknown, 'unknown');
+  const b = r.batch;
+  if (b.status !== 'active' || b.merchant_status !== 'active') fail(403, MESSAGES.blocked, 'blocked');
+  await ownTag(db, req, b, r.serial, await sha256('device:' + body.sid), phone);
+  return json({ ok: true, message: 'تم تسجيل المنتج باسمك ✅' });
 }
 
 async function wallet(db, b, member) {
@@ -110,7 +138,7 @@ export async function loyaltyClaim(req, env) {
   const body = await readJson(req);
   const phone = saPhone(body.phone);
   const name = str(body.name, 'الاسم', { max: 100, optional: true });
-  const { b, tag, device } = await boundTag(env, db, body);
+  const { b, tag, device } = await boundTag(env, db, body, req, phone);
   if (!b.loyalty_enabled) fail(403, 'برنامج النقاط غير مفعّل لهذا المنتج', 'loyalty_off');
   const t = now();
   const claimed = await db.prepare('UPDATE tags SET loyalty_claimed=1 WHERE id=? AND loyalty_claimed=0 RETURNING id').bind(tag.id).first();
@@ -144,7 +172,7 @@ export async function loyaltyWallet(req, env) {
   const db = env.DB;
   await rateLimit(db, 'loyalty:' + (await ipHash(req)), 30, 3600);
   const body = await readJson(req);
-  const { b, device } = await boundTag(env, db, body);
+  const { b, device } = await boundTag(env, db, body, req);
   if (!b.loyalty_enabled) fail(403, 'برنامج النقاط غير مفعّل', 'loyalty_off');
   return json({ ok: true, wallet: await wallet(db, b, await memberForDevice(db, b, saPhone(body.phone), device)) });
 }
@@ -156,7 +184,7 @@ export async function loyaltyRedeem(req, env) {
   const db = env.DB;
   await rateLimit(db, 'loyalty:' + (await ipHash(req)), 30, 3600);
   const body = await readJson(req);
-  const { b, device } = await boundTag(env, db, body);
+  const { b, device } = await boundTag(env, db, body, req);
   if (!b.loyalty_enabled) fail(403, 'برنامج النقاط غير مفعّل', 'loyalty_off');
   const member = await memberForDevice(db, b, saPhone(body.phone), device);
   const cost = b.loyalty_min_redeem;
@@ -182,7 +210,7 @@ export async function rate(req, env) {
   const body = await readJson(req);
   const stars = int(body.stars, 'التقييم', { min: 1, max: 5 });
   const comment = str(body.comment, 'التعليق', { max: 300, optional: true });
-  const { b, tag } = await boundTag(env, db, body);
+  const { b, tag } = await boundTag(env, db, body, req);
   if (!b.ratings_enabled) fail(403, 'التقييم غير متاح', 'ratings_off');
   const r = await db
     .prepare('INSERT INTO ratings(tag_id,merchant_id,batch_id,stars,comment,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(tag_id) DO NOTHING')
@@ -228,38 +256,39 @@ export async function verify(req, env) {
   const t = now();
   // سجل العلامة ينشأ أول ما تنمسح
   await db.prepare('INSERT INTO tags(batch_id,merchant_id,serial) VALUES(?,?,?) ON CONFLICT(batch_id,serial) DO NOTHING').bind(b.id, b.merchant_id, r.serial).run();
+  // كل فتح للرابط ينحسب في السجل. الملكية تنحسم بزر «اشتريت المنتج»، والقفل بعدد الجوالات المختلفة مو المسحات
   const tag = await db
     .prepare(
       `UPDATE tags SET check_count=check_count+1,last_checked_at=?,first_checked_at=COALESCE(first_checked_at,?)
-       WHERE batch_id=? AND serial=? AND status='active'
-       RETURNING id,check_count,first_device,second_device,first_checked_at,entry_done,loyalty_claimed,flagged_at`
+       WHERE batch_id=? AND serial=? AND status IN ('active','auto_locked')
+       RETURNING id,status,check_count,first_device,second_device,first_checked_at,entry_done,loyalty_claimed,flagged_at,owner_at,owner_city,owner_phone,count_from`
     )
     .bind(t, t, b.id, r.serial)
     .first();
-  if (!tag) {
-    const row = await db.prepare('SELECT id,status,first_device,second_device,flagged_at FROM tags WHERE batch_id=? AND serial=?').bind(b.id, r.serial).first();
-    return reject(row?.status === 'auto_locked' ? 'locked' : 'blocked', row);
+  // موقوفة من التاجر أو المدير: ما تنحسب كمسحة
+  if (!tag) return reject('blocked', await db.prepare('SELECT id,status,first_device,second_device,flagged_at,owner_at,owner_city,owner_phone FROM tags WHERE batch_id=? AND serial=?').bind(b.id, r.serial).first());
+  let isOwner = Boolean(tag.first_device) && (tag.first_device === device || tag.second_device === device);
+  // جوال ثاني خلال 10 دقائق من التسجيل (مثل الانتقال من سناب إلى سفاري) يعتبر لنفس الشخص
+  if (!isOwner && tag.first_device && !tag.second_device && tag.status === 'active' && t - (tag.owner_at || t) <= SECOND_DEVICE_SECONDS) {
+    isOwner = Boolean(await db.prepare('UPDATE tags SET second_device=? WHERE id=? AND second_device IS NULL RETURNING id').bind(device, tag.id).first());
   }
-  // كل فتح للرابط يُحسب. الفحص اللي بعد الحد يقفل العلامة نهائياً حتى يعيد التاجر أو المدير تفعيلها.
   const max = b.max_checks || 0;
-  if (max && tag.check_count > max) {
-    await db.prepare("UPDATE tags SET status='auto_locked' WHERE id=? AND status='active'").bind(tag.id).run();
-    return reject('locked', tag, tag.check_count);
-  }
-
-  let bound = false;
-  if (!tag.first_device) {
-    const claimed = await db.prepare('UPDATE tags SET first_device=? WHERE id=? AND first_device IS NULL RETURNING id').bind(device, tag.id).first();
-    bound = Boolean(claimed);
-    if (!claimed) tag.first_device = (await db.prepare('SELECT first_device FROM tags WHERE id=?').bind(tag.id).first()).first_device;
-  }
-  if (!bound) {
-    if (tag.first_device === device || tag.second_device === device) bound = true;
-    else if (!tag.second_device && t - tag.first_checked_at <= SECOND_DEVICE_SECONDS) {
-      bound = Boolean(await db.prepare('UPDATE tags SET second_device=? WHERE id=? AND second_device IS NULL RETURNING id').bind(device, tag.id).first());
+  let devices = null;
+  // صاحب المنتج ما تنقفل عليه أبداً. غيره: بعد عدد جوالات مختلفة تنقفل العلامة (غالباً رابط منسوخ)
+  if (!isOwner) {
+    if (tag.status === 'auto_locked') return reject('locked', tag, tag.check_count);
+    const seen = await db
+      .prepare("SELECT COUNT(DISTINCT device) AS n, MAX(device=?) AS mine FROM scans WHERE tag_id=? AND id>? AND device IS NOT NULL AND device<>COALESCE(?,'') AND device<>COALESCE(?,'')")
+      .bind(device, tag.id, tag.count_from || 0, tag.first_device, tag.second_device)
+      .first();
+    devices = (seen?.n || 0) + (seen?.mine ? 0 : 1);
+    if (max && devices > max) {
+      await db.prepare("UPDATE tags SET status='auto_locked' WHERE id=? AND status='active'").bind(tag.id).run();
+      return reject('locked', tag, tag.check_count);
     }
+    // مسجّل لشخص ثاني: قد يكون اللي بيد العميل نسخة
+    if (tag.first_device) return reject('other_device', tag, tag.check_count);
   }
-  if (!bound) return reject('other_device', tag, tag.check_count);
 
   await checkAnomaly(db, req, tag, b.merchant_id);
   await logScan(db, req, tag.id, b.merchant_id, 'original', tag.check_count, device);
@@ -287,8 +316,11 @@ export async function verify(req, env) {
       details: b.details,
       is_test: Boolean(b.is_test),
       check_no: tag.check_count,
-      checks_left: max ? max - tag.check_count : null,
+      devices,
+      max_devices: max || null,
+      checks_left: max && devices != null ? max - devices : null,
     },
+    owner: { you: isOwner, claimable: !tag.first_device },
     contest: open ? { title: b.contest_title, ends_at: b.contest_ends_at, terms_url: b.contest_terms_url, entered: Boolean(tag.entry_done) } : null,
     loyalty: b.loyalty_enabled ? { ...loyaltyInfo(b), claimed: Boolean(tag.loyalty_claimed) } : null,
     rating: b.ratings_enabled ? { done: Boolean(rated), stars: rated?.stars ?? null } : null,
@@ -321,11 +353,7 @@ export async function enter(req, env) {
   if (b.status !== 'active' || b.merchant_status !== 'active') fail(403, MESSAGES.blocked, 'blocked');
   if (!contestOpen(b)) fail(403, 'المسابقة غير متاحة حالياً', 'contest_closed');
   const device = await sha256('device:' + body.sid);
-  const tag = await db
-    .prepare("SELECT id,status,entry_done FROM tags WHERE batch_id=? AND serial=? AND status='active' AND (first_device=? OR second_device=?)")
-    .bind(b.id, r.serial, device, device)
-    .first();
-  if (!tag) fail(403, MESSAGES.other_device, 'other_device');
+  const tag = await ownTag(db, req, b, r.serial, device, f.phone);
   if (tag.entry_done) fail(409, 'سبق تسجيل مشاركة بهذي العلامة', 'already_entered');
   const res = await db.batch([
     db

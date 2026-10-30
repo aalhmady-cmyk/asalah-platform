@@ -62,7 +62,7 @@ export async function setTagStatus(db, { batchCode, from, to, action }, merchant
   } else {
     const r = await db
       .prepare(
-        `UPDATE tags SET status='active',check_count=0 WHERE batch_id=? AND serial BETWEEN ? AND ? AND status<>'active'
+        `UPDATE tags SET status='active',check_count=0,count_from=(SELECT COALESCE(MAX(id),0) FROM scans) WHERE batch_id=? AND serial BETWEEN ? AND ? AND status<>'active'
          ${isAdmin ? '' : "AND status<>'blocked_admin'"}`
       )
       .bind(b.id, from, to)

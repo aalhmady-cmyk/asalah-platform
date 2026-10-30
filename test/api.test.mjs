@@ -115,17 +115,29 @@ test('التحقق وربط الجهاز', async () => {
   assert.equal(r.data.contest, null);
   r = await post('/api/verify', { t, sid: sid('a') });
   assert.equal(r.data.tag.check_no, 2);
-  r = await post('/api/verify', { t, sid: sid('b') }); // جهاز ثانٍ خلال 10 دقائق
+  assert.equal(r.data.tag.checks_left, 4); // نفس الجوال ما ينحسب مرتين
+  assert.equal(r.data.owner.claimable, true);
+  // قبل الشراء الفحص حر: جوال ثاني يشوف أصلي
+  r = await post('/api/verify', { t, sid: sid('b') });
   assert.equal(r.data.result, 'original');
-  r = await post('/api/verify', { t, sid: sid('c') }); // جهاز ثالث
+  assert.equal(r.data.tag.checks_left, 3);
+  // «اشتريت المنتج»: تتسجل باسم أول جوال، والثاني ما يقدر بعدها
+  assert.equal((await post('/api/claim', { t, sid: sid('a'), phone: '0551112223' })).status, 200);
+  assert.equal((await post('/api/claim', { t, sid: sid('c') })).status, 409);
+  r = await post('/api/verify', { t, sid: sid('a') });
+  assert.equal(r.data.owner.you, true);
+  r = await post('/api/verify', { t, sid: sid('b') }); // جوال ثاني خلال 10 دقائق من التسجيل = نفس الشخص
+  assert.equal(r.data.result, 'original');
+  r = await post('/api/verify', { t, sid: sid('c') }); // جوال ثالث
   assert.equal(r.data.result, 'other_device');
-  // الجهاز المرفوض يشوف سجل المسحات: أول مسحة، العدد، وكم جهاز
-  assert.equal(r.data.history.total, 4);
+  // الجوال المرفوض يشوف سجل المسحات ومين سجّل المنتج (مخفي)
   assert.equal(r.data.history.devices, 3);
   assert.ok(r.data.history.first.at);
   assert.equal(r.data.history.first.mine, false);
   assert.equal(r.data.history.recent[0].mine, true);
   assert.equal(r.data.history.recent[0].result, 'other_device');
+  assert.equal(r.data.history.owner.phone, '05xxxxx223');
+  assert.equal(r.data.history.owner.you, false);
 });
 
 test('الروابط المزيّفة والمعدّلة', async () => {
@@ -139,10 +151,11 @@ test('الروابط المزيّفة والمعدّلة', async () => {
   assert.ok(ov.data.unknown.some((u) => u.merchant_name === 'الكيف الأخضر'));
 });
 
-test('الفحص السادس يقفل العلامة', async () => {
+test('الجوال السادس المختلف يقفل العلامة', async () => {
   const t = tokenOf(S.urls[1]);
-  for (let i = 1; i <= 5; i++) assert.equal((await post('/api/verify', { t, sid: sid('d') })).data.result, 'original');
-  assert.equal((await post('/api/verify', { t, sid: sid('d') })).data.result, 'locked');
+  for (let i = 0; i < 3; i++) assert.equal((await post('/api/verify', { t, sid: sid('d') })).data.result, 'original');
+  for (const c of '1234') assert.equal((await post('/api/verify', { t, sid: sid(c) })).data.result, 'original');
+  assert.equal((await post('/api/verify', { t, sid: sid('5') })).data.result, 'locked');
   assert.equal((await post('/api/verify', { t, sid: sid('d') })).data.result, 'locked');
   const look = await call('/api/m/tags/lookup?q=GK2610-000002', { cookie: S.merchant });
   assert.equal(look.data.tag.status, 'auto_locked');
@@ -169,7 +182,7 @@ test('المسابقة: مشاركة وحدة من الجهاز المربوط',
   const v = await post('/api/verify', { t, sid: sid('a') });
   assert.equal(v.data.contest.title, 'مسابقة الشتاء');
   const form = { t, name: 'محمد', phone: '0551234567', city: 'الرياض', point_of_sale: 'بقالة النور', consent: true };
-  assert.equal((await post('/api/enter', { ...form, sid: sid('c') })).status, 403);
+  assert.equal((await post('/api/enter', { ...form, sid: sid('c') })).status, 409); // مسجّلة لجوال ثاني
   assert.equal((await post('/api/enter', { ...form, consent: false, sid: sid('a') })).status, 400);
   assert.equal((await post('/api/enter', { ...form, sid: sid('a') })).status, 200);
   assert.equal((await post('/api/enter', { ...form, sid: sid('b') })).status, 409);
@@ -347,9 +360,9 @@ test('النقاط والكاش باك: جمع مرة وحدة واستبدال 
   assert.deepEqual(v.data.loyalty, { mode: 'points', per_tag: 10, min_redeem: 20, reward: 'علبة مجانية', claimed: false });
   assert.equal(v.data.rating.done, false);
   const phone = '0559990001';
-  assert.equal((await post('/api/loyalty/claim', { t: t1, sid: sid('9'), phone })).status, 403); // جهاز غير مربوط
-  r = await post('/api/loyalty/claim', { t: t1, sid: sid('1'), phone });
+  r = await post('/api/loyalty/claim', { t: t1, sid: sid('1'), phone }); // إضافة النقاط تسجّل المنتج باسمه
   assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal((await post('/api/loyalty/claim', { t: t1, sid: sid('9'), phone })).status, 409); // مسجّل لجوال ثاني
   assert.equal(r.data.wallet.balance, 10);
   assert.equal(r.data.wallet.can_redeem, false);
   assert.equal((await post('/api/loyalty/claim', { t: t1, sid: sid('1'), phone: '0559990002' })).status, 409);
@@ -389,7 +402,7 @@ test('النقاط والكاش باك: جمع مرة وحدة واستبدال 
 test('التقييم وتاريخ الانتهاء', async () => {
   const t = tokenOf(S.urls[8]);
   assert.equal((await post('/api/rate', { t, sid: sid('1'), stars: 6 })).status, 400);
-  assert.equal((await post('/api/rate', { t, sid: sid('9'), stars: 5 })).status, 403);
+  assert.equal((await post('/api/rate', { t, sid: sid('9'), stars: 5 })).status, 409);
   assert.equal((await post('/api/rate', { t, sid: sid('1'), stars: 4, comment: 'ممتاز' })).status, 200);
   assert.equal((await post('/api/rate', { t, sid: sid('1'), stars: 5 })).status, 409);
   const r = await call('/api/m/ratings', { cookie: S.merchant });

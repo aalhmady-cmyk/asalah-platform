@@ -48,7 +48,7 @@ export async function guaranteeClaim(req, env, bound) {
   await rateLimit(db, 'guarantee:' + (await ipHash(req)), 5, 86400);
   const body = await readJson(req, 1_500_000);
   if (body.consent !== true) fail(400, 'لازم توافق على مشاركة بياناتك مع صاحب العلامة');
-  const { b, tag } = await bound(env, db, body);
+  const { b, tag } = await bound(env, db, body, req);
   if (!b.guarantee_enabled) fail(403, 'صاحب هذي العلامة ما فعّل ضمان أصالة', 'no_guarantee');
   const f = {
     name: str(body.name, 'الاسم', { min: 2, max: 100 }),
