@@ -97,9 +97,17 @@ export async function handleMerchant(req, env, path) {
       db.prepare('SELECT id,name,slug,logo_url,logo_key,brand_color,store_url,store_enabled,low_stock_threshold,max_checks,contest_enabled,contest_title,contest_ends_at,contest_terms_url,public_listed,about FROM merchants WHERE id=?').bind(mid).first(),
       db.prepare("SELECT id,kind,message,created_at,read_at FROM alerts WHERE merchant_id=? AND kind NOT IN ('tag_request','store_request') ORDER BY id DESC LIMIT 10").bind(mid).all(),
     ]);
-    const entries = await db.prepare('SELECT COUNT(*) AS n FROM entries WHERE merchant_id=?').bind(mid).first();
+    const [entries, todo] = await db.batch([
+      db.prepare('SELECT COUNT(*) AS n FROM entries WHERE merchant_id=?').bind(mid),
+      // مهام اليوم في الرئيسية: كل رقم يودّي لقسمه
+      db.prepare(`SELECT
+        (SELECT COUNT(*) FROM orders WHERE merchant_id=?1 AND status='new') AS orders,
+        (SELECT COUNT(*) FROM reports WHERE merchant_id=?1 AND created_at>=?2) AS reports,
+        (SELECT COUNT(*) FROM guarantee_claims WHERE merchant_id=?1 AND status='new') AS claims,
+        (SELECT COUNT(*) FROM tags WHERE merchant_id=?1 AND flagged_at>=?2) AS flagged`).bind(mid, now() - 7 * 86400),
+    ]);
     merchant.logo_url = imageUrl(merchant.logo_key) || merchant.logo_url;
-    return json({ ok: true, merchant, overview: ov, alerts: alerts.results, entries: entries.n });
+    return json({ ok: true, merchant, overview: ov, alerts: alerts.results, entries: entries.results[0].n, todo: todo.results[0] });
   }
 
   // ملصقات QR: التاجر يطبع دفعاته اللي نوعها QR بنفسه

@@ -27,6 +27,7 @@ const ORDERS_ONLY = me.user.merchant_role === 'orders';
 if (ORDERS_ONLY) {
   document.body.classList.add('is-staff', 'is-orders');
   for (const b of document.querySelectorAll('#nav [data-tab]')) if (!['orders', 'account'].includes(b.dataset.tab)) b.remove();
+  for (const g of document.querySelectorAll('#nav .nav-group')) g.remove();
   for (const b of document.querySelectorAll('#bottom-bar [data-go]')) if (!['orders', 'more'].includes(b.dataset.go)) b.remove();
   $('me').textContent = me.user.name + ' · موظف طلبات';
   if (!location.hash || location.hash === '#home') location.hash = '#orders';
@@ -93,7 +94,19 @@ async function loadHome() {
   render($('cities'), hbars(o.cities_7d));
   render($('daily'), bars(o.daily));
   render($('recent'), !o.recent.length ? html`<div class="empty">ما فيه عمليات تحقق للحين</div>` : html`<table style="min-width:520px"><thead><tr><th>رقم العلامة</th><th>النتيجة</th><th>المدينة</th><th>الفحص</th><th>الوقت</th></tr></thead><tbody>${o.recent.slice(0, 10).map((r) => html`<tr><td class="mono">${r.public_id || 'غير معروف'}</td><td>${pill(RESULT, r.result)}</td><td>${r.city || '-'}</td><td>${r.check_no ? `${r.check_no} من ${merchant.max_checks}` : '-'}</td><td class="muted">${when(r.created_at)}</td></tr>`)}</tbody></table>`);
-  const unread = d.alerts.filter((a) => !a.read_at && a.kind !== 'tag_request');
+  // مهامك اليوم: اللي يحتاج منك تصرّف، وكل بطاقة تودّيك لقسمها
+  const t = d.todo || {};
+  const tasks = [
+    t.orders && ['🧾', `${num(t.orders)} طلب جديد بانتظار تأكيدك`, 'orders'],
+    t.flagged && ['⚠️', `${num(t.flagged)} علامة مشبوهة (انمسحت في مدن متباعدة)`, 'reports'],
+    t.reports && ['🚩', `${num(t.reports)} بلاغ تقليد خلال 7 أيام`, 'reports'],
+    t.claims && ['🛡️', `${num(t.claims)} طلب ضمان ينتظر ردك`, 'trust'],
+    low && ['📦', `علاماتك قربت تخلص: باقي ${num(s.remaining)}`, 'tags'],
+  ].filter(Boolean);
+  $('todo').hidden = !tasks.length;
+  render($('todo'), html`<h2>مهامك اليوم</h2><div class="todo-list">${tasks.map(([ic, text, tab]) => html`<button type="button" class="todo-item" data-goto="${tab}"><span>${ic}</span><b>${text}</b><i>←</i></button>`)}</div>`);
+  // التنبيهات كاملة في الجرس، هنا آخر 3 بس
+  const unread = d.alerts.filter((a) => !a.read_at && a.kind !== 'tag_request').slice(0, 3);
   render($('alerts'), html`${unread.map((a) => html`<div class="alert ${['low_stock', 'new_login'].includes(a.kind) ? 'warn' : ['new_order', 'credits_added', 'weekly_summary', 'monthly_report'].includes(a.kind) ? 'info' : 'err'}"><div>${a.message} <span class="small">· ${when(a.created_at)}</span></div></div>`)}${unread.length ? html`<div><button class="btn" type="button" id="alerts-read">تم الاطلاع</button></div>` : ''}`);
   $('alerts-read')?.addEventListener('click', async () => { await api('/api/m/alerts/read', { method: 'POST', body: {} }); loadHome(); });
 }
@@ -622,7 +635,7 @@ const loaders = { home: loadHome, store: loadStore, site: loadSite, orders: load
 api('/api/m/overview').then((d) => { merchant = merchant || d.merchant; brandHeader(d.merchant); }).catch(() => {});
 ordersBadge();
 // الشريط السفلي في الجوال: أهم 4 أقسام، و«المزيد» يفتح القائمة كاملة
-const BAR = ['home', 'tags', 'reports', 'store'];
+const BAR = ['home', 'tags', 'reports', 'orders'];
 function markBar(id) {
   document.body.classList.remove('nav-open');
   for (const b of document.querySelectorAll('#bottom-bar [data-go]')) b.toggleAttribute('aria-current', b.dataset.go === id || (b.dataset.go === 'more' && !BAR.includes(id)));

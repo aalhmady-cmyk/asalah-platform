@@ -18,9 +18,9 @@ export function mountBell({ list, read, routes = {}, go }) {
   panel.hidden = true;
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-label', 'التنبيهات');
-  // الجرس جنب اسم اللوحة في القائمة (فوق في الجوال)، ولو ما فيه قائمة يطفو في الزاوية
-  const host = document.querySelector('.side .brand');
-  if (host) { btn.classList.add('in-brand'); host.append(btn); } else document.body.append(btn);
+  // الجرس جنب اسم المستخدم وزر الخروج (فوق في الجوال)، ولو ما فيه قائمة يطفو في الزاوية
+  const host = document.querySelector('.side .foot');
+  if (host) { btn.classList.add('in-brand'); host.prepend(btn); } else document.body.append(btn);
   document.body.append(panel);
   const badge = btn.querySelector('.bell-n');
   let data = { alerts: [], unread: 0 };

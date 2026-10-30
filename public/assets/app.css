@@ -254,6 +254,18 @@ dialog form { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .bell-list small { color: var(--muted); font-size: 12px; }
 .bell-ic { font-size: 18px; }
 .bell-empty { padding: 28px 16px; text-align: center; color: var(--muted); }
-.bell.in-brand { position: relative; top: auto; inset-inline-end: auto; margin-inline-start: auto; flex: none; box-shadow: none; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.16); color: #fff; }
+.bell.in-brand { width: 36px; height: 36px; border-radius: 11px; position: relative; top: auto; inset-inline-end: auto; margin-inline-start: auto; flex: none; box-shadow: none; background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.16); color: #fff; }
 .bell-panel { inset-inline-end: auto; inset-inline-start: 18px; }
+/* في الكمبيوتر الجرس تحت القائمة، فالقائمة تطلع جنبها من تحت */
+@media (min-width: 861px) { .bell-panel { top: auto; bottom: 24px; inset-inline-start: 272px; } .side .foot .bell { align-self: flex-start; } }
 @media (max-width: 860px) { .bell-panel { inset-inline-start: 12px; } .bell:not(.in-brand) { top: 10px; inset-inline-end: 12px; width: 40px; height: 40px; } .bell-panel { top: 58px; inset-inline-end: 12px; } }
+
+/* مهامك اليوم */
+.todo { background: var(--card, #fff); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+.todo h2 { margin: 0 0 12px; font-size: 17px; }
+.todo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.todo-item { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-tint); color: var(--ink); font: inherit; text-align: start; cursor: pointer; }
+.todo-item b { flex: 1; font-weight: 600; font-size: 14px; }
+.todo-item span { font-size: 20px; }
+.todo-item i { font-style: normal; color: var(--muted); }
+.todo-item:hover { border-color: var(--green, #0E6B4E); }
