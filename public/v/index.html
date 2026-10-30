@@ -55,17 +55,15 @@
     <p id="details" class="details" hidden></p>
     <p id="test-note" class="soft small" hidden>هذي علامة تجريبية</p>
     <div class="ok-actions">
-      <button id="share" class="btn ghost-gold" type="button">شارك: اشتريت أصلي</button>
+      <!-- اشتريت المنتج؟ تتسجل العلامة باسمه، وأي نسخة بعدها تنكشف -->
+      <div id="own" class="own" hidden>
+        <button id="own-btn" class="btn btn-gold big-btn" type="button">نعم، اشتريته · سجّله باسمي</button>
+        <p class="own-note">لسا ما اشتريت؟ عادي، الفحص قبل الشراء ما يأثر على المنتج.</p>
+      </div>
       <a id="store-link" class="btn ghost-gold" hidden rel="noopener">زيارة المتجر</a>
     </div>
   </section>
 
-  <!-- اشتريت المنتج؟ تتسجل العلامة باسمه، وأي نسخة بعدها تنكشف -->
-  <section id="own" class="vcard own" hidden>
-    <div class="pp-h"><span aria-hidden="true">🛍️</span><div><h2>اشتريت المنتج؟ سجّله باسمك</h2><p class="muted small">عشان لو أحد نسخ هذي العلامة، يعرف إن الأصلي معك. وتنحسب لك النقاط والمسابقة مرة وحدة لكل منتج.</p></div></div>
-    <button id="own-btn" class="btn btn-primary big-btn" type="button">نعم، اشتريته · سجّله باسمي</button>
-    <p class="muted small" style="margin:10px 0 0">لسا ما اشتريت؟ عادي، الفحص قبل الشراء ما يأثر على المنتج.</p>
-  </section>
 
   <!-- جواز سفر المنتج: رحلته من المصنع لين وصل يدك -->
   <section id="passport" class="vcard passport" hidden>

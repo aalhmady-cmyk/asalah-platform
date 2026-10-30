@@ -299,7 +299,6 @@ function ok(d) {
     show('expired', t.expired);
   }
   if (t.details) { $('details').textContent = t.details; show('details'); }
-  shareData = { name: t.product_name || '', brand: d.brand.name };
   show('ok');
   $('ok').classList.add('pop');
   if (d.level) setupLevel(d.level);
@@ -477,17 +476,6 @@ function setupShop(s) {
   }
   show('shop');
 }
-
-// ---------- مشاركة "اشتريت أصلي" ----------
-let shareData = null;
-$('share').addEventListener('click', async () => {
-  const what = shareData.name ? tx(`${shareData.name} من ${shareData.brand}`, `${shareData.name} by ${shareData.brand}`) : tx(`منتج ${shareData.brand}`, `a ${shareData.brand} product`);
-  const text = tx(`تأكدت إن ${what} أصلي ✅ عبر علامة أصالة. اشترِ الأصلي دايماً!`, `I verified ${what} is original ✅ with an Asalah tag. Always buy genuine!`);
-  const link = location.origin + '/';
-  if (navigator.share) {
-    try { await navigator.share({ title: tx('اشتريت أصلي', 'I bought original'), text, url: link }); } catch { /* ألغى المشاركة */ }
-  } else window.open('https://wa.me/?text=' + encodeURIComponent(text + ' ' + link), '_blank', 'noopener');
-});
 
 // ---------- النقاط والكاش باك ----------
 // الرقم يُحفظ في الجهاز لكل تاجر، عشان المرة الجاية يضاف الرصيد بضغطة

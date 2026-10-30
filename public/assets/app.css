@@ -29,6 +29,48 @@
   color: var(--ink);
   background: var(--ground);
 }
+/* الوضع الليلي (اللوحات فقط تضع data-theme) */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0E1512;
+  --surface: #17201C;
+  --card: #17201C;
+  --ink: #E6ECE9;
+  --muted: #9AA8A1;
+  --line: #2A3631;
+  --line-soft: #222D28;
+  --field: #111915;
+  --field-line: #3A4842;
+  --green: #3FB58A;
+  --green-ink: #7FD6B4;
+  --green-tint: #173329;
+  --forest: #0A1F18;
+  --forest-2: #1C4436;
+  --amber-tint: #2E2410;
+  --amber-line: #6B5420;
+  --amber-ink: #F2CD86;
+  --red: #F07B70;
+  --red-tint: #3A1714;
+  --red-line: #6E2A24;
+  --red-ink: #F6B0A9;
+}
+:root[data-theme="dark"] a:hover { color: #9BE3C6; }
+:root[data-theme="dark"] .btn-primary { color: #06140F; }
+:root[data-theme="dark"] .btn-primary:hover { background: #5CC79E; color: #06140F; }
+:root[data-theme="dark"] .pill { color: var(--muted); }
+:root[data-theme="dark"] .bars .bar i { background: #2F6B55; }
+:root[data-theme="dark"] .switch { background: #4A5651; }
+:root[data-theme="dark"] .tip.info { background: #2B2410; border-color: #5E4E22; color: #EBD39A; }
+:root[data-theme="dark"] .winner { background: #2B2410; border-color: #5E4E22; }
+:root[data-theme="dark"] .ad-item.off { border-color: #6E2A24; background: #2A1514; }
+:root[data-theme="dark"] .side { border-inline-end: 1px solid var(--line); }
+:root[data-theme="dark"] img { opacity: .94; }
+:root[data-theme="dark"] .ob-steps .next button,
+:root[data-theme="dark"] .lead-note,
+:root[data-theme="dark"] .sb-packs input:checked + span { background: #2B2410; }
+:root[data-theme="dark"] .st-tr.off { background: #121A16; }
+:root[data-theme="dark"] .st-thinking { background: linear-gradient(90deg, #1D261F, var(--green-tint), #1D261F); background-size: 200% 100%; }
+:root[data-theme="dark"] .sb-log { background-color: #111915; background-image: radial-gradient(#25302B 1px, transparent 1px); }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--ground); line-height: 1.5; }
 a { color: var(--green); }
