@@ -21,6 +21,15 @@ if (STAFF) {
   document.querySelector('#nav [data-tab="contest"]')?.remove();
   $('me').textContent = me.user.name + ' · موظف';
 }
+// موظف الطلبات: يشوف «طلبات العملاء» والحساب بس
+const ORDERS_ONLY = me.user.merchant_role === 'orders';
+if (ORDERS_ONLY) {
+  document.body.classList.add('is-staff', 'is-orders');
+  for (const b of document.querySelectorAll('#nav [data-tab]')) if (!['orders', 'account'].includes(b.dataset.tab)) b.remove();
+  for (const b of document.querySelectorAll('#bottom-bar [data-go]')) if (!['orders', 'more'].includes(b.dataset.go)) b.remove();
+  $('me').textContent = me.user.name + ' · موظف طلبات';
+  if (!location.hash || location.hash === '#home') location.hash = '#orders';
+}
 
 function brandHeader(m) {
   $('merchant-name').textContent = m.name;
@@ -543,7 +552,7 @@ async function loadStaff() {
   const d = await api('/api/m/staff');
   $('staff-count').textContent = `${num(d.staff.filter((s) => s.status === 'active').length)} من ${d.max}`;
   render($('staff-list'), !d.staff.length ? html`<div class="empty">ما أضفت موظفين للحين</div>` : html`<table><thead><tr><th>الاسم</th><th>البريد</th><th>آخر دخول</th><th>الحالة</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>${d.staff.map((s) => html`<tr>
-    <td><b>${s.name}</b></td><td class="ltr">${s.email}</td><td>${when(s.last_login_at)}</td>
+    <td><b>${s.name}</b><div class="small muted">${s.kind === 'orders' ? 'موظف طلبات' : 'موظف منتجات وعلامات'}</div></td><td class="ltr">${s.email}</td><td>${when(s.last_login_at)}</td>
     <td>${s.status === 'active' ? pill({ x: ['نشط', 'ok'] }, 'x') : pill({ x: ['موقوف', 'err'] }, 'x')}</td>
     <td><div class="actions"><button class="btn btn-sm" type="button" data-staff="${s.id}" data-staff-status="${s.status === 'active' ? 'disabled' : 'active'}">${s.status === 'active' ? 'إيقاف' : 'تفعيل'}</button><button class="btn btn-sm" type="button" data-staff-pass="${s.id}">كلمة مرور جديدة</button></div></td>
   </tr>`)}</tbody></table>`);
@@ -573,7 +582,7 @@ onSubmit($('staff-form'), async (f, form) => {
 
 async function loadAccount() {
   mountSecurity($('security')).catch((e) => toast(e.message, true));
-  if (STAFF) return;
+  if (STAFF || ORDERS_ONLY) return;
   loadNotify().catch((e) => toast(e.message, true));
   loadStaff().catch((e) => toast(e.message, true));
   if (!merchant) merchant = (await api('/api/m/overview')).merchant;

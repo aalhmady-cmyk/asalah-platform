@@ -1246,3 +1246,16 @@ test('النسخ الاحتياطية للمدير بس', async () => {
   assert.equal(dump.tables.sessions, undefined);
   assert.equal((await call('/api/admin/backups/..%2Fsecret', { cookie: S.admin })).status, 404);
 });
+
+test('موظف الطلبات يشوف الطلبات بس', async () => {
+  const r = await post('/api/m/staff', { name: 'منيرة', email: 'orders@asalah.test', password: 'orders-pass-123', kind: 'orders' }, S.merchant);
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  assert.equal(r.data.staff.kind, 'orders');
+  const res = await fetch(BASE + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: BASE, 'CF-Connecting-IP': '10.7.7.7' }, body: JSON.stringify({ email: 'orders@asalah.test', password: 'orders-pass-123' }) });
+  const ck = res.headers.get('Set-Cookie').split(';')[0];
+  assert.equal((await call('/api/m/orders', { cookie: ck })).status, 200);
+  assert.equal((await call('/api/m/overview', { cookie: ck })).status, 200);
+  assert.equal((await call('/api/m/batches', { cookie: ck })).status, 403);
+  assert.equal((await call('/api/m/staff', { cookie: ck })).status, 403);
+  assert.equal((await call('/api/m/site', { cookie: ck })).status, 403);
+});

@@ -40,32 +40,35 @@ export async function handleMerchant(req, env, path) {
   const mid = user.merchant_id;
   const m = req.method;
   if (user.merchant_role === 'staff' && ownerOnly(path, m)) fail(403, 'هذي الصفحة لصاحب الحساب بس', 'owner_only');
+  // موظف الطلبات: يشوف طلبات العملاء ويحدّث حالتها بس
+  if (user.merchant_role === 'orders' && !(path.startsWith('/api/m/orders') || (path === '/api/m/overview' && m === 'GET'))) fail(403, 'حسابك لطلبات العملاء بس', 'orders_only');
   const trust = (await handleMerchantTrust(req, env, path, user, mid)) || (await handleMerchantGrowth(req, env, path, mid)) || (await handleMerchantSite(req, env, path, user));
   if (trust) return trust;
 
   // ---------- حسابات الموظفين ----------
   if (path === '/api/m/staff' && m === 'GET') {
-    const r = await db.prepare("SELECT id,name,email,status,last_login_at,created_at FROM users WHERE merchant_id=? AND merchant_role='staff' ORDER BY id").bind(mid).all();
+    const r = await db.prepare("SELECT id,name,email,status,merchant_role AS kind,last_login_at,created_at FROM users WHERE merchant_id=? AND merchant_role IN ('staff','orders') ORDER BY id").bind(mid).all();
     return json({ ok: true, staff: r.results, max: MAX_STAFF });
   }
   if (path === '/api/m/staff' && m === 'POST') {
     const b = await readJson(req);
-    const n = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE merchant_id=? AND merchant_role='staff'").bind(mid).first();
+    const n = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE merchant_id=? AND merchant_role IN ('staff','orders')").bind(mid).first();
+    const kind = b.kind === 'orders' ? 'orders' : 'staff';
     if (n.n >= MAX_STAFF) fail(400, `وصلت الحد (${MAX_STAFF} موظفين)`);
     const email = str(b.email, 'البريد', { max: 200 }).toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail(400, 'البريد غير صحيح');
     if (await db.prepare('SELECT id FROM users WHERE email=?').bind(email).first()) fail(409, 'البريد مستخدم لحساب ثاني');
     const { hash, salt } = await hashPassword(validPassword(b.password));
     const row = await db
-      .prepare("INSERT INTO users(email,name,role,merchant_id,merchant_role,password_hash,password_salt,created_at) VALUES(?,?,'merchant',?,'staff',?,?,?) RETURNING id,name,email,status,created_at")
-      .bind(email, str(b.name, 'الاسم', { max: 100 }), mid, hash, salt, now())
+      .prepare("INSERT INTO users(email,name,role,merchant_id,merchant_role,password_hash,password_salt,created_at) VALUES(?,?,'merchant',?,?,?,?,?) RETURNING id,name,email,status,merchant_role AS kind,created_at")
+      .bind(email, str(b.name, 'الاسم', { max: 100 }), mid, kind, hash, salt, now())
       .first();
     await audit(db, user, 'staff_created', { email });
     return json({ ok: true, staff: row }, 201);
   }
   let sm;
   if ((sm = path.match(/^\/api\/m\/staff\/(\d+)$/)) && (m === 'PATCH' || m === 'DELETE')) {
-    const st = await db.prepare("SELECT id,email FROM users WHERE id=? AND merchant_id=? AND merchant_role='staff'").bind(Number(sm[1]), mid).first();
+    const st = await db.prepare("SELECT id,email FROM users WHERE id=? AND merchant_id=? AND merchant_role IN ('staff','orders')").bind(Number(sm[1]), mid).first();
     if (!st) fail(404, 'ما لقينا الموظف');
     const stmts = [];
     if (m === 'DELETE') stmts.push(db.prepare("UPDATE users SET status='disabled' WHERE id=?").bind(st.id));

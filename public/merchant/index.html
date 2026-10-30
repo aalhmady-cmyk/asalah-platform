@@ -309,12 +309,13 @@
       <div class="page-head"><div><h1>الحساب</h1></div></div>
       <div class="card owner-only" id="staff-card" style="margin-top:24px;max-width:720px">
         <div class="card-head"><h2>الموظفين 👥</h2><span class="small muted" id="staff-count"></span></div>
-        <p class="small muted" style="margin:0">أضف موظف يدخل بحسابه الخاص. يقدر يضيف المنتجات والريلز ويرد على التعليقات ويتابع العلامات والتقارير. ما يشوف أرقام العملاء ولا يغيّر الإعدادات.</p>
+        <p class="small muted" style="margin:0">أضف موظف يدخل بحسابه الخاص. «منتجات وعلامات»: يضيف المنتجات والريلز ويرد على التعليقات ويتابع العلامات والتقارير، بدون أرقام العملاء والإعدادات. «طلبات العملاء بس»: يشوف الطلبات ويأكدها ويتواصل مع العملاء، وما يشوف شي ثاني.</p>
         <div class="table-wrap" id="staff-list"></div>
         <form id="staff-form" class="form-grid">
           <label class="field">الاسم<input name="name" required maxlength="100"></label>
           <label class="field">البريد<input name="email" type="email" required class="ltr"></label>
           <label class="field">كلمة مرور مؤقتة<input name="password" type="text" minlength="10" required class="ltr" autocomplete="off"></label>
+          <label class="field">نوع الحساب<select name="kind"><option value="staff">منتجات وعلامات وتقارير</option><option value="orders">طلبات العملاء بس</option></select></label>
           <div style="align-self:end"><button class="btn btn-primary" type="submit">إضافة موظف</button></div>
         </form>
       </div>
