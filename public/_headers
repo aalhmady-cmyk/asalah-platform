@@ -37,3 +37,6 @@
   Cache-Control: no-cache
 /o/*
   Cache-Control: no-cache
+/promo/*
+  Content-Disposition: attachment
+  Cache-Control: public, max-age=86400
