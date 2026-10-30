@@ -1333,3 +1333,15 @@ test('حماية البيانات: طلب حذف وتنفيذه من الإدا�
   const left = await call('/api/admin/privacy', { cookie: S.admin });
   assert.equal(left.data.requests.find((x) => x.id === req.id).status, 'done');
 });
+
+test('البحث الشامل في لوحة التاجر', async () => {
+  let r = await call('/api/m/search?q=GK2610', { cookie: S.merchant });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.ok(r.data.results.some((x) => x.kind === 'batch' && x.title === 'GK2610'));
+  r = await call('/api/m/search?q=gk2610-000001', { cookie: S.merchant });
+  assert.equal(r.data.results[0].kind, 'tag');
+  assert.equal(r.data.results[0].lookup, 'GK2610-000001');
+  r = await call('/api/m/search?q=x', { cookie: S.merchant });
+  assert.deepEqual(r.data.results, []);
+  assert.equal((await call('/api/m/search?q=GK2610')).status, 401);
+});

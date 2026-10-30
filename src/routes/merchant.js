@@ -41,9 +41,36 @@ export async function handleMerchant(req, env, path) {
   const m = req.method;
   if (user.merchant_role === 'staff' && ownerOnly(path, m)) fail(403, 'هذي الصفحة لصاحب الحساب بس', 'owner_only');
   // موظف الطلبات: يشوف طلبات العملاء ويحدّث حالتها بس
-  if (user.merchant_role === 'orders' && !(path.startsWith('/api/m/orders') || (path === '/api/m/overview' && m === 'GET'))) fail(403, 'حسابك لطلبات العملاء بس', 'orders_only');
+  if (user.merchant_role === 'orders' && !(path.startsWith('/api/m/orders') || path === '/api/m/search' || (path === '/api/m/overview' && m === 'GET'))) fail(403, 'حسابك لطلبات العملاء بس', 'orders_only');
   const trust = (await handleMerchantTrust(req, env, path, user, mid)) || (await handleMerchantGrowth(req, env, path, mid)) || (await handleMerchantSite(req, env, path, user));
   if (trust) return trust;
+
+  // ---------- البحث الشامل: طلب، منتج، عميل نقاط، دفعة، علامة ----------
+  if (path === '/api/m/search' && m === 'GET') {
+    const q = (new URL(req.url).searchParams.get('q') || '').trim().slice(0, 60);
+    if (q.length < 2) return json({ ok: true, results: [] });
+    const like = '%' + q.replace(/[%_\\]/g, '') + '%';
+    const digits = q.replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '').replace(/^0+/, '');
+    const phone = digits.length >= 4 ? '%' + digits + '%' : '~';
+    const results = [];
+    const orders = await db
+      .prepare("SELECT id,number,name,phone,status,total FROM orders WHERE merchant_id=? AND status<>'cart' AND (number LIKE ? OR name LIKE ? OR phone LIKE ?) ORDER BY id DESC LIMIT 5")
+      .bind(mid, like, like, phone)
+      .all();
+    for (const o of orders.results) results.push({ kind: 'order', tab: 'orders', title: `${o.number} · ${o.name || 'بدون اسم'}`, sub: `${(o.total / 100).toLocaleString('en-US')} ر.س` });
+    if (user.merchant_role !== 'orders') {
+      const [products, members, batches] = await db.batch([
+        db.prepare('SELECT id,title,price FROM store_products WHERE merchant_id=? AND title LIKE ? ORDER BY id DESC LIMIT 5').bind(mid, like),
+        db.prepare('SELECT phone,name,balance FROM loyalty_members WHERE merchant_id=? AND (phone LIKE ? OR name LIKE ?) ORDER BY last_at DESC LIMIT 5').bind(mid, phone, like),
+        db.prepare('SELECT code,product_name,size FROM batches WHERE merchant_id=? AND (code LIKE ? OR product_name LIKE ?) ORDER BY id DESC LIMIT 5').bind(mid, like, like),
+      ]);
+      for (const p of products.results) results.push({ kind: 'product', tab: 'store', title: p.title, sub: `${(p.price / 100).toLocaleString('en-US')} ر.س` });
+      for (const x of members.results) results.push({ kind: 'member', tab: 'loyalty', title: x.name || '0' + String(x.phone).replace(/^966/, ''), sub: `رصيد ${x.balance}` });
+      for (const b of batches.results) results.push({ kind: 'batch', tab: 'tags', title: b.code, sub: `${b.product_name || ''} · ${b.size} علامة` });
+      if (/^[A-Za-z0-9]{2,16}-\d{1,7}$/.test(q)) results.unshift({ kind: 'tag', tab: 'tags', title: q.toUpperCase(), sub: 'افتح سجل العلامة', lookup: q.toUpperCase() });
+    }
+    return json({ ok: true, results });
+  }
 
   // ---------- حسابات الموظفين ----------
   if (path === '/api/m/staff' && m === 'GET') {

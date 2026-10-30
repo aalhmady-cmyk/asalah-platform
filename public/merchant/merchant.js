@@ -5,6 +5,7 @@ import { initPanelApp } from '/assets/panel-app.js';
 import { playResult } from '/assets/sound.js';
 import { mountSecurity } from '/assets/security.js';
 import { mountBell } from '/assets/bell.js';
+import { mountSearch } from '/assets/search.js';
 import { confirmBox, promptBox } from '/assets/dialog.js';
 
 const $ = (id) => document.getElementById(id);
@@ -642,6 +643,17 @@ function markBar(id) {
   for (const b of document.querySelectorAll('#bottom-bar [aria-current]')) b.setAttribute('aria-current', 'page');
 }
 const showTab = tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => { markBar(id); scrollTo(0, 0); return loaders[id]().catch((e) => toast(e.message, true)); });
+mountSearch({
+  go: showTab,
+  // رقم علامة: نفتح سجلها مباشرة في قسم العلامات
+  onPick: (r) => {
+    if (r.kind !== 'tag') return;
+    const f = $('lookup-form');
+    f.q.value = r.lookup;
+    f.requestSubmit();
+    f.scrollIntoView({ block: 'center' });
+  },
+});
 if (!ORDERS_ONLY) mountBell({ list: '/api/m/alerts', read: '/api/m/alerts/read', go: showTab, routes: { new_order: 'orders', low_stock: 'tags', report: 'reports', tag_anomaly: 'reports', unknown_wave: 'reports', new_login: 'account', guarantee: 'trust', monthly_report: 'monthly' } });
 $('bottom-bar').addEventListener('click', (e) => {
   const b = e.target.closest('[data-go]');
