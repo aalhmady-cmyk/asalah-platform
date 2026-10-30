@@ -79,7 +79,7 @@ export async function loadCredits() {
 }
 
 function packRow(p) {
-  return html`<div class="cr-pack form-grid" style="grid-template-columns:1fr 1fr auto;align-items:end"><label class="field">النقاط<input name="points" type="number" min="1" class="ltr" value="${p.points ?? ''}"></label><label class="field">السعر (ريال)<input name="price" type="number" min="0" step="0.01" class="ltr" value="${p.price ?? ''}"></label><button type="button" class="btn btn-sm btn-danger" data-del-pack aria-label="حذف">✕</button></div>`;
+  return html`<div class="cr-pack form-grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end"><label class="field">النقاط<input name="points" type="number" min="1" class="ltr" value="${p.points ?? ''}"></label><label class="field">السعر (ريال)<input name="price" type="number" min="0" step="0.01" class="ltr" value="${p.price ?? ''}"></label><button type="button" class="btn btn-sm btn-danger" data-del-pack aria-label="حذف">✕</button></div>`;
 }
 
 // يوضح للمدير ربحه من كل باقة مقابل تكلفة المفتاح

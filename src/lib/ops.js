@@ -19,9 +19,10 @@ export async function lookupTag(env, db, q, merchantId) {
   if (l.kind === 'token' && !(await checkSignature(env, b, l))) fail(404, 'هذا الرابط مزيّف: توقيعه ما يطابق أي علامة عندنا');
   if (l.serial < 1 || l.serial > b.size) fail(404, 'الرقم خارج نطاق الدفعة');
   const tag = await db.prepare('SELECT * FROM tags WHERE batch_id=? AND serial=?').bind(b.id, l.serial).first();
-  const [checks, entry] = await db.batch([
+  const [checks, entry, devs] = await db.batch([
     db.prepare('SELECT result,check_no,city,country,created_at FROM scans WHERE tag_id=? ORDER BY id DESC LIMIT 20').bind(tag?.id ?? -1),
     db.prepare('SELECT customer_name,phone,city,point_of_sale,created_at FROM entries WHERE tag_id=?').bind(tag?.id ?? -1),
+    db.prepare('SELECT COUNT(DISTINCT device) AS n FROM scans WHERE tag_id=? AND device IS NOT NULL').bind(tag?.id ?? -1),
   ]);
   return {
     public_id: publicId(b, l.serial),
@@ -29,7 +30,10 @@ export async function lookupTag(env, db, q, merchantId) {
     serial: l.serial,
     status: tag?.status ?? 'active',
     check_count: tag?.check_count ?? 0,
-    devices: (tag?.first_device ? 1 : 0) + (tag?.second_device ? 1 : 0),
+    // كل الجوالات اللي مسحتها، ومين سجّلها باسمه (لو أحد اشتراها)
+    devices: devs.results[0]?.n ?? 0,
+    owner: tag?.owner_at ? { at: tag.owner_at, city: tag.owner_city, phone: tag.owner_phone } : null,
+    chip: b.kind === 'nfc424' ? { uid: tag?.chip_uid ?? null, counter: tag?.sun_ctr ?? null } : null,
     first_checked_at: tag?.first_checked_at ?? null,
     last_checked_at: tag?.last_checked_at ?? null,
     entry: entry.results[0] ?? null,

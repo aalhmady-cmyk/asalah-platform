@@ -42,7 +42,7 @@ export async function handleMerchantSite(req, env, path, user) {
   const mid = user.merchant_id;
   const merchant = await db.prepare(`SELECT ${MERCHANT_COLS} FROM merchants WHERE id=?`).bind(mid).first();
   if (path === '/api/m/site' && m === 'GET') return json(await sitePayload(env, merchant));
-  if (!merchant.store_enabled) fail(403, 'متجرك غير مفعّل. اطلب تفعيل متاجر أصالة من تبويب "متجري" أولاً', 'store_disabled');
+  if (!merchant.store_enabled) fail(403, 'متجرك غير مفعّل. اطلب تفعيل متاجر أصالة من قسم «منتجاتي في متاجر أصالة» أولاً', 'store_disabled');
 
   if (path === '/api/m/site/preview' && m === 'GET') {
     const d = await publicSite(env, merchant.slug, { preview: mid });

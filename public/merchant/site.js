@@ -224,7 +224,7 @@ export async function loadSite() {
   const root = $('site');
   if (!S.enabled) {
     render(root, html`<div class="page-head"><div><h1>متجري الخاص 🏪</h1><p>متجر برابط خاص فيك، بمعرض ثلاثي الأبعاد وطلبات تجيك على واتساب.</p></div></div>
-      <div class="card" style="margin-top:24px;max-width:640px"><h2>فعّل متاجر أصالة أولاً</h2><p class="muted">المتجر الخاص يعرض منتجاتك اللي في متاجر أصالة. اطلب التفعيل من تبويب "متجري 🛍️".</p><div><button class="btn btn-primary" type="button" data-go-tab="store">روح لتبويب متجري</button></div></div>`);
+      <div class="card" style="margin-top:24px;max-width:640px"><h2>فعّل متاجر أصالة أولاً</h2><p class="muted">المتجر الخاص يعرض منتجاتك اللي في متاجر أصالة. اطلب التفعيل من قسم «منتجاتي في متاجر أصالة 🛍️».</p><div><button class="btn btn-primary" type="button" data-go-tab="store">روح لقسم منتجاتي</button></div></div>`);
     root.querySelector('[data-go-tab]').onclick = () => document.querySelector('#nav [data-tab="store"]').click();
     return;
   }
@@ -301,7 +301,7 @@ function drawBar() {
 }
 
 async function publish() {
-  if (!S.products.length && !await confirmBox('ما عندك منتجات معروضة للحين. تنشر المتجر فاضي؟ (أضف منتجاتك من تبويب "متجري 🛍️")')) return;
+  if (!S.products.length && !await confirmBox('ما عندك منتجات معروضة للحين. تنشر المتجر فاضي؟ (أضف منتجاتك من قسم «منتجاتي في متاجر أصالة 🛍️»)')) return;
   const d = await api('/api/m/site/publish', { method: 'POST' });
   S.published = true;
   S.dirty = false;
@@ -427,7 +427,7 @@ function drawManual() {
 function drawLandings() {
   const el = $('sb-landings');
   if (!el) return;
-  if (!S.products.length) return render(el, html`<p class="muted">أضف منتجاتك من تبويب "متجري 🛍️"، وبعدها تقدر تسوي لكل منتج صفحة هبوط.</p>`);
+  if (!S.products.length) return render(el, html`<p class="muted">أضف منتجاتك من قسم «منتجاتي في متاجر أصالة 🛍️»، وبعدها تقدر تسوي لكل منتج صفحة هبوط.</p>`);
   render(el, html`<div class="sb-lp-list">${S.products.map((p) => html`<div class="sb-lp">
     ${p.image_url ? html`<img src="${p.image_url}" alt="" loading="lazy">` : raw('<span class="sb-lp-noimg">🛍️</span>')}
     <div class="sb-lp-info"><b>${p.title}</b><small>${sar(p.price)} · ${p.landing ? '✅ صفحة جاهزة' : 'بدون صفحة هبوط'}</small></div>

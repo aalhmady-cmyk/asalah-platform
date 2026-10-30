@@ -307,6 +307,8 @@ function tagCard(t) {
       <div>الفحوصات: <b>${t.check_count}</b></div><div>الأجهزة: <b>${t.devices}</b></div>
       <div>أول فحص: <b>${when(t.first_checked_at)}</b></div><div>آخر فحص: <b>${when(t.last_checked_at)}</b></div>
     </div>
+    ${t.owner ? html`<div class="alert info small"><div>🛍️ مسجّلة باسم مشتري${t.owner.city ? ' في ' + t.owner.city : ''} · ${when(t.owner.at)}${t.owner.phone ? html` · <span class="ltr">0${String(t.owner.phone).replace(/^966/, '')}</span>` : ''}</div></div>` : ''}
+    ${t.chip ? html`<div class="small muted">شريحة 424 DNA · ${t.chip.uid ? html`UID <span class="mono">${t.chip.uid}</span> · آخر عدّاد ${t.chip.counter}` : 'ما انلمست للحين'}</div>` : ''}
     ${t.entry ? html`<div class="alert info small"><div>مشاركة: ${t.entry.customer_name} · <span class="ltr">${t.entry.phone}</span> · ${t.entry.city}</div></div>` : ''}
     ${t.checks.length ? html`<table><thead><tr><th>النتيجة</th><th>الفحص</th><th>المدينة</th><th>الوقت</th></tr></thead><tbody>${t.checks.map((c) => html`<tr><td>${pill(RESULT, c.result)}</td><td>${c.check_no ?? '-'}</td><td>${c.city || '-'}</td><td>${when(c.created_at)}</td></tr>`)}</tbody></table>` : html`<div class="empty">ما انمسحت هذي العلامة للحين</div>`}
   </div>`;
