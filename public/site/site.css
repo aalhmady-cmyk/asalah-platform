@@ -48,6 +48,7 @@ body[data-view="3d"] .top { position: fixed; inset-inline: 0; background: linear
 .viewsw button { border: 0; background: none; color: #fff; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .viewsw [aria-pressed="true"] { background: var(--a); color: var(--bg); }
 .cart-btn { position: relative; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.14); font-size: 20px; cursor: pointer; }
+.lang-btn { height: 36px; min-width: 40px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.25); background: transparent; color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .cart-btn span { position: absolute; top: -4px; inset-inline-end: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--a); color: var(--bg); font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
 .cart-btn.bump { animation: bump .45s; }
 @keyframes bump { 40% { transform: scale(1.25) rotate(-8deg); } }
