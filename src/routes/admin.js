@@ -11,6 +11,7 @@ import { hotspots, monthlyReport } from '../lib/insights.js';
 import { lookupTag, overviewFor, setTagStatus } from '../lib/ops.js';
 import { printLinks, publicId, stockFor, tokenFor } from '../lib/tags.js';
 import { batchKeys, toHex } from '../lib/sun.js';
+import { erasePhone } from '../lib/privacy.js';
 import { audit, csvResponse, fail, int, json, now, randomHex, readJson, str, url } from '../lib/util.js';
 import { getBackup, listBackups, makeBackup } from '../lib/backup.js';
 
@@ -284,6 +285,21 @@ export async function handleAdmin(req, env, path) {
     return json({ ok: true });
   }
   // النسخ الاحتياطية: القائمة، نسخة الحين، والتحميل
+  // ---------- طلبات حذف البيانات ----------
+  if (path === '/api/admin/privacy' && m === 'GET') {
+    const r = await db.prepare('SELECT id,phone,note,status,erased,created_at,done_at FROM privacy_requests ORDER BY status=\'new\' DESC, id DESC LIMIT 100').all();
+    return json({ ok: true, requests: r.results });
+  }
+  if ((match = path.match(/^\/api\/admin\/privacy\/(\d+)$/)) && m === 'POST') {
+    const b = await readJson(req);
+    const row = await db.prepare("SELECT id,phone FROM privacy_requests WHERE id=? AND status='new'").bind(Number(match[1])).first();
+    if (!row) fail(404, 'الطلب غير موجود أو تم تنفيذه');
+    const erase = b.action === 'erase';
+    const erased = erase ? await erasePhone(db, row.phone) : null;
+    await db.prepare('UPDATE privacy_requests SET status=?,erased=?,done_at=?,done_by=? WHERE id=?').bind(erase ? 'done' : 'rejected', erased, now(), user.id, row.id).run();
+    await audit(db, user, erase ? 'privacy_erased' : 'privacy_rejected', { id: row.id, erased });
+    return json({ ok: true, erased, message: erase ? `تم الحذف (${erased} سجل)` : 'تم رفض الطلب' });
+  }
   if (path === '/api/admin/backups' && m === 'GET') return json({ ok: true, backups: await listBackups(env) });
   if (path === '/api/admin/backups' && m === 'POST') {
     const b = await makeBackup(env);

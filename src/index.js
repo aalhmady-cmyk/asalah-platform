@@ -6,6 +6,7 @@ import { serveImage } from './lib/images.js';
 import { prepare } from './lib/schema.js';
 import { HttpError, json } from './lib/util.js';
 import { handleAdmin } from './routes/admin.js';
+import { runRetention } from './lib/privacy.js';
 import { runBackup } from './lib/backup.js';
 import { changePassword, endSessions, forgotPassword, login, login2fa, logout, me, resetPassword, security, setup, totpDisable, totpEnable, totpSetup } from './routes/auth.js';
 import { handleMerchant } from './routes/merchant.js';
@@ -20,7 +21,7 @@ import { handlePublicStore } from './routes/store.js';
 import { handlePublicSite, serveSitePage } from './routes/site.js';
 import { handleCustomer } from './lib/customers.js';
 import { serveMedia } from './lib/store.js';
-import { brandPage, brands, enter, guideChat, guideInfo, joinRequest, shopAiRoute, stats, loyaltyClaim, loyaltyRedeem, loyaltyWallet, rate, report, verify, guarantee, humanConfig, claimOwnership } from './routes/public.js';
+import { brandPage, brands, enter, guideChat, guideInfo, joinRequest, shopAiRoute, stats, loyaltyClaim, loyaltyRedeem, loyaltyWallet, rate, report, verify, guarantee, humanConfig, claimOwnership, privacyRequest } from './routes/public.js';
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
@@ -67,6 +68,7 @@ async function route(req, env) {
   if (path === '/api/public/stats' && m === 'GET') return stats(env);
   if (path === '/api/public/human' && m === 'GET') return humanConfig(env);
   if (path === '/api/public/join' && m === 'POST') return joinRequest(req, env);
+  if (path === '/api/public/privacy' && m === 'POST') return privacyRequest(req, env);
   if (path === '/api/public/shop-ai' && (m === 'GET' || m === 'POST')) return shopAiRoute(req, env);
   if (path === '/api/public/assistant' && m === 'GET') return guideInfo(env);
   if (path === '/api/public/assistant' && m === 'POST') return guideChat(req, env);
@@ -126,6 +128,7 @@ export default {
         await runWeekly(e).catch((err) => console.error('ASALAH_WEEKLY', err?.stack || err));
         await runMonthly(e).catch((err) => console.error('ASALAH_MONTHLY', err?.stack || err));
         await runBackup(e).catch((err) => console.error('ASALAH_BACKUP', err?.stack || err));
+        await runRetention(e).catch((err) => console.error('ASALAH_RETENTION', err?.stack || err));
       })
     );
   },

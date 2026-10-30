@@ -487,6 +487,23 @@ export async function saveJoin(db, b) {
   return f;
 }
 
+// طلب حذف بيانات العميل برقم جواله: يوصل للإدارة، وتنفّذه خلال 30 يوم
+export async function privacyRequest(req, env) {
+  const db = env.DB;
+  await rateLimit(db, 'privacy:' + (await ipHash(req)), 3, 3600);
+  const b = await readJson(req);
+  await requireHuman(env, req, b.cf_token);
+  const phone = saPhone(b.phone);
+  const note = str(b.note, 'الملاحظة', { max: 300, optional: true });
+  if (!(await db.prepare("SELECT id FROM privacy_requests WHERE phone=? AND status='new'").bind(phone).first())) {
+    await db.prepare('INSERT INTO privacy_requests(phone,note,created_at) VALUES(?,?,?)').bind(phone, note, now()).run();
+    const msg = `طلب حذف بيانات: ${phone}`;
+    await db.prepare("INSERT INTO alerts(merchant_id,kind,message,created_at) VALUES(NULL,'privacy_request',?,?)").bind(msg, now()).run();
+    await pushAlert(db, null, 'privacy_request', msg);
+  }
+  return json({ ok: true, message: 'وصلنا طلبك. بنحذف بياناتك خلال 30 يوم كحد أقصى، وممكن نتواصل معك على نفس الرقم للتأكد.' });
+}
+
 export async function joinRequest(req, env) {
   const db = env.DB;
   await rateLimit(db, 'join:' + (await ipHash(req)), 3, 3600);

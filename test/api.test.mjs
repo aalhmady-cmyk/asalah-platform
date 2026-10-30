@@ -1317,3 +1317,19 @@ test('شرائح NTAG 424 DNA: كل لمسة رابط جديد، والمنسو�
   // لمسة جديدة من صاحبها تشتغل
   assert.equal((await post('/api/verify', { t, sid: sid('1'), ...(await makeSun(keys, UID, 11)) })).data.result, 'original');
 });
+
+test('حماية البيانات: طلب حذف وتنفيذه من الإدارة', async () => {
+  const phone = '0551112223';
+  let r = await post('/api/public/privacy', { phone, note: 'احذف بياناتي' });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  r = await call('/api/admin/privacy', { cookie: S.admin });
+  const req = r.data.requests.find((x) => x.phone === '966551112223');
+  assert.ok(req);
+  assert.equal((await call('/api/admin/privacy', { cookie: S.merchant })).status, 403);
+  r = await post(`/api/admin/privacy/${req.id}`, { action: 'erase' }, S.admin);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.ok(r.data.erased >= 1);
+  assert.equal((await post(`/api/admin/privacy/${req.id}`, { action: 'erase' }, S.admin)).status, 404);
+  const left = await call('/api/admin/privacy', { cookie: S.admin });
+  assert.equal(left.data.requests.find((x) => x.id === req.id).status, 'done');
+});

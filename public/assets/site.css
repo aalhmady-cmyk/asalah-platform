@@ -175,6 +175,7 @@ body.site { background: var(--ground); }
 .legal h2 { font-size: 20px; margin-top: 14px; }
 .legal p, .legal li { color: var(--ink); font-size: 16px; margin: 0; }
 .legal ul { margin: 0; padding-inline-start: 22px; display: flex; flex-direction: column; gap: 6px; }
+.legal-form { display: flex; flex-direction: column; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); max-width: 460px; }
 .legal .upd { color: var(--muted); font-size: 14px; }
 .site-foot a { color: inherit; }
 

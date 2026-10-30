@@ -24,6 +24,7 @@ import m0021 from '../../migrations/0021_scan_history.sql';
 import m0022 from '../../migrations/0022_security.sql';
 import m0023 from '../../migrations/0023_ownership.sql';
 import m0024 from '../../migrations/0024_sun_chips.sql';
+import m0025 from '../../migrations/0025_privacy.sql';
 import { randomHex } from './util.js';
 
 const MIGRATIONS = [
@@ -51,6 +52,7 @@ const MIGRATIONS = [
   ['0022_security.sql', m0022],
   ['0023_ownership.sql', m0023],
   ['0024_sun_chips.sql', m0024],
+  ['0025_privacy.sql', m0025],
 ];
 
 // يقسم الملف لجمل: نشيل التعليقات ونقسم على ; في آخر السطر

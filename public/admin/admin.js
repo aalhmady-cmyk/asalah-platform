@@ -131,7 +131,7 @@ async function loadHome() {
     <div class="kpi"><span class="label">تجار نشطون</span><span class="value">${num(d.totals.active_merchants)} من ${num(merchants.length)}</span><span class="note">نسبة الأصلي ${o.original_ratio ?? '-'}%</span></div>
     <div class="kpi"><span class="label">أكواد مزيّفة اليوم</span><span class="value">${num(o.unknown_today)}</span><span class="note bad">${num(o.reports_7d)} بلاغ خلال 7 أيام</span></div>`);
   const unread = d.alerts.filter((a) => !a.read_at);
-  render($('home-alerts'), html`${unread.map((a) => html`<div class="alert ${['tag_request', 'join_request', 'store_request', 'password_request', 'credit_request'].includes(a.kind) ? 'info' : a.kind === 'low_stock' ? 'warn' : 'err'}"><div><b>${a.merchant_name || 'المنصة'}</b><div class="small">${a.message} · ${when(a.created_at)}</div></div></div>`)}${unread.length ? html`<div><button class="btn" type="button" id="alerts-read">تم الاطلاع على التنبيهات</button></div>` : ''}`);
+  render($('home-alerts'), html`${unread.map((a) => html`<div class="alert ${['tag_request', 'join_request', 'store_request', 'password_request', 'credit_request', 'privacy_request'].includes(a.kind) ? 'info' : a.kind === 'low_stock' ? 'warn' : 'err'}"><div><b>${a.merchant_name || 'المنصة'}</b><div class="small">${a.message} · ${when(a.created_at)}</div></div></div>`)}${unread.length ? html`<div><button class="btn" type="button" id="alerts-read">تم الاطلاع على التنبيهات</button></div>` : ''}`);
   $('alerts-read')?.addEventListener('click', async () => { await api('/api/admin/alerts/read', { method: 'POST', body: {} }); loadHome(); });
   render($('home-bars'), bars(o.daily));
   render($('home-cities'), hbars(o.cities_7d));
@@ -662,13 +662,27 @@ onSubmit($('story-form'), async (f) => {
   toast(f.merchant_id ? 'انحفظت القصة، تطلع الحين في صفحة التجار ✅' : 'انشالت القصة من الصفحة');
 });
 
-const loaders = { credits: loadCredits, home: loadHome, leads: loadLeads, site: loadSite, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, push: loadPush, reports: loadReports, users: loadUsers, audit: loadAudit, security: async () => { mountSecurity($('security-box')).catch((e) => toast(e.message, true)); await loadBackups(); } };
+const loaders = { credits: loadCredits, home: loadHome, leads: loadLeads, site: loadSite, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, push: loadPush, reports: loadReports, users: loadUsers, audit: loadAudit, security: async () => { mountSecurity($('security-box')).catch((e) => toast(e.message, true)); await Promise.all([loadBackups(), loadPrivacy()]); } };
 async function loadBackups() {
   const { backups } = await api('/api/admin/backups');
   render($('backups-list'), backups.length
     ? html`<ul class="sec-list">${backups.map((b) => html`<li><span class="sec-ic">💾</span><div><b>${when(b.at)}</b><small>${(b.size / 1024 / 1024).toFixed(2)} ميجا${b.rows ? ' · ' + num(b.rows) + ' سجل' : ''}</small></div><a class="btn small" href="/api/admin/backups/${b.name}" download>تحميل</a></li>`)}</ul>`
     : html`<p class="muted small">ما فيه نسخ للحين. أول نسخة تنحفظ تلقائياً خلال ساعة، أو اضغط الزر.</p>`);
 }
+const PRIV = { new: ['جديد', 'warn'], done: ['تم الحذف', 'ok'], rejected: ['مرفوض', ''] };
+async function loadPrivacy() {
+  const { requests } = await api('/api/admin/privacy');
+  render($('privacy-list'), requests.length
+    ? html`<ul class="sec-list">${requests.map((r) => html`<li><span class="sec-ic">🧹</span><div><b class="ltr">${r.phone.replace(/^966/, '0')}</b> <span class="pill ${PRIV[r.status][1]}">${PRIV[r.status][0]}</span><small>${when(r.created_at)}${r.note ? ' · ' + r.note : ''}${r.status === 'done' ? ` · انمسح ${r.erased} سجل` : ''}</small></div>${r.status === 'new' ? html`<div class="actions"><a class="btn small" href="https://wa.me/${r.phone}" target="_blank" rel="noopener">واتساب</a><button class="btn small btn-danger" type="button" data-priv="${r.id}" data-act="erase">احذف بياناته</button><button class="btn small" type="button" data-priv="${r.id}" data-act="reject">رفض</button></div>` : ''}</li>`)}</ul>`
+    : html`<p class="muted small">ما فيه طلبات.</p>`);
+}
+$('privacy-list').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-priv]');
+  if (!b) return;
+  const erase = b.dataset.act === 'erase';
+  if (!await confirmBox(erase ? 'بنحذف اسم وجوال هذا العميل من كل مكان، وما يرجع. تكمل؟' : 'ترفض الطلب؟ (مثلاً الرقم مو له)')) return;
+  try { toast((await api(`/api/admin/privacy/${b.dataset.priv}`, { method: 'POST', body: { action: b.dataset.act } })).message); await loadPrivacy(); } catch (err) { toast(err.message, true); }
+});
 $('backup-now').addEventListener('click', async (e) => {
   e.target.disabled = true;
   try { toast((await api('/api/admin/backups', { method: 'POST', body: {} })).message); await loadBackups(); } catch (err) { toast(err.message, true); } finally { e.target.disabled = false; }
