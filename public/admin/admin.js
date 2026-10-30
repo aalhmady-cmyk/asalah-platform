@@ -3,6 +3,7 @@ import { playResult } from '/assets/sound.js';
 import { loadCredits, creditsBadge } from '/admin/credits.js';
 import { mountSecurity } from '/assets/security.js';
 import { api, raw, bars, BATCH_STATUS, hbars, hotspotsTable, html, pickImage, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
+import { confirmBox, promptBox } from '/assets/dialog.js';
 
 const $ = (id) => document.getElementById(id);
 let merchants = [];
@@ -177,7 +178,7 @@ let clipRec = null;
 $('sound-clips').addEventListener('click', async (e) => {
   const reset = e.target.closest('[data-clip-reset]');
   if (reset) {
-    if (!confirm('ترجع للصوت الافتراضي؟')) return;
+    if (!await confirmBox('ترجع للصوت الافتراضي؟')) return;
     try { await api('/api/admin/sound/clip/' + reset.dataset.clipReset, { method: 'DELETE' }); await loadSound(); } catch (err) { toast(err.message, true); }
     return;
   }
@@ -239,7 +240,7 @@ document.addEventListener('click', async (e) => {
   const st = e.target.closest('[data-batch-status]');
   if (st) {
     const activating = st.dataset.batchStatus === 'active';
-    if (!confirm(activating ? 'تفعيل الدفعة يعني العلامات صارت في السوق وتنقبل عند العملاء. تكمل؟' : 'إيقاف الدفعة يخلي كل علاماتها تظهر للعميل كموقوفة. تكمل؟')) return;
+    if (!await confirmBox(activating ? 'تفعيل الدفعة يعني العلامات صارت في السوق وتنقبل عند العملاء. تكمل؟' : 'إيقاف الدفعة يخلي كل علاماتها تظهر للعميل كموقوفة. تكمل؟')) return;
     try {
       await api(`/api/admin/batches/${st.dataset.id}`, { method: 'PATCH', body: { status: st.dataset.batchStatus } });
       toast(activating ? 'تم تفعيل الدفعة' : 'تم إيقاف الدفعة');
@@ -301,7 +302,7 @@ onSubmit($('lookup-form'), async (f) => {
 onSubmit($('status-form'), async (f) => {
   const body = { batch_code: f.batch_code, from: Number(f.from), to: f.to ? Number(f.to) : Number(f.from), action: f.action };
   const label = body.from === body.to ? `العلامة ${body.from}` : `العلامات من ${body.from} إلى ${body.to}`;
-  if (!confirm(`${f.action === 'block' ? 'إيقاف' : 'تفعيل'} ${label} في الدفعة ${body.batch_code.toUpperCase()}؟`)) return;
+  if (!await confirmBox(`${f.action === 'block' ? 'إيقاف' : 'تفعيل'} ${label} في الدفعة ${body.batch_code.toUpperCase()}؟`)) return;
   const d = await api('/api/admin/tags/status', { method: 'POST', body });
   toast(`تم ${f.action === 'block' ? 'الإيقاف' : 'التفعيل'}: ${num(d.changes)} علامة تغيّرت`);
 });
@@ -345,7 +346,7 @@ document.addEventListener('click', async (e) => {
       loadUsers();
     }
     if (r) {
-      const p = prompt('اكتب كلمة مرور مؤقتة جديدة (10 أحرف أو أكثر):');
+      const p = await promptBox('اكتب كلمة مرور مؤقتة جديدة (10 أحرف أو أكثر):');
       if (!p) return;
       await api(`/api/admin/users/${r.dataset.userReset}`, { method: 'PATCH', body: { password: p } });
       toast('تم تغيير كلمة المرور، وانقفلت جلسات الحساب المفتوحة');
@@ -424,13 +425,13 @@ document.addEventListener('click', async (e) => {
       const on = b.dataset.on === '1';
       let reason = null;
       if (on) {
-        reason = prompt('سبب الإيقاف (يوصل للتاجر، اختياري):');
+        reason = await promptBox('سبب الإيقاف (يوصل للتاجر، اختياري):');
         if (reason === null) return;
       }
       await api(`/api/admin/store/${b.dataset.adBlock}/block`, { method: 'POST', body: { blocked: on, reason: reason || null } });
       toast(on ? 'تم الإيقاف ووصل تنبيه للتاجر' : 'رجع يظهر في المتاجر');
     } else {
-      if (!confirm('تحذف التعليق؟')) return;
+      if (!await confirmBox('تحذف التعليق؟')) return;
       const [kind, item, id] = c.dataset.adCdel.split('/');
       await api(`/api/admin/store/${kind}/${item}/comments/${id}`, { method: 'DELETE' });
       toast('انحذف التعليق');
@@ -499,7 +500,7 @@ async function drivePush(c) {
   loadPush();
 }
 onSubmit($('push-form'), async (data, form) => {
-  if (!confirm(`نرسل الإشعار «${data.title}» لـ ${AUD[data.audience]}؟ ما يمديك ترجعه بعد الإرسال.`)) return;
+  if (!await confirmBox(`نرسل الإشعار «${data.title}» لـ ${AUD[data.audience]}؟ ما يمديك ترجعه بعد الإرسال.`)) return;
   const body = { title: data.title, body: data.body, audience: data.audience };
   if (data.target === 'product') body.product_id = Number(data.product_id);
   else if (data.target === 'reels') body.url = '/stores/?v=reels';
@@ -511,13 +512,13 @@ onSubmit($('push-form'), async (data, form) => {
 });
 document.addEventListener('click', async (e) => {
   const go = e.target.closest('[data-push-go]'), stop = e.target.closest('[data-push-stop]'), hide = e.target.closest('[data-push-hide]');
-  if (hide && confirm('نحذف هذا الإشعار من تطبيقات كل العملاء؟')) { await api(`/api/admin/push/${hide.dataset.pushHide}/hide`, { method: 'POST', body: {} }).catch((x) => toast(x.message, true)); loadPush(); }
+  if (hide && await confirmBox('نحذف هذا الإشعار من تطبيقات كل العملاء؟')) { await api(`/api/admin/push/${hide.dataset.pushHide}/hide`, { method: 'POST', body: {} }).catch((x) => toast(x.message, true)); loadPush(); }
   if (go) await drivePush((await api(`/api/admin/push/${go.dataset.pushGo}/continue`, { method: 'POST', body: {} })).campaign).catch((x) => toast(x.message, true));
-  if (stop && confirm('نوقف إرسال هذا الإشعار؟')) { await api(`/api/admin/push/${stop.dataset.pushStop}/stop`, { method: 'POST', body: {} }).catch((x) => toast(x.message, true)); loadPush(); }
+  if (stop && await confirmBox('نوقف إرسال هذا الإشعار؟')) { await api(`/api/admin/push/${stop.dataset.pushStop}/stop`, { method: 'POST', body: {} }).catch((x) => toast(x.message, true)); loadPush(); }
 });
 
 $('push-clear').addEventListener('click', async () => {
-  if (!confirm('متأكد؟ بنحذف كل الإشعارات اللي أرسلتها من تطبيقات كل العملاء، وما تقدر ترجعها.')) return;
+  if (!await confirmBox('متأكد؟ بنحذف كل الإشعارات اللي أرسلتها من تطبيقات كل العملاء، وما تقدر ترجعها.')) return;
   try {
     const r = await api('/api/admin/push/clear', { method: 'POST', body: {} });
     toast(r.cleared ? `انحذف ${num(r.cleared)} إشعار من كل التطبيقات ✅` : 'ما فيه إشعارات تنحذف');
@@ -577,7 +578,7 @@ $('leads-board').addEventListener('click', async (e) => {
   try {
     if (n) {
       const l = leadsCache.find((x) => String(x.id) === n.dataset.leadNote);
-      const note = prompt('ملاحظة على الطلب', l?.note || '');
+      const note = await promptBox('ملاحظة على الطلب', l?.note || '');
       if (note === null) return;
       await api('/api/admin/leads/' + n.dataset.leadNote, { method: 'PATCH', body: { note: note.trim() || null } });
       await loadLeads();
@@ -587,7 +588,7 @@ $('leads-board').addEventListener('click', async (e) => {
       $('merchant-form').name.value = l.brand;
       pendingLead = l.id;
     } else if (del) {
-      if (!confirm('تحذف الطلب؟')) return;
+      if (!await confirmBox('تحذف الطلب؟')) return;
       await api('/api/admin/leads/' + del.dataset.leadDel, { method: 'DELETE' });
       await loadLeads();
     }
@@ -633,7 +634,7 @@ onSubmit($('plans-form'), async (f) => {
   toast('انحفظت الباقات ✅');
 });
 $('plans-reset').addEventListener('click', async () => {
-  if (!confirm('ترجع الباقات للنص الافتراضي؟')) return;
+  if (!await confirmBox('ترجع الباقات للنص الافتراضي؟')) return;
   try { const d = await api('/api/admin/site', { method: 'PUT', body: { plans: null } }); drawPlans(d.plans); toast('رجعت الباقات الافتراضية'); } catch (err) { toast(err.message, true); }
 });
 onSubmit($('story-form'), async (f) => {

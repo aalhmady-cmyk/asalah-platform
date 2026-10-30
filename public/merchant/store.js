@@ -2,6 +2,7 @@
 import { api, html, num, raw, render, toast } from '/assets/common.js';
 import { clipReel, cutReel, reelDuration } from '/merchant/reel.js';
 import { bindClip } from '/stores/clip.js';
+import { confirmBox } from '/assets/dialog.js';
 
 const $ = (id) => document.getElementById(id);
 let S = null; // بيانات المتجر من الخادم
@@ -455,7 +456,7 @@ async function aiFix(p) {
 async function bulk(act) {
   const ids = [...PF.sel];
   let n = 0;
-  if (act === 'bulk-del' && !confirm(`تحذف ${ids.length} منتج نهائياً؟`)) return;
+  if (act === 'bulk-del' && !await confirmBox(`تحذف ${ids.length} منتج نهائياً؟`)) return;
   for (const id of ids) {
     const p = S.products.find((x) => x.id === id);
     if (!p) continue;
@@ -657,9 +658,9 @@ async function reelComments(id, kind = 'reels') {
   dlg.addEventListener('click', async (e) => {
     if (e.target.closest('[data-x]')) { dlg.close(); dlg.remove(); return loadStore(); }
     const d = e.target.closest('[data-del]');
-    if (d && confirm('تحذف التعليق؟')) { await api(`/api/m/store/${kind}/${id}/comments/${d.dataset.del}`, { method: 'DELETE' }); await draw(); }
+    if (d && await confirmBox('تحذف التعليق؟')) { await api(`/api/m/store/${kind}/${id}/comments/${d.dataset.del}`, { method: 'DELETE' }); await draw(); }
     const u = e.target.closest('[data-unreply]');
-    if (u && confirm('تحذف ردك؟')) { await api(`/api/m/store/${kind}/${id}/comments/${u.dataset.unreply}`, { method: 'PATCH', body: { reply: null } }); await draw(); }
+    if (u && await confirmBox('تحذف ردك؟')) { await api(`/api/m/store/${kind}/${id}/comments/${u.dataset.unreply}`, { method: 'PATCH', body: { reply: null } }); await draw(); }
   });
   dlg.addEventListener('submit', async (e) => {
     const f = e.target.closest('[data-reply]');
@@ -756,7 +757,7 @@ document.addEventListener('click', async (e) => {
       await api('/api/m/store/products/' + id, { method: 'PATCH', body: { status: p.status === 'hidden' ? 'active' : 'hidden' } });
       await loadStore();
     } else if (act === 'del') {
-      if (!confirm('تحذف المنتج نهائياً؟')) return;
+      if (!await confirmBox('تحذف المنتج نهائياً؟')) return;
       await api('/api/m/store/products/' + id, { method: 'DELETE' });
       toast('انحذف المنتج');
       await loadStore();
@@ -773,7 +774,7 @@ document.addEventListener('click', async (e) => {
       await api('/api/m/store/reels/' + id, { method: 'PATCH', body: { status: r.status === 'hidden' ? 'active' : 'hidden' } });
       await loadStore();
     } else if (act === 'reel-del') {
-      if (!confirm('تحذف الريل نهائياً؟')) return;
+      if (!await confirmBox('تحذف الريل نهائياً؟')) return;
       await api('/api/m/store/reels/' + id, { method: 'DELETE' });
       toast('انحذف الريل');
       await loadStore();

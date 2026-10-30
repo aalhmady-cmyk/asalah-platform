@@ -4,6 +4,7 @@ import { loadSite, loadOrders, ordersBadge } from '/merchant/site.js';
 import { initPanelApp } from '/assets/panel-app.js';
 import { playResult } from '/assets/sound.js';
 import { mountSecurity } from '/assets/security.js';
+import { confirmBox, promptBox } from '/assets/dialog.js';
 
 const $ = (id) => document.getElementById(id);
 const me = await api('/api/auth/me');
@@ -68,8 +69,8 @@ async function loadHome() {
       <button class="btn btn-gold" type="button" id="request-tags">اطلب علامات جديدة</button>
     </div>`);
   $('request-tags').addEventListener('click', async () => {
-    const qr = confirm('تبيها ملصقات QR تطبعها بنفسك؟ (أرخص وأسرع، مناسبة للبداية)\n\nموافق = ملصقات QR\nإلغاء = شرائح NFC');
-    const count = Number(prompt(qr ? 'كم ملصق QR تحتاج؟' : 'كم شريحة NFC تحتاج؟', qr ? '500' : '20000'));
+    const qr = await confirmBox('ملصقات QR تطبعها بنفسك أرخص وأسرع ومناسبة للبداية. وشرائح NFC يلمسها العميل بجواله وأصعب في التقليد.', { title: 'وش نوع العلامات؟', icon: '🏷️', ok: 'ملصقات QR', cancel: 'شرائح NFC' });
+    const count = Number(await promptBox(qr ? 'كم ملصق QR تحتاج؟' : 'كم شريحة NFC تحتاج؟', qr ? '500' : '20000'));
     if (!count) return;
     try { toast((await api('/api/m/request-tags', { method: 'POST', body: { count, kind: qr ? 'qr' : 'nfc' } })).message); } catch (e) { toast(e.message, true); }
   });
@@ -151,7 +152,7 @@ $('batches').addEventListener('click', async (e) => {
       await api(`/api/m/batches/${up.dataset.image}/image`, { method: 'POST', body: img });
       toast('تم رفع صورة المنتج');
     } else {
-      if (!confirm('حذف صورة المنتج؟ بيظهر شعارك بدالها.')) return;
+      if (!await confirmBox('حذف صورة المنتج؟ بيظهر شعارك بدالها.')) return;
       await api(`/api/m/batches/${del.dataset.imageDel}/image`, { method: 'DELETE' });
       toast('تم حذف الصورة');
     }
@@ -173,7 +174,7 @@ onSubmit($('lookup-form'), async (f) => {
 });
 onSubmit($('status-form'), async (f) => {
   const body = { batch_code: f.batch_code, from: Number(f.from), to: f.to ? Number(f.to) : Number(f.from), action: f.action };
-  if (!confirm(`${f.action === 'block' ? 'إيقاف' : 'تفعيل'} العلامات من ${body.from} إلى ${body.to}؟`)) return;
+  if (!await confirmBox(`${f.action === 'block' ? 'إيقاف' : 'تفعيل'} العلامات من ${body.from} إلى ${body.to}؟`)) return;
   const d = await api('/api/m/tags/status', { method: 'POST', body });
   toast(`تم: ${num(d.changes)} علامة تغيّرت`);
   loadTags();
@@ -224,7 +225,7 @@ $('claims-table').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-claim]');
   if (!b) return;
   const ok = b.dataset.st === 'approved';
-  const note = prompt(ok ? 'ملاحظة للسجل (مثال: رجّعنا المبلغ بتحويل)' : 'سبب الرفض (يشوفه العميل)') ;
+  const note = await promptBox(ok ? 'ملاحظة للسجل (مثال: رجّعنا المبلغ بتحويل)' : 'سبب الرفض (يشوفه العميل)') ;
   if (note === null) return;
   try {
     await api('/api/m/guarantee/' + b.dataset.claim, { method: 'POST', body: { status: b.dataset.st, note: note || null } });
@@ -308,7 +309,7 @@ $('rec-btn').addEventListener('click', async () => {
 });
 $('voice-file').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) uploadVoice(f); e.target.value = ''; });
 $('voice-now').addEventListener('click', async (e) => {
-  if (!e.target.closest('#voice-del') || !confirm('تحذف رسالتك الصوتية؟')) return;
+  if (!e.target.closest('#voice-del') || !await confirmBox('تحذف رسالتك الصوتية؟')) return;
   try { await api('/api/m/voice', { method: 'DELETE' }); drawVoice(null); } catch (err) { toast(err.message, true); }
 });
 document.addEventListener('click', (e) => { const g = e.target.closest('[data-goto]'); if (g) { e.preventDefault(); showTab(g.dataset.goto); } });
@@ -373,7 +374,7 @@ onSubmit($('loyalty-form'), async (f) => {
 });
 onSubmit($('use-form'), async (f, form) => {
   const use = f.act === 'use';
-  if (use && !confirm(`تأكيد استخدام الكود ${f.code.toUpperCase()}؟ ما يقدر العميل يستخدمه مرة ثانية.`)) return;
+  if (use && !await confirmBox(`تأكيد استخدام الكود ${f.code.toUpperCase()}؟ ما يقدر العميل يستخدمه مرة ثانية.`)) return;
   const box = $('use-result');
   try {
     const { redemption: x } = await api('/api/m/loyalty/use', { method: 'POST', body: { code: f.code, check_only: !use } });
@@ -400,7 +401,7 @@ async function loadContestData() {
 }
 $('entries').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-exclude]');
-  if (!b || !confirm(`استبعاد الرقم ${b.dataset.exclude} من السحب؟`)) return;
+  if (!b || !await confirmBox(`استبعاد الرقم ${b.dataset.exclude} من السحب؟`)) return;
   try { await api('/api/m/excluded', { method: 'POST', body: { phone: b.dataset.exclude } }); toast('تم الاستبعاد'); loadContestData(); } catch (err) { toast(err.message, true); }
 });
 $('excluded').addEventListener('click', async (e) => {
@@ -417,7 +418,7 @@ onSubmit($('exclude-form'), async (f, form) => {
 const dayStart = (d) => (d ? Math.floor(Date.parse(d + 'T00:00:00+03:00') / 1000) : null);
 const dayEnd = (d) => (d ? Math.floor(Date.parse(d + 'T23:59:59+03:00') / 1000) : null);
 onSubmit($('draw-form'), async (f) => {
-  if (!confirm(`بنسحب ${f.winners} فائز الحين، والنتيجة تنحفظ وما تتغيّر. نكمل؟`)) return;
+  if (!await confirmBox(`بنسحب ${f.winners} فائز الحين، والنتيجة تنحفظ وما تتغيّر. نكمل؟`)) return;
   const box = $('draw-result');
   render(box, html`<div class="draw-rolling">🎲 جاري السحب…</div>`);
   const [d] = await Promise.all([
@@ -479,7 +480,7 @@ $('sellers-table').addEventListener('click', async (e) => {
     $('seller-form-title').textContent = 'تعديل نقطة بيع';
     f.scrollIntoView({ behavior: 'smooth' });
   }
-  if (del && confirm('حذف نقطة البيع؟')) {
+  if (del && await confirmBox('حذف نقطة البيع؟')) {
     try { await api('/api/m/sellers/' + del.dataset.delSeller, { method: 'DELETE' }); loadSellers(); } catch (err) { toast(err.message, true); }
   }
 });
@@ -555,7 +556,7 @@ $('staff-list').addEventListener('click', async (e) => {
       toast('تم تحديث الموظف');
     }
     if (p) {
-      const pw = prompt('اكتب كلمة مرور مؤقتة جديدة للموظف (10 أحرف أو أكثر):');
+      const pw = await promptBox('اكتب كلمة مرور مؤقتة جديدة للموظف (10 أحرف أو أكثر):');
       if (!pw) return;
       await api(`/api/m/staff/${p.dataset.staffPass}`, { method: 'PATCH', body: { password: pw } });
       toast('تغيّرت كلمة المرور. أرسلها للموظف');
@@ -591,7 +592,7 @@ async function loadAccount() {
     } catch (e) { toast(e.message, true); }
   });
   $('logo-del')?.addEventListener('click', async () => {
-    if (!confirm('حذف الشعار؟')) return;
+    if (!await confirmBox('حذف الشعار؟')) return;
     try {
       await api('/api/m/logo', { method: 'DELETE' });
       merchant = (await api('/api/m/overview')).merchant;

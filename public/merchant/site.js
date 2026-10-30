@@ -2,6 +2,7 @@
 // ومعاينة حية، ونشر وتراجع، ورابط وQR، وصفحات هبوط. وتبويب "طلبات العملاء" والسلات المتروكة.
 import { api, html, num, raw, render, toast, when } from '/assets/common.js';
 import qrcode from '/assets/vendor/qrcode.mjs';
+import { confirmBox, promptBox } from '/assets/dialog.js';
 
 const $ = (id) => document.getElementById(id);
 let S = null; // بيانات المتجر من الخادم
@@ -293,14 +294,14 @@ function drawBar() {
   };
   $('sb-publish').onclick = () => publish().catch((e) => toast(e.message, true));
   if ($('sb-unpublish')) $('sb-unpublish').onclick = async () => {
-    if (!confirm('توقف متجرك الخاص؟ الرابط بيطلع للعملاء "غير متاح" لين تنشره مرة ثانية.')) return;
+    if (!await confirmBox('توقف متجرك الخاص؟ الرابط بيطلع للعملاء "غير متاح" لين تنشره مرة ثانية.')) return;
     try { toast((await api('/api/m/site/unpublish', { method: 'POST' })).message); S.published = false; drawBar(); drawShare(); } catch (e) { toast(e.message, true); }
   };
   $('sb-topup').onclick = topup;
 }
 
 async function publish() {
-  if (!S.products.length && !confirm('ما عندك منتجات معروضة للحين. تنشر المتجر فاضي؟ (أضف منتجاتك من تبويب "متجري 🛍️")')) return;
+  if (!S.products.length && !await confirmBox('ما عندك منتجات معروضة للحين. تنشر المتجر فاضي؟ (أضف منتجاتك من تبويب "متجري 🛍️")')) return;
   const d = await api('/api/m/site/publish', { method: 'POST' });
   S.published = true;
   S.dirty = false;
@@ -533,11 +534,11 @@ export async function loadOrders() {
     const del = e.target.closest('[data-or-del]');
     if (note) {
       const o = O.orders.find((x) => x.id === Number(note.dataset.orNote));
-      const v = prompt('ملاحظة داخلية على الطلب (ما يشوفها العميل)', o.merchant_note || '');
+      const v = await promptBox('ملاحظة داخلية على الطلب (ما يشوفها العميل)', o.merchant_note || '');
       if (v == null) return;
       try { await api('/api/m/orders/' + o.id, { method: 'PATCH', body: { merchant_note: v } }); loadOrders(); } catch (err) { toast(err.message, true); }
     }
-    if (del && confirm('تحذف هالسلة؟')) {
+    if (del && await confirmBox('تحذف هالسلة؟')) {
       try { await api('/api/m/orders/' + del.dataset.orDel, { method: 'DELETE' }); loadOrders(); } catch (err) { toast(err.message, true); }
     }
   };

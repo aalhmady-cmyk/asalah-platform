@@ -2,6 +2,7 @@
 import { EN, onLangToggle, takeCachedResult, translatePage, tx } from '/v/i18n.js';
 import { playResult, preload } from '/assets/sound.js';
 import { humanToken } from '/assets/human.js';
+import { alertBox, confirmBox } from '/assets/dialog.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => ($(id).hidden = !on);
@@ -341,7 +342,7 @@ $('g-form').addEventListener('submit', async (e) => {
     $('g-done').textContent = EN ? 'Your claim reached the brand, they will contact you.' : r.message;
     show('g-done');
   } catch (err) {
-    alert(err.message);
+    alertBox(err.message);
   } finally {
     btn.disabled = false;
   }
@@ -517,7 +518,7 @@ async function claim(phone, manual) {
     local?.setItem('asalah_phone_' + brandKey, phone);
   } catch (err) {
     if (err.data?.code === 'already_claimed') { loyalty.claimed = true; await loadWallet(phone); }
-    else if (manual) alert(err.message);
+    else if (manual) alertBox(err.message);
     else $('reward-sub').textContent = tx('اكتب رقم جوالك تحت عشان تنحفظ في رصيدك', 'Enter your mobile below to save it to your balance');
   } finally {
     btn.disabled = false;
@@ -531,7 +532,7 @@ $('claim-form').addEventListener('submit', (e) => {
 $('redeem-btn').addEventListener('click', async () => {
   const phone = savedPhone() || $('claim-form').phone.value.trim();
   const what = loyalty.reward || fmt(loyalty.min_redeem);
-  if (!confirm(tx(`تبي تستبدل ${fmt(loyalty.min_redeem)} مقابل: ${what}؟`, `Redeem ${fmt(loyalty.min_redeem)} for: ${what}?`))) return;
+  if (!await confirmBox(tx(`تبي تستبدل ${fmt(loyalty.min_redeem)} مقابل: ${what}؟`, `Redeem ${fmt(loyalty.min_redeem)} for: ${what}?`))) return;
   $('redeem-btn').disabled = true;
   try {
     const r = await post('/api/loyalty/redeem', { t: token, sid, phone });
@@ -541,7 +542,7 @@ $('redeem-btn').addEventListener('click', async () => {
     show('w-code');
     $('w-code').scrollIntoView({ behavior: 'smooth', block: 'center' });
   } catch (err) {
-    alert(err.message);
+    alertBox(err.message);
   } finally {
     $('redeem-btn').disabled = false;
   }
@@ -582,7 +583,7 @@ $('rate-form').addEventListener('submit', async (e) => {
   try {
     await post('/api/rate', { t: token, sid, stars, comment: e.target.comment.value.trim() || null });
   } catch (err) {
-    if (err.data?.code !== 'already_rated') { alert(err.message); btn.disabled = false; return; }
+    if (err.data?.code !== 'already_rated') { alertBox(err.message); btn.disabled = false; return; }
   }
   show('rate-form', false);
   show('rated');
@@ -609,7 +610,7 @@ $('entry-form').addEventListener('submit', async (e) => {
     show('contest', false);
     show('entered');
   } catch (err) {
-    alert(err.message);
+    alertBox(err.message);
     if (err.data?.code === 'already_entered') { show('contest', false); show('entered'); }
   } finally {
     btn.disabled = false;
@@ -637,7 +638,7 @@ $('report-form').addEventListener('submit', async (e) => {
       show('ai-box');
     }
   } catch (err) {
-    alert(err.message);
+    alertBox(err.message);
   } finally {
     btn.disabled = false;
     btn.textContent = label;

@@ -1,5 +1,6 @@
 // تبويب "نقاط المساعد" في اللوحة الأم: النقاط المجانية والباقات وأسعارها، رصيد كل تاجر، وطلبات الشحن.
 import { api, html, num, render, toast, when } from '/assets/common.js';
+import { promptBox } from '/assets/dialog.js';
 
 const $ = (id) => document.getElementById(id);
 let D = null;
@@ -62,7 +63,7 @@ export async function loadCredits() {
     const req = e.target.closest('[data-req]');
     const dis = e.target.closest('[data-dismiss]');
     if (add || req) {
-      const v = prompt(req ? 'كم نقطة تضيف؟ (بعد ما يدفع التاجر)' : 'كم نقطة؟ (رقم سالب للخصم)', req?.dataset.pts || '50');
+      const v = await promptBox(req ? 'كم نقطة تضيف؟ (بعد ما يدفع التاجر)' : 'كم نقطة؟ (رقم سالب للخصم)', req?.dataset.pts || '50');
       const delta = Math.round(Number(v));
       if (!v || !delta) return;
       try {

@@ -70,9 +70,11 @@ function open({ title, message, icon, ok = 'تمام', cancel = 'إلغاء', da
 }
 
 // تأكيد: يرجع true أو false
-export const confirmBox = (message, opts = {}) => open({ message, ...opts });
+const RISKY = /حذف|تحذف|إيقاف|توقف|نوقف|استبعاد|ما يمديك ترجعه|نهائياً/;
+export const confirmBox = (message, opts = {}) => open({ message, danger: RISKY.test(message), ok: RISKY.test(message) ? 'نعم، متأكد' : 'تمام', ...opts });
 // إدخال قيمة وحدة: يرجع النص أو null
 export async function promptBox(message, opts = {}) {
+  if (typeof opts !== 'object') opts = { value: opts };
   const r = await open({ message, ...opts, fields: [{ name: 'v', value: opts.value, placeholder: opts.placeholder, type: opts.type, ltr: opts.ltr, multiline: opts.multiline, inputmode: opts.inputmode, required: opts.required }] });
   return r ? r.v : null;
 }

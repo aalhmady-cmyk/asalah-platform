@@ -45,3 +45,12 @@ try {
     for (const el of document.querySelectorAll('[data-stat]')) countUp(el, s[el.dataset.stat] ?? 0);
   }
 } catch {}
+
+// قائمة الجوال
+const burger = document.querySelector('.nav-burger');
+if (burger) {
+  const set = (on) => { document.body.classList.toggle('menu-open', on); burger.setAttribute('aria-expanded', String(on)); };
+  burger.addEventListener('click', () => set(!document.body.classList.contains('menu-open')));
+  document.getElementById('site-menu').addEventListener('click', (e) => { if (e.target.closest('a')) set(false); });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });
+}
