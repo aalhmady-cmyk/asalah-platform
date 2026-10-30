@@ -13,7 +13,7 @@ function store(kind) {
 }
 const local = store('localStorage'), session = store('sessionStorage');
 
-// معرّف عشوائي للمتصفح: العلامة ترتبط بأول جهاز يمسحها
+// معرّف عشوائي للمتصفح: العلامة تنسجل باسم الجهاز اللي ضغط «اشتريته»
 function deviceId() {
   let id = local?.getItem('asalah_sid');
   if (!/^[a-f0-9]{64}$/.test(id || '')) {
