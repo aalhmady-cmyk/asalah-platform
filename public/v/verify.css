@@ -182,3 +182,10 @@
 
 /* شريط الصفحة التجريبية */
 .demo-bar { display: block; text-align: center; padding: 10px 16px; background: #D9B45A; color: #0F2A21; font-weight: 700; font-size: 14px; text-decoration: none; }
+
+/* سجل المسحات */
+.history .h-owner, .history .h-flag { margin: 0 0 14px; padding: 10px 12px; border-radius: 12px; font-size: 14px; line-height: 1.6; }
+.history .h-owner { background: var(--green-tint); color: var(--green-ink); }
+.history .h-owner.other { background: #FFF4E0; color: #8A5300; }
+.history .h-flag { background: #FDECEA; color: #B42318; }
+.pp-steps li.warn .pp-dot { background: #FDECEA; color: #B42318; }

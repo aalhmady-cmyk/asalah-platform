@@ -64,6 +64,16 @@ const norm = (s) => String(s || '').trim().toLowerCase().replace(/^al[\s-]/, '')
 const CITY_INDEX = new Map();
 for (const c of CITIES) { CITY_INDEX.set(norm(c[0]), c); CITY_INDEX.set(norm(c[1]), c); }
 const cityOf = (name) => CITY_INDEX.get(norm(name)) || null;
+// اسم المدينة بالعربي إذا نعرفها، وإلا الاسم كما جا من Cloudflare
+export const cityAr = (name) => (name ? cityOf(name)?.[1] || name : null);
+// المسافة بالكيلو بين مدينتين معروفتين، أو null
+export function cityDistance(a, b) {
+  const x = cityOf(a), y = cityOf(b);
+  if (!x || !y) return null;
+  const r = Math.PI / 180, dLat = (y[2] - x[2]) * r, dLon = (y[3] - x[3]) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(x[2] * r) * Math.cos(y[2] * r) * Math.sin(dLon / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+}
 
 // كل التقليد (أكواد مزيّفة، موقوفة، مقفلة، بلاغات) مجمّع حسب المدينة، بدون أي بيانات شخصية
 export async function fakesMap(db, merchantId, hours) {

@@ -119,6 +119,13 @@ test('التحقق وربط الجهاز', async () => {
   assert.equal(r.data.result, 'original');
   r = await post('/api/verify', { t, sid: sid('c') }); // جهاز ثالث
   assert.equal(r.data.result, 'other_device');
+  // الجهاز المرفوض يشوف سجل المسحات: أول مسحة، العدد، وكم جهاز
+  assert.equal(r.data.history.total, 4);
+  assert.equal(r.data.history.devices, 3);
+  assert.ok(r.data.history.first.at);
+  assert.equal(r.data.history.first.mine, false);
+  assert.equal(r.data.history.recent[0].mine, true);
+  assert.equal(r.data.history.recent[0].result, 'other_device');
 });
 
 test('الروابط المزيّفة والمعدّلة', async () => {

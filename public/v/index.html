@@ -134,11 +134,11 @@
       <label class="field">رقم الجوال<input name="phone" type="tel" inputmode="numeric" placeholder="05xxxxxxxx" autocomplete="tel" required class="ltr"></label>
       <label class="field">المدينة<input name="city" required minlength="2"></label>
       <label class="field">اسم المحل اللي اشتريت منه<input name="point_of_sale" required minlength="2"></label>
-      <label class="check"><input type="checkbox" name="consent" required><span>أوافق على <a id="terms" href="#" target="_blank" rel="noopener">شروط المسابقة</a> وعلى استخدام بياناتي للسحب فقط</span></label>
+      <label class="check"><input type="checkbox" name="consent" required><span>أوافق على <a id="terms" href="#" target="_blank" rel="noopener">شروط المسابقة</a> وعلى استخدام بياناتي للسحب، وتسجيل المنتج باسمي (يظهر اسمي الأول فقط لمن يمسحه بعدي)</span></label>
       <button class="btn btn-primary big-btn" type="submit">سجّل مشاركتي</button>
     </form>
   </section>
-  <section id="entered" class="vcard center" hidden><h2>تم تسجيل مشاركتك</h2><p class="muted">بالتوفيق في السحب!</p></section>
+  <section id="entered" class="vcard center" hidden><h2>تم تسجيل مشاركتك</h2><p class="muted">بالتوفيق في السحب!</p><p class="muted small">وتسجّل المنتج باسمك، فلو مسحه أحد بعدك يعرف إنه منتجك.</p></section>
 
   <section id="bad" class="vcard result-bad center" hidden aria-live="polite">
     <svg width="80" height="80" viewBox="0 0 80 80" role="img" aria-label="تحذير"><circle cx="40" cy="40" r="34" fill="#FDECEA" stroke="#B42318" stroke-width="3"/><path d="M40 24v22M40 55v1" stroke="#B42318" stroke-width="6" stroke-linecap="round"/></svg>
@@ -150,6 +150,14 @@
     <svg width="80" height="80" viewBox="0 0 80 80" role="img" aria-label="تنبيه"><circle cx="40" cy="40" r="34" fill="#FFF4E0" stroke="#8A5300" stroke-width="3"/><rect x="30" y="22" width="20" height="34" rx="4" fill="none" stroke="#8A5300" stroke-width="3"/><path d="M37 50h6" stroke="#8A5300" stroke-width="3" stroke-linecap="round"/></svg>
     <h1>تم التحقق من جهاز آخر</h1>
     <p id="other-msg"></p>
+  </section>
+
+  <!-- سجل المسحات: متى ووين ومن أي جوال انمسحت العلامة -->
+  <section id="history" class="vcard history" hidden>
+    <div class="pp-h"><span aria-hidden="true">🕓</span><div><h2>سجل التحقق من هذي العلامة</h2><p class="muted small" id="h-sub"></p></div></div>
+    <p id="h-owner" class="h-owner" hidden></p>
+    <p id="h-flag" class="h-flag" hidden></p>
+    <ol class="pp-steps" id="h-list"></ol>
   </section>
 
   <section id="report" class="vcard" hidden>

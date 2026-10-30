@@ -8,6 +8,7 @@ import { guide } from '../lib/guide.js';
 import { shopForVerify } from './store.js';
 import { shopAI } from '../lib/shop.js';
 import { imageUrl } from '../lib/images.js';
+import { checkAnomaly, logScan, scanHistory } from '../lib/scans.js';
 import { checkSignature, parseToken, publicId } from '../lib/tags.js';
 import { fail, geo, int, ipHash, json, now, rateLimit, readJson, saPhone, sha256, str } from '../lib/util.js';
 
@@ -25,14 +26,6 @@ const MESSAGES = {
 
 function brand(m) {
   return m ? { name: m.name, logo_url: imageUrl(m.logo_key) || m.logo_url, brand_color: m.brand_color, store_url: m.store_url, whatsapp: m.whatsapp } : null;
-}
-
-async function logScan(db, req, tagId, merchantId, result, checkNo) {
-  const g = geo(req);
-  await db
-    .prepare('INSERT INTO scans(tag_id,merchant_id,result,check_no,country,city,created_at) VALUES(?,?,?,?,?,?,?)')
-    .bind(tagId, merchantId, result, checkNo ?? null, g.country, g.city, now())
-    .run();
 }
 
 async function logUnknown(db, req, raw, merchantId) {
@@ -220,9 +213,13 @@ export async function verify(req, env) {
   }
   const b = r.batch;
   const snd = await soundInfo(db, Boolean(b.verify_sound));
-  const reject = async (result, tagId = null, checkNo = null) => {
-    await logScan(db, req, tagId, b.merchant_id, result, checkNo);
-    return json({ ok: false, result, message: MESSAGES[result], brand: brand(b), report_allowed: true, ...snd });
+  const device = await sha256('device:' + body.sid);
+  // لو العلامة معروفة نعرض للعميل سجل مسحاتها (متى ووين ومن أي جوال) عشان يحكم بنفسه
+  const reject = async (result, tag = null, checkNo = null) => {
+    if (tag) await checkAnomaly(db, req, tag, b.merchant_id);
+    await logScan(db, req, tag?.id ?? null, b.merchant_id, result, checkNo, tag ? device : null);
+    const history = tag ? await scanHistory(db, tag, device) : null;
+    return json({ ok: false, result, message: MESSAGES[result], brand: brand(b), report_allowed: true, history, check_no: checkNo, ...snd });
   };
   if (b.merchant_status !== 'active' || b.status === 'blocked') return reject('blocked');
   if (b.status === 'pending') return reject('not_activated');
@@ -234,22 +231,21 @@ export async function verify(req, env) {
     .prepare(
       `UPDATE tags SET check_count=check_count+1,last_checked_at=?,first_checked_at=COALESCE(first_checked_at,?)
        WHERE batch_id=? AND serial=? AND status='active'
-       RETURNING id,check_count,first_device,second_device,first_checked_at,entry_done,loyalty_claimed`
+       RETURNING id,check_count,first_device,second_device,first_checked_at,entry_done,loyalty_claimed,flagged_at`
     )
     .bind(t, t, b.id, r.serial)
     .first();
   if (!tag) {
-    const row = await db.prepare('SELECT id,status FROM tags WHERE batch_id=? AND serial=?').bind(b.id, r.serial).first();
-    return reject(row?.status === 'auto_locked' ? 'locked' : 'blocked', row?.id);
+    const row = await db.prepare('SELECT id,status,first_device,second_device,flagged_at FROM tags WHERE batch_id=? AND serial=?').bind(b.id, r.serial).first();
+    return reject(row?.status === 'auto_locked' ? 'locked' : 'blocked', row);
   }
   // كل فتح للرابط يُحسب. الفحص اللي بعد الحد يقفل العلامة نهائياً حتى يعيد التاجر أو المدير تفعيلها.
   const max = b.max_checks || 0;
   if (max && tag.check_count > max) {
     await db.prepare("UPDATE tags SET status='auto_locked' WHERE id=? AND status='active'").bind(tag.id).run();
-    return reject('locked', tag.id, tag.check_count);
+    return reject('locked', tag, tag.check_count);
   }
 
-  const device = await sha256('device:' + body.sid);
   let bound = false;
   if (!tag.first_device) {
     const claimed = await db.prepare('UPDATE tags SET first_device=? WHERE id=? AND first_device IS NULL RETURNING id').bind(device, tag.id).first();
@@ -262,9 +258,10 @@ export async function verify(req, env) {
       bound = Boolean(await db.prepare('UPDATE tags SET second_device=? WHERE id=? AND second_device IS NULL RETURNING id').bind(device, tag.id).first());
     }
   }
-  if (!bound) return reject('other_device', tag.id, tag.check_count);
+  if (!bound) return reject('other_device', tag, tag.check_count);
 
-  await logScan(db, req, tag.id, b.merchant_id, 'original', tag.check_count);
+  await checkAnomaly(db, req, tag, b.merchant_id);
+  await logScan(db, req, tag.id, b.merchant_id, 'original', tag.check_count, device);
   const open = contestOpen(b);
   const [rated, passport, level, claim] = await Promise.all([
     b.ratings_enabled ? db.prepare('SELECT stars FROM ratings WHERE tag_id=?').bind(tag.id).first() : null,
@@ -299,6 +296,7 @@ export async function verify(req, env) {
     level,
     guarantee: b.guarantee_enabled ? { terms: b.guarantee_terms, claimed: claim?.status || null } : null,
     voice_url: voiceUrl(b.voice_key),
+    history: await scanHistory(db, tag, device),
     ...snd,
   });
 }

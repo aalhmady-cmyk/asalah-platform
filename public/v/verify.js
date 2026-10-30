@@ -148,12 +148,71 @@ async function run() {
   lastResult = d.result;
   if (d.result === 'original') return ok(d);
   if (d.result === 'other_device') {
-    $('other-msg').textContent = resultMsg(d);
+    $('other-msg').textContent = otherMsg(d) || resultMsg(d);
     show('other');
+    if (d.history) setupHistory(d.history);
     show('report');
     return;
   }
   bad(d.result, resultMsg(d));
+  if (d.history) setupHistory(d.history);
+}
+
+// ---------- سجل المسحات ----------
+const KINDS = {
+  iphone: ['آيفون', 'iPhone'], ipad: ['آيباد', 'iPad'], samsung: ['سامسونج', 'Samsung'], huawei: ['هواوي', 'Huawei'], xiaomi: ['شاومي', 'Xiaomi'],
+  oppo: ['أوبو', 'OPPO'], android: ['أندرويد', 'Android'], windows: ['كمبيوتر', 'computer'], mac: ['ماك', 'Mac'], other: ['جهاز', 'device'],
+};
+const kindName = (k) => { const n = KINDS[k] || KINDS.other; return EN ? n[1] : n[0]; };
+const when = (sec) => new Date(sec * 1000).toLocaleString(EN ? 'en-GB' : 'ar-SA-u-ca-gregory-nu-latn', { timeZone: 'Asia/Riyadh', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' });
+const where = (city) => (city ? tx(` في ${city}`, ` in ${city}`) : '');
+
+// رسالة "مرتبطة بجوال آخر" بالتفاصيل: أي جوال، متى، وين، وكم مسحة
+function otherMsg(d) {
+  const h = d.history, f = h?.first;
+  if (!f) return null;
+  let m = tx(
+    `هذي العلامة مرتبطة بجوال ${kindName(f.kind)} آخر مسحها أول مرة ${when(f.at)}${where(f.city)}. هذي المسحة رقم ${h.total}.`,
+    `This tag is linked to another ${kindName(f.kind)} that first scanned it ${when(f.at)}${where(f.city)}. This is scan #${h.total}.`
+  );
+  if (h.owner?.name) m += tx(` والمنتج مسجّل باسم ${h.owner.name}.`, ` The product is registered to ${h.owner.name}.`);
+  m += tx(' إذا اشتريت المنتج جديد ومقفول، بلّغنا تحت.', ' If you bought it new and sealed, report it below.');
+  return m;
+}
+
+function setupHistory(h) {
+  if (!h.total) return;
+  $('h-sub').textContent = tx(`انمسحت ${h.total} مرة من ${h.devices} جهاز`, `Scanned ${h.total} times from ${h.devices} device${h.devices > 1 ? 's' : ''}`);
+  if (h.owner) {
+    $('h-owner').textContent = h.owner.you
+      ? tx('✅ هذا المنتج مسجّل باسمك', '✅ This product is registered to you')
+      : tx(`👤 هذا المنتج مسجّل باسم ${h.owner.name}، ولو ما هو أنت فالمنتج اللي بيدك غالباً منسوخ.`, `👤 This product is registered to ${h.owner.name}. If that is not you, the one in your hand is probably a copy.`);
+    $('h-owner').classList.toggle('other', !h.owner.you);
+    show('h-owner');
+  }
+  if (h.flagged) {
+    $('h-flag').textContent = tx('⚠️ هذي العلامة انمسحت في مدن متباعدة خلال وقت قصير، واحتمال إنها منسوخة.', '⚠️ This tag was scanned in distant cities within a short time. It may have been copied.');
+    show('h-flag');
+  }
+  const items = h.recent.map((r) => {
+    const bad = r.result && r.result !== 'original';
+    const li = el('li', r.mine ? 'you' : bad ? 'warn' : '');
+    const box = el('div');
+    const who = r.mine ? tx(`${kindName(r.kind)} (جهازك)`, `${kindName(r.kind)} (your device)`) : tx(`${kindName(r.kind)} آخر`, `another ${kindName(r.kind)}`);
+    const note = r.result === 'other_device' ? tx(' · رفضناه لأنه جهاز آخر', ' · refused, another device') : r.result === 'locked' ? tx(' · وقفت العلامة', ' · tag locked') : '';
+    box.append(el('b', '', who), el('small', '', when(r.at) + where(r.city) + note));
+    li.append(el('span', 'pp-dot', r.mine ? '📱' : bad ? '⛔' : '📲'), box);
+    return li;
+  });
+  if (h.total > h.recent.length && h.first && !h.recent.some((r) => r.at === h.first.at)) {
+    const li = el('li', h.first.mine ? 'you' : '');
+    const box = el('div');
+    box.append(el('b', '', tx('أول مسحة', 'First scan')), el('small', '', `${kindName(h.first.kind)} · ${when(h.first.at)}${where(h.first.city)}`));
+    li.append(el('span', 'pp-dot', '1'), box);
+    items.push(li);
+  }
+  $('h-list').replaceChildren(...items);
+  show('history');
 }
 
 function ok(d) {
@@ -190,6 +249,7 @@ function ok(d) {
   if (d.voice_url) setupVoice(d.voice_url);
   resultSound('original');
   if (d.passport) setupPassport(d.passport, t);
+  if (d.history && d.history.total > 1) { $('passport').after($('history')); setupHistory(d.history); }
   if (d.guarantee) setupGuarantee(d.guarantee);
   if (d.shop) setupShop(d.shop);
   if (d.loyalty) setupLoyalty(d.loyalty, d.brand);
