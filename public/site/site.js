@@ -325,7 +325,19 @@ document.addEventListener('click', (e) => {
 document.querySelector('.viewsw').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) setView(b.dataset.v); });
 
 // ---------- المعرض ثلاثي الأبعاد ----------
+// الجوالات الضعيفة (ذاكرة قليلة، أو جربنا قبل وكان ثقيل) تفتح على العرض العادي
+const SLOW_KEY = 'asalah_3d_slow';
+const slowBefore = () => { try { return localStorage.getItem(SLOW_KEY) === '1'; } catch { return false; } };
+const weak = (navigator.deviceMemory && navigator.deviceMemory < 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency < 3);
 const webgl = (() => { try { const c = document.createElement('canvas'); return Boolean(c.getContext('webgl2') || c.getContext('webgl')); } catch { return false; } })();
+let autoGrid = weak || slowBefore();
+function tooSlow() {
+  try { localStorage.setItem(SLOW_KEY, '1'); } catch { /* تخزين مقفل */ }
+  autoGrid = true;
+  if (current !== '3d') return;
+  setView('grid', true);
+  toast('حوّلناك للعرض العادي عشان يكون أسرع على جوالك. تقدر ترجع للمعرض من فوق.');
+}
 
 async function setView(v, quiet, focusId) {
   if (v === '3d' && (!webgl || !D.products.length)) { if (!quiet) toast(webgl ? 'ما فيه منتجات في المعرض للحين' : 'جوالك ما يدعم المعرض ثلاثي الأبعاد'); v = 'grid'; }
@@ -338,6 +350,7 @@ async function setView(v, quiet, focusId) {
   if (v === '3d') {
     if (!show) {
       const { mountShowroom } = await import('/site/showroom.js');
+      try {
       show = await mountShowroom({
         canvas: $('show-canvas'),
         products: D.products,
@@ -346,7 +359,13 @@ async function setView(v, quiet, focusId) {
         sections: sections(),
         onPick: showCard,
         onNear: showNear,
+        onSlow: tooSlow,
       });
+      } catch {
+        // تعذّر تشغيل الرسوم (ذاكرة الجوال أو المتصفح)
+        show = null;
+        return tooSlow();
+      }
       render($('show-secs'), html`${sections().map((s, i) => html`<button type="button" data-sec="${i}">${s.title}</button>`)}`);
       $('show-secs').onclick = (e) => { const b = e.target.closest('[data-sec]'); if (b) show.goSection(Number(b.dataset.sec)); };
       setTimeout(() => $('show-hint').classList.add('fade'), 5000);
@@ -410,7 +429,7 @@ async function boot() {
   let v = C.view;
   try { v = sessionStorage.getItem('asalah_view_' + slug) || v; } catch { /* تخزين مقفل */ }
   route();
-  if (onProduct || v !== '3d' || !webgl || !D.products.length) return setView('grid', true);
+  if (onProduct || v !== '3d' || !webgl || autoGrid || !D.products.length) return setView('grid', true);
   // باب المعرض: ينفتح بلمسة (أو تلقائياً في معاينة اللوحة)
   const doors = $('doors');
   render($('door-logo'), D.merchant.logo_url ? html`<img src="${D.merchant.logo_url}" alt="">` : html`${C.name.trim().charAt(0)}`);

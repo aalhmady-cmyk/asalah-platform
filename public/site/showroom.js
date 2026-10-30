@@ -141,7 +141,7 @@ function softDot() {
   return new THREE.CanvasTexture(cv);
 }
 
-export async function mountShowroom({ canvas, products, config: c, merchant, sections, onPick, onNear }) {
+export async function mountShowroom({ canvas, products, config: c, merchant, sections, onPick, onNear, onSlow }) {
   const font = FONT[c.font] || FONT.plex;
   await document.fonts?.ready?.catch?.(() => {});
   const colors = { bg: c.colors.bg, accent: c.colors.accent, primary: c.colors.primary };
@@ -482,12 +482,36 @@ export async function mountShowroom({ canvas, products, config: c, merchant, sec
   ro.observe(canvas);
   resize();
 
+  // مراقبة السرعة: لو الجوال ثقيل نخفف الجودة أول، ولو بقي ثقيل نرجع للعرض العادي
+  const perf = { t0: 0, n: 0, step: 0, done: false };
+  function watchPerf(now) {
+    if (perf.done || fly || drag) { perf.t0 = 0; return; }
+    if (!perf.t0) { perf.t0 = now; perf.n = 0; return; }
+    perf.n++;
+    const span = now - perf.t0;
+    if (span < 2500) return;
+    const fps = (perf.n * 1000) / span;
+    perf.t0 = 0;
+    if (fps >= 24) { perf.done = true; return; }
+    if (perf.step === 0) {
+      perf.step = 1;
+      renderer.setPixelRatio(1);
+      dust.visible = false;
+      if (smoke) smoke.visible = false;
+      resize();
+      return;
+    }
+    perf.done = true;
+    if (fps < 18) onSlow?.();
+  }
+
   const fwd = new THREE.Vector3();
   function frame(now) {
     raf = requestAnimationFrame(frame);
-    if (!running || document.hidden) return;
+    if (!running || document.hidden) { perf.t0 = 0; return; }
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
+    watchPerf(now);
     const t = now / 1000;
     if (fly) {
       const k = Math.min(1, (now - fly.t0) / fly.dur);
@@ -545,13 +569,13 @@ export async function mountShowroom({ canvas, products, config: c, merchant, sec
     }
     // ذرات الضوء
     const pa = dustGeo.attributes.position;
-    for (let i = 0; i < N; i++) {
+    if (dust.visible) for (let i = 0; i < N; i++) {
       let y = pa.getY(i) + dt * 0.08;
       if (y > 3.7) y = 0.1;
       pa.setY(i, y);
     }
-    pa.needsUpdate = true;
-    if (smoke) {
+    pa.needsUpdate = dust.visible;
+    if (smoke?.visible) {
       const a = smoke.geometry.attributes.position;
       const { seed, items: si } = smoke.userData;
       for (let i = 0; i < a.count; i++) {
