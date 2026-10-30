@@ -7,7 +7,7 @@ const setup = document.getElementById('setup');
 const forgot = document.getElementById('forgot');
 const reset = document.getElementById('reset');
 const qs = new URLSearchParams(location.search);
-const showForm = (f) => { for (const x of [login, setup, forgot, reset]) x.hidden = x !== f; };
+const showForm = (f) => { for (const x of [login, setup, forgot, reset, document.getElementById('otp')]) x.hidden = x !== f; };
 if (qs.has('setup')) showForm(setup);
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-show]');
@@ -70,11 +70,34 @@ function verified(form, label) {
   btn.querySelector('.scan-label').textContent = label;
 }
 
+let ticket = null;
+const otp = document.getElementById('otp');
 onSubmit(login, async (f, form) => {
   if (!form.reportValidity()) return;
   const d = await scanning(form, 'جاري التحقق…', () => api('/api/auth/login', { method: 'POST', body: f }));
+  // الحساب عليه تحقق بخطوتين: نطلب رمز التطبيق
+  if (d.need_2fa) {
+    ticket = d.ticket;
+    login.hidden = true;
+    otp.hidden = false;
+    otp.code.value = '';
+    otp.code.focus();
+    return;
+  }
   verified(form, '✓ تم التحقق');
   setTimeout(() => (location.href = home(d.user.role)), 650);
+});
+
+onSubmit(otp, async (f, form) => {
+  if (!form.reportValidity()) return;
+  try {
+    const d = await scanning(form, 'جاري التحقق…', () => api('/api/auth/login/2fa', { method: 'POST', body: { ticket, code: f.code.trim() } }));
+    verified(form, '✓ تم التحقق');
+    setTimeout(() => (location.href = home(d.user.role)), 650);
+  } catch (e) {
+    if (e.data?.code === 'ticket_expired') { otp.hidden = true; login.hidden = false; }
+    throw e;
+  }
 });
 
 onSubmit(setup, async (f, form) => {

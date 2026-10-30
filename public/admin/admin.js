@@ -1,6 +1,7 @@
 import { initPanelApp } from '/assets/panel-app.js';
 import { playResult } from '/assets/sound.js';
 import { loadCredits, creditsBadge } from '/admin/credits.js';
+import { mountSecurity } from '/assets/security.js';
 import { api, raw, bars, BATCH_STATUS, hbars, hotspotsTable, html, pickImage, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
@@ -640,7 +641,12 @@ onSubmit($('story-form'), async (f) => {
   toast(f.merchant_id ? 'انحفظت القصة، تطلع الحين في صفحة التجار ✅' : 'انشالت القصة من الصفحة');
 });
 
-const loaders = { credits: loadCredits, home: loadHome, leads: loadLeads, site: loadSite, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, push: loadPush, reports: loadReports, users: loadUsers, audit: loadAudit };
+const loaders = { credits: loadCredits, home: loadHome, leads: loadLeads, site: loadSite, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, push: loadPush, reports: loadReports, users: loadUsers, audit: loadAudit, security: () => mountSecurity($('security-box')) };
+onSubmit($('password-form'), async (f) => {
+  const d = await api('/api/auth/password', { method: 'POST', body: f });
+  toast(d.message);
+  setTimeout(() => (location.href = '/admin/login/'), 1200);
+});
 let current = 'home';
 const refresh = () => loaders[current]().catch((e) => toast(e.message, true));
 const showTab = tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => { current = id; refresh(); });

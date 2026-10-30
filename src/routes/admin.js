@@ -67,7 +67,7 @@ export async function handleAdmin(req, env, path) {
     const [ov, merchants, alerts, unknown] = await Promise.all([
       overviewFor(db, null),
       listMerchants(db),
-      db.prepare("SELECT a.*,m.name AS merchant_name FROM alerts a LEFT JOIN merchants m ON m.id=a.merchant_id WHERE a.kind NOT IN ('store_blocked','staff_password','weekly_summary','monthly_report','new_order','credits_added') ORDER BY a.id DESC LIMIT 20").all(),
+      db.prepare("SELECT a.*,m.name AS merchant_name FROM alerts a LEFT JOIN merchants m ON m.id=a.merchant_id WHERE a.kind NOT IN ('store_blocked','staff_password','weekly_summary','monthly_report','new_order','credits_added') AND NOT (a.kind='new_login' AND a.merchant_id IS NOT NULL) ORDER BY a.id DESC LIMIT 20").all(),
       db.prepare('SELECT u.preview,u.count,u.city,u.country,u.last_at,m.name AS merchant_name FROM unknown_codes u LEFT JOIN merchants m ON m.id=u.merchant_id ORDER BY u.last_at DESC LIMIT 20').all(),
     ]);
     const totals = merchants.reduce(

@@ -1172,3 +1172,51 @@ test('المتجر الخاص: البناء والمعاينة والنشر وا
   assert.equal((await post('/api/m/site/unpublish', {}, S.merchant)).status, 200);
   assert.equal((await call('/api/public/site/green-kif')).status, 404);
 });
+
+test('التحقق بخطوتين والأجهزة', async () => {
+  const { codeAt } = await import('../src/lib/totp.js');
+  const cred = { email: 'admin@asalah.test', password: 'very-strong-pass-1' };
+  let r = await post('/api/auth/2fa/setup', {}, S.admin);
+  assert.equal(r.status, 200);
+  const secret = r.data.secret;
+  assert.ok(r.data.url.startsWith('otpauth://totp/'));
+  assert.equal((await post('/api/auth/2fa/enable', { code: '000000' }, S.admin)).status, 400);
+  const step = Math.floor(Date.now() / 30000);
+  r = await post('/api/auth/2fa/enable', { code: await codeAt(secret, step) }, S.admin);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const backups = r.data.backup_codes;
+  assert.equal(backups.length, 8);
+
+  // الدخول يحتاج رمز بعد كلمة المرور، ونفس الرمز ما ينقبل مرتين
+  r = await post('/api/auth/login', cred);
+  assert.equal(r.data.need_2fa, true);
+  assert.equal(r.cookie, null);
+  assert.equal((await post('/api/auth/login/2fa', { ticket: r.data.ticket, code: await codeAt(secret, step) })).status, 400);
+  r = await post('/api/auth/login/2fa', { ticket: r.data.ticket, code: await codeAt(secret, step + 1) });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const second = r.cookie;
+  assert.equal((await call('/api/auth/me', { cookie: second })).data.user.role, 'admin');
+
+  // رمز احتياطي يشتغل مرة وحدة
+  let t = (await post('/api/auth/login', cred)).data.ticket;
+  assert.equal((await post('/api/auth/login/2fa', { ticket: t, code: backups[0] })).status, 200);
+  t = (await post('/api/auth/login', cred)).data.ticket;
+  assert.equal((await post('/api/auth/login/2fa', { ticket: t, code: backups[0] })).status, 400);
+  assert.equal((await post('/api/auth/login/2fa', { ticket: 'x'.repeat(48), code: '123456' })).status, 401);
+
+  // قائمة الأجهزة وتسجيل خروج الباقي
+  let sec = (await call('/api/auth/security', { cookie: S.admin })).data;
+  assert.equal(sec.totp_on, true);
+  assert.equal(sec.backup_left, 7);
+  assert.ok(sec.sessions.length >= 3);
+  assert.equal(sec.sessions.filter((s) => s.current).length, 1);
+  assert.equal((await post('/api/auth/sessions/end', { all: true }, S.admin)).status, 200);
+  assert.equal((await call('/api/auth/me', { cookie: second })).status, 401);
+  sec = (await call('/api/auth/security', { cookie: S.admin })).data;
+  assert.equal(sec.sessions.length, 1);
+
+  // الإيقاف يحتاج كلمة المرور والرمز
+  assert.equal((await post('/api/auth/2fa/disable', { password: cred.password, code: '111111' }, S.admin)).status, 400);
+  assert.equal((await post('/api/auth/2fa/disable', { password: cred.password, code: backups[1] }, S.admin)).status, 200);
+  assert.equal((await postFrom('10.20.30.40', '/api/auth/login', cred)).status, 200);
+});

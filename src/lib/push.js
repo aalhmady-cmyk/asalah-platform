@@ -134,7 +134,8 @@ export async function pushAlert(db, merchantId, kind, message) {
       const ownerOnly = kind === 'staff_password' ? " AND u.merchant_role='owner'" : '';
       parts.push(['/merchant/', (await db.prepare(`SELECT p.id,p.endpoint,p.p256dh,p.auth FROM user_push p JOIN users u ON u.id=p.user_id WHERE u.role='merchant' AND u.merchant_id=? AND u.status='active'${ownerOnly} LIMIT 10`).bind(merchantId).all()).results]);
     }
-    if (!ADMIN_SKIP.includes(kind)) {
+    // دخول حساب تاجر يخص التاجر بس
+    if (!ADMIN_SKIP.includes(kind) && !(kind === 'new_login' && merchantId)) {
       parts.push(['/admin/', (await db.prepare("SELECT p.id,p.endpoint,p.p256dh,p.auth FROM user_push p JOIN users u ON u.id=p.user_id WHERE u.role='admin' AND u.status='active' LIMIT 10").all()).results]);
     }
     for (const [url, subs] of parts) {

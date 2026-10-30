@@ -3,6 +3,7 @@ import { loadStore } from '/merchant/store.js';
 import { loadSite, loadOrders, ordersBadge } from '/merchant/site.js';
 import { initPanelApp } from '/assets/panel-app.js';
 import { playResult } from '/assets/sound.js';
+import { mountSecurity } from '/assets/security.js';
 
 const $ = (id) => document.getElementById(id);
 const me = await api('/api/auth/me');
@@ -82,7 +83,7 @@ async function loadHome() {
   render($('daily'), bars(o.daily));
   render($('recent'), !o.recent.length ? html`<div class="empty">ما فيه عمليات تحقق للحين</div>` : html`<table style="min-width:520px"><thead><tr><th>رقم العلامة</th><th>النتيجة</th><th>المدينة</th><th>الفحص</th><th>الوقت</th></tr></thead><tbody>${o.recent.slice(0, 10).map((r) => html`<tr><td class="mono">${r.public_id || 'غير معروف'}</td><td>${pill(RESULT, r.result)}</td><td>${r.city || '-'}</td><td>${r.check_no ? `${r.check_no} من ${merchant.max_checks}` : '-'}</td><td class="muted">${when(r.created_at)}</td></tr>`)}</tbody></table>`);
   const unread = d.alerts.filter((a) => !a.read_at && a.kind !== 'tag_request');
-  render($('alerts'), html`${unread.map((a) => html`<div class="alert ${a.kind === 'low_stock' ? 'warn' : ['new_order', 'credits_added', 'weekly_summary', 'monthly_report'].includes(a.kind) ? 'info' : 'err'}"><div>${a.message} <span class="small">· ${when(a.created_at)}</span></div></div>`)}${unread.length ? html`<div><button class="btn" type="button" id="alerts-read">تم الاطلاع</button></div>` : ''}`);
+  render($('alerts'), html`${unread.map((a) => html`<div class="alert ${['low_stock', 'new_login'].includes(a.kind) ? 'warn' : ['new_order', 'credits_added', 'weekly_summary', 'monthly_report'].includes(a.kind) ? 'info' : 'err'}"><div>${a.message} <span class="small">· ${when(a.created_at)}</span></div></div>`)}${unread.length ? html`<div><button class="btn" type="button" id="alerts-read">تم الاطلاع</button></div>` : ''}`);
   $('alerts-read')?.addEventListener('click', async () => { await api('/api/m/alerts/read', { method: 'POST', body: {} }); loadHome(); });
 }
 
@@ -570,6 +571,7 @@ onSubmit($('staff-form'), async (f, form) => {
 });
 
 async function loadAccount() {
+  mountSecurity($('security')).catch((e) => toast(e.message, true));
   if (STAFF) return;
   loadNotify().catch((e) => toast(e.message, true));
   loadStaff().catch((e) => toast(e.message, true));

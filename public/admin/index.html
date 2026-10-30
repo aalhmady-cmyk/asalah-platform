@@ -37,6 +37,7 @@
       <button type="button" data-tab="reports">التقليد والبلاغات <span class="badge" id="unknown-badge"></span></button>
       <button type="button" data-tab="users">الحسابات</button>
       <button type="button" data-tab="audit">سجل العمليات</button>
+      <button type="button" data-tab="security">الأمان 🔐</button>
     </nav>
     <div class="foot"><span id="me"></span><button type="button" id="logout">تسجيل الخروج</button></div>
   </aside>
@@ -209,6 +210,17 @@
     <section id="audit" hidden>
       <div class="page-head"><div><h1>سجل العمليات</h1><p>آخر 200 عملية: مين سوّى وش ومتى</p></div></div>
       <div class="card" style="margin-top:24px"><div class="table-wrap" id="audit-table"></div></div>
+    </section>
+
+    <section id="security" hidden>
+      <div class="page-head"><div><h1>الأمان</h1><p>كلمة المرور، التحقق بخطوتين، والأجهزة المسجّل منها الدخول</p></div></div>
+      <div id="security-box" style="margin-top:24px;max-width:640px"></div>
+      <form class="card" id="password-form" style="margin-top:16px;max-width:640px">
+        <h2>تغيير كلمة المرور</h2>
+        <label class="field">كلمة المرور الحالية<input name="current" type="password" autocomplete="current-password" required class="ltr"></label>
+        <label class="field">كلمة المرور الجديدة (10 أحرف أو أكثر)<input name="new_password" type="password" minlength="10" autocomplete="new-password" required class="ltr"></label>
+        <div><button class="btn btn-primary" type="submit">تغيير</button></div>
+      </form>
     </section>
   </main>
 </div>

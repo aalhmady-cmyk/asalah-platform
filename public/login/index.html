@@ -94,6 +94,18 @@
         <button class="scan-btn" type="submit"><span class="scan-label">دخول</span><span class="scan-bar" aria-hidden="true"></span></button>
         <button type="button" class="link-btn" data-show="forgot">نسيت كلمة المرور؟</button>
       </form>
+      <form id="otp" class="auth-form" hidden novalidate>
+        <div>
+          <h1>رمز التحقق</h1>
+          <p class="muted">افتح تطبيق المصادقة في جوالك واكتب الرمز (6 أرقام). ضاع جوالك؟ اكتب رمز احتياطي.</p>
+        </div>
+        <label class="ifield">
+          <span>الرمز</span>
+          <div class="ibox"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 18h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><input name="code" inputmode="numeric" autocomplete="one-time-code" required class="ltr" maxlength="12" placeholder="123456"></div>
+        </label>
+        <button class="scan-btn" type="submit"><span class="scan-label">تأكيد</span><span class="scan-bar" aria-hidden="true"></span></button>
+        <button type="button" class="link-btn" data-show="login">رجوع</button>
+      </form>
       <form id="forgot" class="auth-form" hidden novalidate>
         <div>
           <h1>نسيت كلمة المرور؟</h1>

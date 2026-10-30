@@ -224,3 +224,17 @@ dialog form { padding: 24px; display: flex; flex-direction: column; gap: 14px; }
 .ad-notif-img { margin-top: 8px; border-radius: 12px; max-height: 160px; width: 100%; object-fit: cover; }
 .ad-prog { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
 .ad-prog i { display: block; height: 100%; background: var(--green); transition: width .3s; }
+
+/* بطاقة الأمان */
+.sec-card h2 { margin-top: 0; }
+.sec-list { list-style: none; margin: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.sec-list li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.sec-list li > div { flex: 1; min-width: 0; }
+.sec-list b { display: block; }
+.sec-list small { color: var(--muted); font-size: 13px; }
+.sec-ic { font-size: 22px; }
+.sec-steps { padding-inline-start: 20px; display: flex; flex-direction: column; gap: 10px; line-height: 1.7; }
+.sec-qr svg { width: 180px; height: 180px; background: #fff; border-radius: 12px; padding: 6px; margin: 8px 0; display: block; }
+.sec-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.sec-row input { flex: 1; min-width: 140px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font: inherit; letter-spacing: 4px; text-align: center; }
+.sec-codes { background: var(--green-tint); padding: 14px; border-radius: 12px; font-size: 16px; letter-spacing: 2px; line-height: 1.9; columns: 2; }

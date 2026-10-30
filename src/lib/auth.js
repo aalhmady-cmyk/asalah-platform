@@ -22,11 +22,11 @@ export function validPassword(p) {
   return p;
 }
 
-export async function createSession(db, userId) {
+export async function createSession(db, userId, meta = {}) {
   const token = randomHex(32);
   const t = now();
   await db.batch([
-    db.prepare('INSERT INTO sessions(token_hash,user_id,created_at,expires_at) VALUES(?,?,?,?)').bind(await sha256(token), userId, t, t + SESSION_TTL),
+    db.prepare('INSERT INTO sessions(token_hash,user_id,created_at,expires_at,device_kind,city) VALUES(?,?,?,?,?,?)').bind(await sha256(token), userId, t, t + SESSION_TTL, meta.kind || null, meta.city || null),
     db.prepare('DELETE FROM sessions WHERE expires_at<?').bind(t),
     db.prepare('UPDATE users SET last_login_at=? WHERE id=?').bind(t, userId),
   ]);
@@ -35,6 +35,11 @@ export async function createSession(db, userId) {
 
 export function cookieHeader(value, maxAge) {
   return `${COOKIE}=${value}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+}
+
+export async function currentTokenHash(req) {
+  const token = tokenFrom(req);
+  return token ? sha256(token) : null;
 }
 
 function tokenFrom(req) {

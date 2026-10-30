@@ -6,7 +6,7 @@ import { serveImage } from './lib/images.js';
 import { prepare } from './lib/schema.js';
 import { HttpError, json } from './lib/util.js';
 import { handleAdmin } from './routes/admin.js';
-import { changePassword, forgotPassword, login, logout, me, resetPassword, setup } from './routes/auth.js';
+import { changePassword, endSessions, forgotPassword, login, login2fa, logout, me, resetPassword, security, setup, totpDisable, totpEnable, totpSetup } from './routes/auth.js';
 import { handleMerchant } from './routes/merchant.js';
 import { handleSeo } from './routes/seo.js';
 import { handlePublicPush, handleUserPush } from './routes/push.js';
@@ -25,6 +25,8 @@ const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'no-referrer',
   'X-Frame-Options': 'DENY',
+  // المتصفح يفتح الموقع دائماً بـ https حتى لو انكتب الرابط بدونها
+  'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
 };
 
 const SITE_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'self'";
@@ -73,6 +75,12 @@ async function route(req, env) {
   if (path === '/api/public/fakes-map' || path === '/api/public/seller') return handlePublicTrust(req, env, path);
   if (path === '/api/public/merchants-page') return handlePublicGrowth(req, env, path);
   if (path === '/api/auth/login' && m === 'POST') return login(req, env);
+  if (path === '/api/auth/login/2fa' && m === 'POST') return login2fa(req, env);
+  if (path === '/api/auth/security' && m === 'GET') return security(req, env);
+  if (path === '/api/auth/2fa/setup' && m === 'POST') return totpSetup(req, env);
+  if (path === '/api/auth/2fa/enable' && m === 'POST') return totpEnable(req, env);
+  if (path === '/api/auth/2fa/disable' && m === 'POST') return totpDisable(req, env);
+  if (path === '/api/auth/sessions/end' && m === 'POST') return endSessions(req, env);
   if (path === '/api/auth/logout' && m === 'POST') return logout(req, env);
   if (path === '/api/auth/me' && m === 'GET') return me(req, env);
   if (path === '/api/auth/password' && m === 'POST') return changePassword(req, env);
