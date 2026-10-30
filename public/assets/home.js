@@ -30,7 +30,7 @@ function countUp(el, to) {
 
 // الأقسام تظهر بحركة خفيفة وقت النزول
 const io = 'IntersectionObserver' in window ? new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && (e.target.classList.add('in'), io.unobserve(e.target))), { threshold: 0.12 }) : null;
-if (io) document.querySelectorAll('.step, .feat, .split, .merchants').forEach((el) => { el.classList.add('reveal'); io.observe(el); });
+if (io) document.querySelectorAll('.step, .feat, .split, .merchants, .biz-band').forEach((el) => { el.classList.add('reveal'); io.observe(el); });
 
 
 try {
@@ -39,7 +39,8 @@ try {
 show();
 try {
   const s = await (await fetch('/api/public/stats')).json();
-  if (s.ok && s.original > 0) {
+  // الأرقام الصغيرة تعطي انطباع إن المنصة فاضية، فما نعرضها إلا لما تكبر
+  if (s.ok && s.original >= 500) {
     document.getElementById('stats').hidden = false;
     for (const el of document.querySelectorAll('[data-stat]')) countUp(el, s[el.dataset.stat] ?? 0);
   }

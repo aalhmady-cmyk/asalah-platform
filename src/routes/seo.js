@@ -133,6 +133,8 @@ async function sitemap(env, origin) {
   const day = (t) => new Date((t || 0) * 1000).toISOString().slice(0, 10);
   const urls = [
     `<url><loc>${origin}/</loc></url>`,
+    `<url><loc>${origin}/merchants/</loc></url>`,
+    `<url><loc>${origin}/map/</loc><changefreq>hourly</changefreq></url>`,
     `<url><loc>${origin}/stores/</loc><changefreq>daily</changefreq></url>`,
     `<url><loc>${origin}/privacy/</loc></url>`,
     `<url><loc>${origin}/terms/</loc></url>`,

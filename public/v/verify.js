@@ -23,14 +23,35 @@ function deviceId() {
 // الرمز يُشال من العنوان عشان الرابط المنسوخ من المتصفح ما يحمله، ويبقى في الجلسة لو حدّث الصفحة
 const params = new URLSearchParams(location.search);
 const hashParams = new URLSearchParams(location.hash.slice(1));
-let token = params.get('t') || hashParams.get('t') || session?.getItem('asalah_t') || '';
-if (params.has('t') || hashParams.has('t')) {
+// صفحة تجريبية للتجار (?demo=ok أو ?demo=fake): نفس الصفحة ببيانات ثابتة وبدون أي طلب للخادم
+const DEMO = ['ok', 'fake'].includes(params.get('demo')) ? params.get('demo') : null;
+let token = DEMO ? 'demo' : params.get('t') || hashParams.get('t') || session?.getItem('asalah_t') || '';
+if (!DEMO && (params.has('t') || hashParams.has('t'))) {
   session?.setItem('asalah_t', token);
   history.replaceState(null, '', location.pathname);
 }
 const sid = deviceId();
 
+function demoResult() {
+  const t = Math.floor(Date.now() / 1000);
+  if (DEMO === 'fake') return { ok: false, result: 'unknown', message: 'هذي العلامة غير مسجلة عندنا. لا تستخدم المنتج قبل ما تتأكد من البائع.', brand: null, sound: true };
+  return {
+    ok: true, result: 'original', message: '', sound: true, sound_clips: {}, voice_url: null, shop: null, contest: null,
+    brand: { name: tx('علامتك التجارية', 'Your brand'), logo_url: null, brand_color: '#0E6B4E', store_url: null, whatsapp: null },
+    tag: { public_id: 'DEMO-000001', batch: 'DEMO', product_name: tx('منتجك', 'Your product'), produced_on: '2026-09', image_url: null, expires_on: null, expired: false, details: null, is_test: false, check_no: 1, checks_left: 4 },
+    loyalty: { mode: 'points', per_tag: 10, min_redeem: 100, reward: tx('خصم 20 ريال', '20 SAR off'), claimed: false },
+    rating: { done: false, stars: null },
+    passport: { produced_on: '2026-09', issued_at: t - 20 * 86400, shipped_at: t - 9 * 86400, first_check_at: t, batch_verified: 128, batch_size: 500 },
+    level: { count: 1, key: 'bronze', name: 'برونزي', name_en: 'Bronze', icon: '🥉', next: { name: 'فضي', name_en: 'Silver', icon: '🥈', need: 4 } },
+    guarantee: { terms: tx('إذا طلع المنتج مقلّد نرجع لك المبلغ كامل.', 'If it turns out fake, we refund you in full.'), claimed: null },
+  };
+}
+
 async function post(path, body) {
+  if (DEMO) {
+    if (path === '/api/verify') return demoResult();
+    throw new Error(tx('هذي صفحة تجريبية 🙂 في منتجك الحقيقي يوصل هذا الطلب لك مباشرة.', 'This is a demo page 🙂 On your real product this goes straight to you.'));
+  }
   const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({ ok: false, message: tx('تعذر الاتصال، حاول مرة ثانية', 'Connection failed, please try again') }));
   if (!res.ok && res.status !== 200) throw Object.assign(new Error(EN ? enError(data) : data.message || 'صار خطأ'), { data, status: res.status });
@@ -104,7 +125,8 @@ function soundChip(kind) {
 translatePage();
 onLangToggle(() => lastData);
 async function run() {
-  const cached = takeCachedResult();
+  const cached = DEMO ? null : takeCachedResult();
+  if (DEMO) show('demo-bar');
   replay = Boolean(cached);
   if (!cached) preload(EN);
   const steps = cached ? Promise.resolve() : scanSteps();

@@ -186,3 +186,15 @@ body.site { background: var(--ground); }
 .mb-dot { width: 14px; height: 14px; border-radius: 50%; background: #FF4D4F; box-shadow: 0 0 0 0 rgba(255,77,79,.7); animation: mbp 1.6s infinite; flex: none; }
 @keyframes mbp { 70% { box-shadow: 0 0 0 14px rgba(255,77,79,0); } 100% { box-shadow: 0 0 0 0 rgba(255,77,79,0); } }
 @media (prefers-reduced-motion: reduce) { .mb-dot { animation: none; } }
+
+/* شريط التجار في الرئيسية */
+.biz-band { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; padding: 32px; border-radius: 28px; background: linear-gradient(135deg, #0F2A21, #1B4A3A); color: #fff; text-decoration: none; border: 2px solid transparent; transition: border-color .15s, transform .15s; }
+.biz-band:hover { color: #fff; border-color: var(--gold); transform: translateY(-2px); }
+.biz-band > div:first-child { flex: 1 1 420px; display: flex; flex-direction: column; gap: 12px; }
+.biz-band h2 { color: #fff; }
+.biz-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.biz-chips span { padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); font-size: 14px; }
+.biz-cta { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.biz-cta small { color: var(--forest-ink); }
+@media (max-width: 860px) { .site-nav nav a.nav-biz { display: inline; } .biz-band { padding: 24px; } }
+@media (max-width: 420px) { .site-nav nav { gap: 10px; } .site-nav nav a.nav-shop { font-size: 13px; } }

@@ -9,6 +9,12 @@ $('month').addEventListener('change', (e) => { q.set('month', e.target.value); l
 $('print').addEventListener('click', () => print());
 $('back').addEventListener('click', () => (history.length > 1 ? history.back() : (location.href = '/login/')));
 
+// السهم مقارنة بالشهر اللي قبله
+const trend = (cur, prev) => {
+  if (!prev) return '';
+  const p = Math.round(((cur - prev) / prev) * 100);
+  return html`<small class="${p >= 0 ? 'up' : 'down'}">${p >= 0 ? '▲' : '▼'} ${Math.abs(p)}٪ عن الشهر اللي قبله</small>`;
+};
 const monthName = (m) => new Date(m + '-15T12:00:00Z').toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { month: 'long', year: 'numeric' });
 
 function monthBars(daily) {
@@ -38,7 +44,7 @@ try {
       <div class="r-title"><span class="small muted">التقرير الشهري</span><b>${monthName(month)}</b></div>
     </header>
     <div class="r-kpis">
-      <div class="r-kpi gold"><span>علامات انمسحت (مبيعات تقديرية)</span><b>${num(r.sold)}</b></div>
+      <div class="r-kpi gold"><span>علامات انمسحت (مبيعات تقديرية)</span><b>${num(r.sold)}</b>${trend(r.sold, r.prev_sold)}</div>
       <div class="r-kpi"><span>كل المسحات</span><b>${num(r.scans)}</b></div>
       <div class="r-kpi"><span>نسبة الأصلي</span><b>${r.original_ratio == null ? '-' : r.original_ratio + '%'}</b></div>
       <div class="r-kpi"><span>مسحات مشبوهة</span><b>${num(fake)}</b></div>
@@ -46,6 +52,8 @@ try {
       <div class="r-kpi"><span>بلاغات العملاء</span><b>${num(r.reports)}</b></div>
       <div class="r-kpi"><span>مشاركات المسابقة</span><b>${num(r.entries)}</b></div>
       <div class="r-kpi"><span>أرقام مختلفة شاركت</span><b>${num(r.entry_phones)}</b></div>
+      <div class="r-kpi"><span>تقييم العملاء</span><b>${r.ratings?.count ? `${r.ratings.avg} ★` : '-'}</b>${r.ratings?.count ? html`<small class="muted">من ${num(r.ratings.count)} تقييم</small>` : ''}</div>
+      <div class="r-kpi"><span>طلبات ضمان أصالة</span><b>${num(r.guarantee?.claims || 0)}</b>${r.guarantee?.claims ? html`<small class="muted">انقبل ${num(r.guarantee.approved)}</small>` : ''}</div>
     </div>
     <section class="r-sec"><h2>المسحات اليومية <span class="small muted">(الأحمر = غير أصلي)</span></h2>${monthBars(r.daily)}</section>
     <div class="r-two">
@@ -54,6 +62,7 @@ try {
     </div>
     <section class="r-sec"><h2>بؤر التقليد</h2>${r.hotspots.length ? html`<table><thead><tr><th>المدينة</th><th>حالات مشبوهة</th><th>بلاغات</th><th>محلات مذكورة</th></tr></thead><tbody>${r.hotspots.map((h) => html`<tr><td><b>${h.city}</b></td><td>${num(h.suspicious)}</td><td>${num(h.reports)}</td><td class="small">${h.places.join('، ') || '-'}</td></tr>`)}</tbody></table>` : html`<div class="empty">ما فيه تقليد ملحوظ هالشهر 👍</div>`}</section>
     <footer class="r-foot"><span>أصالة المنتجات الأصلية</span><span>صدر في ${new Date(r.generated_at * 1000).toLocaleString('ar-SA-u-ca-gregory-nu-latn', { timeZone: 'Asia/Riyadh' })}</span></footer>`);
+  if (q.get('pdf') === '1') setTimeout(() => print(), 600);
 } catch (e) {
   render($('sheet'), html`<div class="alert err"><div>${e.message}</div></div>`);
   toast(e.message, true);

@@ -6,3 +6,37 @@
 .app-install-a { display: flex; gap: 8px; align-items: center; }
 /* داخل التطبيق على الآيفون: مسافة تحت شريط الساعة وفوق شريط الرجوع */
 @media (display-mode: standalone) { body { padding-bottom: env(safe-area-inset-bottom); } }
+
+/* أقسام القائمة الجانبية */
+.side nav .nav-group { margin: 14px 14px 4px; font-size: 12px; font-weight: 700; color: var(--forest-muted, #8FB3A5); letter-spacing: .2px; }
+/* الشريط السفلي في الجوال (لوحة التاجر) */
+.bottom-bar { display: none; }
+@media (max-width: 720px) {
+  .side nav .nav-group { display: none; }
+  body:has(.bottom-bar) .side nav { display: none; }
+  body.nav-open:has(.bottom-bar) .side nav { display: flex; position: fixed; inset-inline: 10px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 60; flex-direction: column; max-height: 70vh; overflow-y: auto; padding: 12px; border-radius: 20px; background: var(--forest); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+  body.nav-open:has(.bottom-bar) .side nav .nav-group { display: block; }
+  body.nav-open:has(.bottom-bar)::after { content: ''; position: fixed; inset: 0; z-index: 55; background: rgba(15,42,33,.45); }
+  .bottom-bar { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; inset-inline: 0; bottom: 0; z-index: 70; background: var(--surface, #fff); border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 20px rgba(15,42,33,.08); }
+  .bottom-bar button { border: 0; background: none; font: inherit; font-size: 11px; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 52px; justify-content: center; border-radius: 12px; cursor: pointer; }
+  .bottom-bar button i { font-style: normal; font-size: 21px; line-height: 1; filter: grayscale(.6); }
+  .bottom-bar button[aria-current="page"] { color: var(--green-ink); font-weight: 700; background: var(--green-tint); }
+  .bottom-bar button[aria-current="page"] i { filter: none; }
+  body:has(.bottom-bar) .main { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+}
+
+/* خطوات البداية للتاجر */
+.onboard { border: 2px solid var(--gold, #D9B45A); }
+.ob-progress { height: 8px; border-radius: 99px; background: var(--ground); overflow: hidden; }
+.ob-progress i { display: block; height: 100%; background: linear-gradient(90deg, #D9B45A, #0E6B4E); border-radius: 99px; }
+.ob-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.ob-steps button { width: 100%; display: flex; gap: 12px; align-items: center; text-align: start; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); font: inherit; cursor: pointer; color: var(--ink); }
+.ob-steps button:hover:not(:disabled) { border-color: var(--gold, #D9B45A); }
+.ob-steps button:disabled { cursor: default; opacity: .65; }
+.ob-steps b { display: block; font-size: 15px; }
+.ob-steps small { display: block; color: var(--muted); font-size: 13px; }
+.ob-dot { flex: none; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font-size: 14px; font-weight: 700; }
+.ob-steps .done .ob-dot { background: var(--green-ink, #0E6B4E); border-color: var(--green-ink, #0E6B4E); color: #fff; }
+.ob-steps .done b { text-decoration: line-through; }
+.ob-steps .next button { border-color: var(--gold, #D9B45A); background: #FFF8E6; }
+.ob-go { margin-inline-start: auto; color: var(--green-ink); font-weight: 700; }

@@ -26,11 +26,13 @@
     </div>
     <nav id="nav" aria-label="القائمة الرئيسية">
       <button type="button" data-tab="home">الرئيسية</button>
+      <button type="button" data-tab="leads">طلبات التجار 📥 <span class="badge" id="leads-badge"></span></button>
       <button type="button" data-tab="merchants">التجار</button>
       <button type="button" data-tab="batches">الدفعات</button>
       <button type="button" data-tab="tags">العلامات</button>
       <button type="button" data-tab="store">المتاجر 🛍️</button>
       <button type="button" data-tab="push">الإشعارات 🔔</button>
+      <button type="button" data-tab="site">صفحة التجار 🏷️</button>
       <button type="button" data-tab="reports">التقليد والبلاغات <span class="badge" id="unknown-badge"></span></button>
       <button type="button" data-tab="users">الحسابات</button>
       <button type="button" data-tab="audit">سجل العمليات</button>
@@ -50,6 +52,7 @@
       </div>
       <div style="display:flex;flex-direction:column;gap:24px;margin-top:24px">
         <div class="kpis" id="home-kpis"></div>
+        <div class="card" id="health"></div>
         <div id="home-alerts" style="display:flex;flex-direction:column;gap:12px"></div>
         <div class="row">
           <div class="card wide"><div class="card-head"><h2>المسحات، آخر 14 يوم</h2><span class="small muted">كل التجار</span></div><div id="home-bars"></div></div>
@@ -57,6 +60,42 @@
         </div>
         <div class="card"><div class="card-head"><h2>التجار</h2></div><div class="table-wrap" id="home-merchants"></div></div>
       </div>
+    </section>
+
+    <section id="leads" hidden>
+      <div class="page-head"><div><h1>طلبات التجار الجدد 📥</h1><p>كل طلب من المساعد أو من صفحة التجار يوصل هنا. حرّكه بين المراحل لين يصير مشترك.</p></div><button class="btn btn-primary" type="button" id="lead-add-btn">+ طلب يدوي</button></div>
+      <form class="card" id="lead-form" hidden style="margin-top:20px">
+        <h2>طلب يدوي</h2>
+        <div class="row">
+          <label class="field">الاسم<input name="name" required minlength="2"></label>
+          <label class="field">العلامة التجارية<input name="brand" required minlength="2"></label>
+          <label class="field">الجوال<input name="phone" type="tel" class="ltr" placeholder="05xxxxxxxx"></label>
+          <label class="field">نوع المنتج<input name="product"></label>
+        </div>
+        <div class="actions"><button class="btn btn-primary" type="submit">حفظ</button><button class="btn" type="button" id="lead-cancel">إلغاء</button></div>
+      </form>
+      <div class="leads-board" id="leads-board" style="margin-top:24px"></div>
+    </section>
+
+    <section id="site" hidden>
+      <div class="page-head"><div><h1>صفحة التجار 🏷️</h1><p>الباقات وقصة النجاح اللي تطلع في <a href="/merchants/" target="_blank">alsalah-sa.com/merchants</a></p></div><a class="btn" href="/merchants/" target="_blank">افتح الصفحة ↗</a></div>
+      <form class="card" id="plans-form" style="margin-top:24px">
+        <div class="card-head"><h2>الباقات والأسعار</h2><button class="btn btn-sm" type="button" id="plans-reset">رجّع الافتراضي</button></div>
+        <p class="small muted" style="margin:0">اكتب السعر كنص حر، مثل «299 ريال شهرياً» أو «حسب الكمية» أو «مجاناً فترة الإطلاق». كل ميزة في سطر.</p>
+        <div class="plans-edit" id="plans-edit"></div>
+        <div><button class="btn btn-primary" type="submit">حفظ الباقات</button></div>
+      </form>
+      <form class="card" id="story-form" style="margin-top:24px">
+        <h2>قصة النجاح</h2>
+        <p class="small muted" style="margin:0">اختر التاجر واكتب كلمته. الأرقام (التحقق، التقليد، المدن، الأيام) تنحسب تلقائياً من بياناته الحقيقية. اتركها بدون تاجر وتختفي من الصفحة.</p>
+        <div class="row">
+          <label class="field">التاجر<select name="merchant_id" id="story-merchant"></select></label>
+          <label class="field">العنوان (اختياري)<input name="headline" maxlength="100" placeholder="مثال: الكيف الأخضر وقّف التقليد في 3 أشهر"></label>
+        </div>
+        <label class="field">كلمة صاحب العلامة<textarea name="quote" maxlength="400" rows="3" placeholder="اكتب كلامه مثل ما قاله"></textarea></label>
+        <label class="field">اسم القائل وصفته<input name="author" maxlength="80" placeholder="مثال: أبو فهد، مالك الكيف الأخضر"></label>
+        <div><button class="btn btn-primary" type="submit">حفظ القصة</button></div>
+      </form>
     </section>
 
     <section id="merchants" hidden>

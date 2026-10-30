@@ -1,6 +1,6 @@
 import { initPanelApp } from '/assets/panel-app.js';
 import { playResult } from '/assets/sound.js';
-import { api, bars, BATCH_STATUS, hbars, hotspotsTable, html, pickImage, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
+import { api, raw, bars, BATCH_STATUS, hbars, hotspotsTable, html, pickImage, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 
 const $ = (id) => document.getElementById(id);
 let merchants = [];
@@ -48,7 +48,12 @@ onSubmit($('merchant-form'), async (f, form) => {
     low_stock_threshold: Number(f.low_stock_threshold), max_checks: Number(f.max_checks), public_listed: f.public_listed === 'on',
   };
   if (f.id) await api(`/api/admin/merchants/${f.id}`, { method: 'PATCH', body: { ...body, status: f.status, store_enabled: f.store_enabled === 'on', verify_sound: f.verify_sound === 'on' } });
-  else await api('/api/admin/merchants', { method: 'POST', body: { ...body, slug: f.slug } });
+  else {
+    const r = await api('/api/admin/merchants', { method: 'POST', body: { ...body, slug: f.slug } });
+    // التاجر جاي من طلب انضمام: نعلّم الطلب إنه اشترك
+    if (pendingLead) await api('/api/admin/leads/' + pendingLead, { method: 'PATCH', body: { status: 'subscribed', merchant_id: r.merchant.id } }).catch(() => {});
+  }
+  pendingLead = null;
   form.closest('dialog').close();
   toast('تم حفظ التاجر');
   refresh();
@@ -112,6 +117,7 @@ document.addEventListener('click', (e) => {
 });
 
 async function loadHome() {
+  loadHealth().catch(() => {});
   const d = await api('/api/admin/overview');
   merchants = d.merchants;
   const o = d.overview;
@@ -516,7 +522,124 @@ $('push-clear').addEventListener('click', async () => {
     loadPush();
   } catch (x) { toast(x.message, true); }
 });
-const loaders = { home: loadHome, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, push: loadPush, reports: loadReports, users: loadUsers, audit: loadAudit };
+
+// ---------- صحة المنصة ----------
+async function loadHealth() {
+  const h = await api('/api/admin/health');
+  const item = (cls, icon, title, list, fmt) => list.length ? html`<div class="hl-item ${cls}"><b>${icon} ${title} <span class="pill">${list.length}</span></b><div class="small">${list.slice(0, 6).map((x, i) => html`${i ? '، ' : ''}${fmt(x)}`)}${list.length > 6 ? ` و${list.length - 6} غيرهم` : ''}</div></div>` : '';
+  const issues = h.low_stock.length + h.quiet.length + h.not_activated.length + h.no_batch.length;
+  $('leads-badge').textContent = h.new_leads ? String(h.new_leads) : '';
+  render($('health'), html`<div class="card-head"><h2>صحة المنصة 🩺</h2>${issues ? html`<span class="pill warn">${issues} يحتاج متابعة</span>` : html`<span class="pill ok">كل شي تمام 👌</span>`}</div>
+    <div class="hl-grid">
+      ${h.new_leads ? html`<button type="button" class="hl-item info" data-goto-tab="leads"><b>📥 طلبات تجار جديدة <span class="pill">${h.new_leads}</span></b><div class="small">افتح «طلبات التجار» وتواصل معهم</div></button>` : ''}
+      ${item('warn', '📦', 'مخزون علامات قرب يخلص', h.low_stock, (x) => `${x.name} (باقي ${num(x.remaining)}${x.days_left != null ? ` · ${x.days_left} يوم` : ''})`)}
+      ${item('warn', '⏳', 'دفعات ما تفعّلت من أكثر من أسبوع', h.not_activated, (x) => `${x.name} (${x.batches} دفعة · ${x.days} يوم)`)}
+      ${item('err', '😴', 'تجار ما انمسح لهم شي من أسبوعين', h.quiet, (x) => x.name)}
+      ${item('info', '🆕', 'تجار بدون أي دفعة', h.no_batch, (x) => `${x.name} (من ${x.days} يوم)`)}
+      <div class="hl-item"><b>🗺️ أكثر المدن تقليداً (30 يوم)</b><div class="small">${h.fake_cities.length ? h.fake_cities.map((c, i) => html`${i ? ' · ' : ''}${c.city} ${num(c.n)}`) : 'ما فيه تقليد ملحوظ 👍'}</div><a class="small" href="/map/?admin=1" target="_blank">افتح الخريطة ↗</a></div>
+    </div>`);
+}
+$('health').addEventListener('click', (e) => { const b = e.target.closest('[data-goto-tab]'); if (b) showTab(b.dataset.gotoTab); });
+
+// ---------- طلبات التجار الجدد ----------
+const LEAD_COLS = [['new', 'جديد', '🆕'], ['contacted', 'تواصلنا', '📞'], ['subscribed', 'اشترك', '✅'], ['rejected', 'ما كمل', '✖️']];
+async function loadLeads() {
+  const d = await api('/api/admin/leads');
+  $('leads-badge').textContent = d.counts.new ? String(d.counts.new) : '';
+  render($('leads-board'), html`${LEAD_COLS.map(([k, label, icon]) => html`<div class="lead-col"><h3>${icon} ${label} <span class="pill">${d.counts[k]}</span></h3>
+    ${d.leads.filter((l) => l.status === k).map((l) => html`<div class="lead-card">
+      <b>${l.brand}</b>
+      <div class="small">${l.name}${l.phone ? html` · <a class="ltr" href="https://wa.me/${l.phone.replace(/^0/, '966')}" target="_blank" rel="noopener">${l.phone.replace(/^966/, '0')}</a>` : ''}</div>
+      ${l.product || l.qty ? html`<div class="small muted">${[l.product, l.qty ? l.qty + ' منتج شهرياً' : ''].filter(Boolean).join(' · ')}</div>` : ''}
+      ${l.note ? html`<div class="small lead-note">📝 ${l.note}</div>` : ''}
+      <div class="small muted">${l.source === 'manual' ? 'يدوي' : 'من المساعد'} · ${when(l.created_at)}</div>
+      <div class="lead-actions">
+        <select data-lead-status="${l.id}" aria-label="المرحلة">${LEAD_COLS.map(([v, t]) => html`<option value="${v}" ${raw(v === l.status ? 'selected' : '')}>${t}</option>`)}</select>
+        <button class="btn btn-sm" type="button" data-lead-note="${l.id}">📝</button>
+        ${l.status !== 'subscribed' ? html`<button class="btn btn-sm" type="button" data-lead-merchant="${l.id}" title="إنشاء حساب تاجر">➕ تاجر</button>` : ''}
+        <button class="btn btn-sm btn-danger" type="button" data-lead-del="${l.id}" aria-label="حذف">🗑️</button>
+      </div>
+    </div>`)}
+    ${d.counts[k] ? '' : html`<div class="empty small">ما فيه</div>`}
+  </div>`)}`);
+  leadsCache = d.leads;
+}
+let leadsCache = [];
+$('leads-board').addEventListener('change', async (e) => {
+  const s = e.target.closest('[data-lead-status]');
+  if (!s) return;
+  try { await api('/api/admin/leads/' + s.dataset.leadStatus, { method: 'PATCH', body: { status: s.value } }); await loadLeads(); } catch (err) { toast(err.message, true); }
+});
+$('leads-board').addEventListener('click', async (e) => {
+  const n = e.target.closest('[data-lead-note]'), m = e.target.closest('[data-lead-merchant]'), del = e.target.closest('[data-lead-del]');
+  try {
+    if (n) {
+      const l = leadsCache.find((x) => String(x.id) === n.dataset.leadNote);
+      const note = prompt('ملاحظة على الطلب', l?.note || '');
+      if (note === null) return;
+      await api('/api/admin/leads/' + n.dataset.leadNote, { method: 'PATCH', body: { note: note.trim() || null } });
+      await loadLeads();
+    } else if (m) {
+      const l = leadsCache.find((x) => String(x.id) === m.dataset.leadMerchant);
+      openDialog('dlg-merchant');
+      $('merchant-form').name.value = l.brand;
+      pendingLead = l.id;
+    } else if (del) {
+      if (!confirm('تحذف الطلب؟')) return;
+      await api('/api/admin/leads/' + del.dataset.leadDel, { method: 'DELETE' });
+      await loadLeads();
+    }
+  } catch (err) { toast(err.message, true); }
+});
+let pendingLead = null;
+$('lead-add-btn').addEventListener('click', () => { $('lead-form').hidden = false; $('lead-form').name.focus(); });
+$('lead-cancel').addEventListener('click', () => { $('lead-form').hidden = true; });
+onSubmit($('lead-form'), async (f, form) => {
+  await api('/api/admin/leads', { method: 'POST', body: { name: f.name, brand: f.brand, phone: f.phone || null, product: f.product || null } });
+  form.reset();
+  form.hidden = true;
+  toast('انضاف الطلب');
+  await loadLeads();
+});
+
+// ---------- صفحة التجار: الباقات وقصة النجاح ----------
+function drawPlans(plans) {
+  render($('plans-edit'), html`${plans.map((p, i) => html`<fieldset class="plan-edit">
+    <legend>الباقة ${i + 1}</legend>
+    <label class="field">الاسم<input name="name${i}" value="${p.name}" maxlength="40" required></label>
+    <label class="field">السعر<input name="price${i}" value="${p.price}" maxlength="40" required></label>
+    <label class="field">وصف قصير<input name="note${i}" value="${p.note || ''}" maxlength="60"></label>
+    <label class="field">المزايا (كل ميزة بسطر)<textarea name="items${i}" rows="4">${p.items.join('\n')}</textarea></label>
+    <label class="check"><input type="radio" name="featured" value="${i}" ${raw(p.featured ? 'checked' : '')}> الباقة المميزة</label>
+  </fieldset>`)}`);
+}
+async function loadSite() {
+  const d = await api('/api/admin/site');
+  if (!merchants.length) merchants = (await api('/api/admin/merchants')).merchants;
+  drawPlans(d.plans);
+  const f = $('story-form');
+  render($('story-merchant'), html`<option value="">بدون قصة</option>${merchants.map((m) => html`<option value="${m.id}">${m.name}</option>`)}`);
+  f.merchant_id.value = d.story?.merchant_id || '';
+  f.headline.value = d.story?.headline || '';
+  f.quote.value = d.story?.quote || '';
+  f.author.value = d.story?.author || '';
+}
+onSubmit($('plans-form'), async (f) => {
+  const plans = [0, 1, 2, 3].filter((i) => f['name' + i] !== undefined).map((i) => ({ name: f['name' + i], price: f['price' + i], note: f['note' + i] || null, items: f['items' + i], featured: f.featured === String(i) }));
+  const d = await api('/api/admin/site', { method: 'PUT', body: { plans } });
+  drawPlans(d.plans);
+  toast('انحفظت الباقات ✅');
+});
+$('plans-reset').addEventListener('click', async () => {
+  if (!confirm('ترجع الباقات للنص الافتراضي؟')) return;
+  try { const d = await api('/api/admin/site', { method: 'PUT', body: { plans: null } }); drawPlans(d.plans); toast('رجعت الباقات الافتراضية'); } catch (err) { toast(err.message, true); }
+});
+onSubmit($('story-form'), async (f) => {
+  await api('/api/admin/site', { method: 'PUT', body: { story: f.merchant_id ? { merchant_id: Number(f.merchant_id), headline: f.headline || null, quote: f.quote, author: f.author } : null } });
+  toast(f.merchant_id ? 'انحفظت القصة، تطلع الحين في صفحة التجار ✅' : 'انشالت القصة من الصفحة');
+});
+
+const loaders = { home: loadHome, leads: loadLeads, site: loadSite, merchants: loadMerchants, batches: loadBatches, tags: async () => {}, store: loadStore, push: loadPush, reports: loadReports, users: loadUsers, audit: loadAudit };
 let current = 'home';
 const refresh = () => loaders[current]().catch((e) => toast(e.message, true));
-tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => { current = id; refresh(); });
+const showTab = tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => { current = id; refresh(); });

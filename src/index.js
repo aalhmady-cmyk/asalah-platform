@@ -13,6 +13,8 @@ import { handlePublicPush, handleUserPush } from './routes/push.js';
 import { runCampaigns } from './lib/push.js';
 import { runWeekly } from './lib/trust.js';
 import { handlePublicTrust } from './routes/trust.js';
+import { handlePublicGrowth } from './routes/growth.js';
+import { runMonthly } from './lib/growth.js';
 import { handlePublicStore } from './routes/store.js';
 import { handleCustomer } from './lib/customers.js';
 import { serveMedia } from './lib/store.js';
@@ -62,6 +64,7 @@ async function route(req, env) {
   if (path === '/api/report' && m === 'POST') return report(req, env);
   if (path === '/api/guarantee' && m === 'POST') return guarantee(req, env);
   if (path === '/api/public/fakes-map' || path === '/api/public/seller') return handlePublicTrust(req, env, path);
+  if (path === '/api/public/merchants-page') return handlePublicGrowth(req, env, path);
   if (path === '/api/auth/login' && m === 'POST') return login(req, env);
   if (path === '/api/auth/logout' && m === 'POST') return logout(req, env);
   if (path === '/api/auth/me' && m === 'GET') return me(req, env);
@@ -98,6 +101,7 @@ export default {
         await runStoreSync(e).catch((err) => console.error('ASALAH_SYNC', err?.stack || err));
         await runCampaigns(e.DB).catch((err) => console.error('ASALAH_PUSH', err?.stack || err));
         await runWeekly(e).catch((err) => console.error('ASALAH_WEEKLY', err?.stack || err));
+        await runMonthly(e).catch((err) => console.error('ASALAH_MONTHLY', err?.stack || err));
       })
     );
   },

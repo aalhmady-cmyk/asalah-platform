@@ -1,4 +1,4 @@
-import { api, hotspotsTable, initial, pickImage, bars, BATCH_STATUS, hbars, html, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
+import { api, raw, hotspotsTable, initial, pickImage, bars, BATCH_STATUS, hbars, html, logout, num, onSubmit, pill, render, RESULT, TAG_STATUS, tabs, toast, when } from '/assets/common.js';
 import { loadStore } from '/merchant/store.js';
 import { initPanelApp } from '/assets/panel-app.js';
 import { playResult } from '/assets/sound.js';
@@ -26,7 +26,29 @@ function brandHeader(m) {
   else logo.textContent = initial(m.name);
 }
 
+// خطوات البداية: تختفي لما تكتمل أو يخفيها التاجر
+async function loadOnboard() {
+  const box = $('onboard');
+  let hidden = false;
+  try { hidden = localStorage.getItem('asalah_onboard_hide') === '1'; } catch {}
+  if (hidden) return;
+  const d = await api('/api/m/onboarding');
+  if (d.done >= d.total) { box.hidden = true; return; }
+  const next = d.steps.find((x) => !x.done);
+  render(box, html`<div class="card-head"><h2>ابدأ هنا 🚀</h2><button class="btn btn-sm" type="button" id="onboard-hide">إخفاء</button></div>
+    <div class="ob-progress"><i style="width:${Math.round((d.done / d.total) * 100)}%"></i></div>
+    <p class="small muted" style="margin:0">خلصت ${d.done} من ${d.total} خطوات. كل خطوة تخلي حمايتك أقوى وعميلك أوثق.</p>
+    <ol class="ob-steps">${d.steps.map((x) => html`<li class="${x.done ? 'done' : x === next ? 'next' : ''}"><button type="button" data-ob="${x.tab}" ${raw(x.done ? 'disabled' : '')}><span class="ob-dot">${x.done ? '✓' : ''}</span><span><b>${x.title}</b><small>${x.hint}</small></span>${x.done ? '' : html`<span class="ob-go">←</span>`}</button></li>`)}</ol>`);
+  box.hidden = false;
+}
+$('onboard').addEventListener('click', (e) => {
+  if (e.target.closest('#onboard-hide')) { try { localStorage.setItem('asalah_onboard_hide', '1'); } catch {} $('onboard').hidden = true; return; }
+  const b = e.target.closest('[data-ob]');
+  if (b) showTab(b.dataset.ob);
+});
+
 async function loadHome() {
+  loadOnboard().catch(() => {});
   const d = await api('/api/m/overview');
   merchant = d.merchant;
   brandHeader(merchant);
@@ -407,6 +429,11 @@ onSubmit($('draw-form'), async (f) => {
 // ---------- التقرير الشهري ----------
 $('month-form').month.value = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 7);
 onSubmit($('month-form'), async (f) => { window.open('/report/?month=' + encodeURIComponent(f.month), '_blank'); });
+document.querySelectorAll('[data-month]').forEach((b) => b.addEventListener('click', () => {
+  const d = new Date(Date.now() + 3 * 3600e3);
+  if (b.dataset.month === 'prev') d.setUTCDate(0);
+  window.open(`/report/?month=${d.toISOString().slice(0, 7)}&pdf=1`, '_blank');
+}));
 
 // ---------- نقاط البيع ----------
 let sellers = [];
@@ -579,4 +606,18 @@ onSubmit($('password-form'), async (f) => {
 const loaders = { home: loadHome, store: loadStore, assistant: async () => { if (!merchant) merchant = (await api('/api/m/overview')).merchant; return loadAssistant(); }, tags: loadTags, loyalty: loadLoyalty, contest: async () => { await loadContest(); await loadContestData(); }, reports: loadReports, monthly: async () => {}, sellers: loadSellers, account: loadAccount, trust: loadTrust };
 // هوية التاجر في القائمة الجانبية حتى لو فتح اللوحة على غير الرئيسية
 api('/api/m/overview').then((d) => { merchant = merchant || d.merchant; brandHeader(d.merchant); }).catch(() => {});
-const showTab = tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => loaders[id]().catch((e) => toast(e.message, true)));
+// الشريط السفلي في الجوال: أهم 4 أقسام، و«المزيد» يفتح القائمة كاملة
+const BAR = ['home', 'tags', 'reports', 'store'];
+function markBar(id) {
+  document.body.classList.remove('nav-open');
+  for (const b of document.querySelectorAll('#bottom-bar [data-go]')) b.toggleAttribute('aria-current', b.dataset.go === id || (b.dataset.go === 'more' && !BAR.includes(id)));
+  for (const b of document.querySelectorAll('#bottom-bar [aria-current]')) b.setAttribute('aria-current', 'page');
+}
+const showTab = tabs($('nav'), [...document.querySelectorAll('.main > section')], (id) => { markBar(id); scrollTo(0, 0); return loaders[id]().catch((e) => toast(e.message, true)); });
+$('bottom-bar').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-go]');
+  if (!b) return;
+  if (b.dataset.go === 'more') document.body.classList.toggle('nav-open');
+  else showTab(b.dataset.go);
+});
+document.addEventListener('click', (e) => { if (document.body.classList.contains('nav-open') && !e.target.closest('#nav, #bottom-bar')) document.body.classList.remove('nav-open'); });

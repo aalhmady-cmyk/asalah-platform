@@ -27,24 +27,36 @@
     </div>
     <nav id="nav" aria-label="أقسام اللوحة">
       <button type="button" data-tab="home">الرئيسية</button>
-      <button type="button" data-tab="store">متجري 🛍️</button>
       <button type="button" data-tab="assistant">المساعد الذكي ✨</button>
+      <span class="nav-group">الحماية</span>
       <button type="button" data-tab="tags">العلامات</button>
-      <button type="button" data-tab="loyalty">النقاط والكاش باك 🪙</button>
-      <button type="button" data-tab="contest">المسابقة</button>
       <button type="button" data-tab="reports">التقليد والبلاغات</button>
       <button type="button" data-tab="trust">الضمان والثقة 🛡️</button>
-      <button type="button" data-tab="monthly">التقارير</button>
       <button type="button" data-tab="sellers">نقاط البيع</button>
+      <span class="nav-group">العملاء</span>
+      <button type="button" data-tab="loyalty">النقاط والكاش باك 🪙</button>
+      <button type="button" data-tab="contest">المسابقة</button>
+      <span class="nav-group">البيع والتقارير</span>
+      <button type="button" data-tab="store">متجري 🛍️</button>
+      <button type="button" data-tab="monthly">التقارير</button>
+      <span class="nav-group">الإعدادات</span>
       <button type="button" data-tab="account">الحساب</button>
     </nav>
     <div class="foot"><span id="me"></span><button type="button" id="logout">تسجيل الخروج</button></div>
   </aside>
+  <nav class="bottom-bar" id="bottom-bar" aria-label="أهم الأقسام">
+    <button type="button" data-go="home"><i>🏠</i>الرئيسية</button>
+    <button type="button" data-go="tags"><i>🏷️</i>العلامات</button>
+    <button type="button" data-go="reports"><i>🚨</i>التقليد</button>
+    <button type="button" data-go="store"><i>🛍️</i>متجري</button>
+    <button type="button" data-go="more"><i>☰</i>المزيد</button>
+  </nav>
 
   <main class="main">
     <section id="home">
       <div style="display:flex;flex-direction:column;gap:24px">
         <div id="app-install" hidden></div>
+        <div id="onboard" class="card onboard" hidden></div>
         <div id="alerts" style="display:flex;flex-direction:column;gap:12px"></div>
         <div class="row">
           <div class="hero wide" id="stock"></div>
@@ -230,11 +242,19 @@
     </section>
 
     <section id="monthly" hidden>
-      <div class="page-head"><div><h1>التقرير الشهري</h1><p>ملخص الشهر: المسحات والمبيعات التقديرية والتقليد والمسابقة. تقدر تطبعه أو تحفظه PDF.</p></div></div>
-      <form class="card" id="month-form" style="margin-top:24px;max-width:520px">
-        <label class="field">الشهر<input name="month" type="month" required class="ltr"></label>
-        <div><button class="btn btn-primary" type="submit">افتح التقرير</button></div>
-      </form>
+      <div class="page-head"><div><h1>التقرير الشهري 📄</h1><p>ملخص الشهر: المبيعات التقديرية ومقارنتها بالشهر اللي قبله، والتقليد، والتقييمات، والضمان. يتحمّل PDF بضغطة وترسله لشركائك.</p></div></div>
+      <div class="row" style="margin-top:24px">
+        <div class="card">
+          <h2>تقرير جاهز</h2>
+          <p class="small muted" style="margin:0">يفتح التقرير ويطلع لك حفظ PDF على طول. أول كل شهر يوصلك تنبيه إن تقرير الشهر اللي راح جاهز.</p>
+          <div class="actions"><button class="btn btn-primary" type="button" data-month="prev">⬇️ تقرير الشهر الماضي</button><button class="btn" type="button" data-month="cur">⬇️ الشهر الحالي (لين اليوم)</button></div>
+        </div>
+        <form class="card" id="month-form">
+          <h2>شهر معيّن</h2>
+          <label class="field">الشهر<input name="month" type="month" required class="ltr"></label>
+          <div><button class="btn" type="submit">افتح التقرير</button></div>
+        </form>
+      </div>
     </section>
 
     <section id="sellers" hidden>

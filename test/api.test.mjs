@@ -990,3 +990,53 @@ test('صوت نتيجة التحقق: التاجر يوقفه لمنتجاته،
   assert.deepEqual((await call('/api/admin/sound', { cookie: S.admin })).data.clips, {});
   assert.equal((await fetch(BASE + url)).status, 404);
 });
+
+test('النمو: صفحة التجار وطلبات الانضمام وصحة المنصة وخطوات البداية والتقرير الشهري', async () => {
+  // الباقات الافتراضية، والقصة مخفية لين يختارها المدير
+  let pg = await call('/api/public/merchants-page');
+  assert.equal(pg.status, 200);
+  assert.equal(pg.data.plans.length, 3);
+  assert.equal(pg.data.story, null);
+  assert.equal((await call('/api/admin/site', { method: 'PUT', body: { plans: [] }, cookie: S.admin })).status, 400);
+  assert.equal((await call('/api/admin/site', { method: 'PUT', body: { plans: [{ name: 'أساسي', price: '199 ريال', items: 'ميزة 1\nميزة 2', featured: true }] }, cookie: S.merchant })).status, 403);
+  let r = await call('/api/admin/site', { method: 'PUT', body: { plans: [{ name: 'أساسي', price: '199 ريال', items: 'ميزة 1\nميزة 2', featured: true }], story: { merchant_id: S.mid, quote: 'التقليد خف عندنا', author: 'أبو فهد' } }, cookie: S.admin });
+  assert.equal(r.status, 200);
+  pg = await call('/api/public/merchants-page');
+  assert.deepEqual(pg.data.plans[0].items, ['ميزة 1', 'ميزة 2']);
+  assert.equal(pg.data.story.quote, 'التقليد خف عندنا');
+  assert.ok(pg.data.story.stats.original > 0);
+  await call('/api/admin/site', { method: 'PUT', body: { plans: null, story: null }, cookie: S.admin });
+  assert.equal((await call('/api/public/merchants-page')).data.plans.length, 3);
+
+  // طلب الانضمام من المساعد يوصل لطلبات التجار
+  let leads = (await call('/api/admin/leads', { cookie: S.admin })).data;
+  const before = leads.leads.length;
+  assert.ok(leads.leads.some((l) => l.brand === 'عطور الورد'));
+  assert.equal((await post('/api/admin/leads', { name: 'خالد', brand: 'بن الجنوب', phone: '0559876543' }, S.admin)).status, 201);
+  leads = (await call('/api/admin/leads', { cookie: S.admin })).data;
+  assert.equal(leads.leads.length, before + 1);
+  const id = leads.leads.find((l) => l.brand === 'بن الجنوب').id;
+  assert.equal((await patch('/api/admin/leads/' + id, { status: 'oops' }, S.admin)).status, 400);
+  assert.equal((await patch('/api/admin/leads/' + id, { status: 'contacted', note: 'يبي 5000 شريحة' }, S.admin)).data.lead.status, 'contacted');
+  assert.equal((await call('/api/admin/leads', { cookie: S.merchant })).status, 403);
+  assert.equal((await call('/api/admin/leads/' + id, { method: 'DELETE', cookie: S.admin })).status, 200);
+
+  // صحة المنصة
+  const h = (await call('/api/admin/health', { cookie: S.admin })).data;
+  assert.equal(typeof h.merchants, 'number');
+  assert.ok(Array.isArray(h.low_stock) && Array.isArray(h.quiet) && Array.isArray(h.fake_cities));
+  assert.ok(h.new_leads >= 1);
+
+  // خطوات البداية للتاجر
+  const ob = (await call('/api/m/onboarding', { cookie: S.merchant })).data;
+  assert.equal(ob.total, ob.steps.length);
+  assert.ok(ob.steps.find((x) => x.key === 'first').done);
+  assert.ok(ob.steps.find((x) => x.key === 'voice').done);
+
+  // التقرير الشهري فيه المقارنة والتقييم والضمان
+  const month = new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 7);
+  const rep = (await call('/api/m/report?month=' + month, { cookie: S.merchant })).data.report;
+  assert.equal(typeof rep.prev_sold, 'number');
+  assert.ok(rep.ratings && rep.guarantee);
+  assert.ok(rep.guarantee.claims >= 1);
+});

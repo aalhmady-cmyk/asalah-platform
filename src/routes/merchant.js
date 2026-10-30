@@ -1,6 +1,7 @@
 // لوحة التاجر: كل استعلام مقيّد بتاجر المستخدم.
 import { pushAlert } from '../lib/push.js';
 import { handleMerchantTrust } from './trust.js';
+import { handleMerchantGrowth } from './growth.js';
 import { hashPassword, requireUser, validPassword } from '../lib/auth.js';
 import { ask, assistantEnabled, merchantContext, tips } from '../lib/assistant.js';
 import { deleteImage, imageUrl, saveImage } from '../lib/images.js';
@@ -38,7 +39,7 @@ export async function handleMerchant(req, env, path) {
   const mid = user.merchant_id;
   const m = req.method;
   if (user.merchant_role === 'staff' && ownerOnly(path, m)) fail(403, 'هذي الصفحة لصاحب الحساب بس', 'owner_only');
-  const trust = await handleMerchantTrust(req, env, path, user, mid);
+  const trust = (await handleMerchantTrust(req, env, path, user, mid)) || (await handleMerchantGrowth(req, env, path, mid));
   if (trust) return trust;
 
   // ---------- حسابات الموظفين ----------

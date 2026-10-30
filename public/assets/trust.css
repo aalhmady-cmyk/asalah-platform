@@ -16,3 +16,24 @@
 .sound-clip .actions { margin: 0; }
 .sound-clip > .pill { justify-self: start; }
 @media (max-width: 760px) { .sound-clip { grid-template-columns: 1fr; } .sound-clip audio { max-width: 100%; width: 100%; } }
+
+/* صحة المنصة */
+.hl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.hl-item { display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); text-align: start; font: inherit; color: var(--ink); }
+button.hl-item { cursor: pointer; }
+.hl-item.warn { background: var(--amber-tint, #FFF6E0); border-color: var(--amber-line, #F0D9A0); }
+.hl-item.err { background: var(--red-tint, #FDECEA); border-color: var(--red-line, #F3C2BC); }
+.hl-item.info { background: var(--green-tint, #E8F3EE); border-color: #BFDCCF; }
+/* طلبات التجار */
+.leads-board { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px; overflow-x: auto; align-items: start; }
+.lead-col { background: var(--ground); border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 120px; }
+.lead-col h3 { font-size: 16px; display: flex; gap: 6px; align-items: center; }
+.lead-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+.lead-note { background: #FFF8E6; border-radius: 8px; padding: 4px 8px; }
+.lead-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
+.lead-actions select { min-height: 32px; border-radius: 8px; border: 1px solid var(--field-line, #ddd); font: inherit; font-size: 13px; padding: 0 6px; }
+@media (max-width: 900px) { .leads-board { grid-template-columns: repeat(4, 240px); } }
+/* محرر الباقات */
+.plans-edit { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.plan-edit { border: 1px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.plan-edit legend { font-weight: 700; padding: 0 6px; }

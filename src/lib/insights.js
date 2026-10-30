@@ -149,6 +149,21 @@ export function monthRange(month) {
   return { from, to };
 }
 
+// مقارنة بالشهر اللي قبله + التقييمات وطلبات الضمان
+async function monthExtras(db, merchantId, from, to) {
+  const prevFrom = from - (to - from);
+  const [prev, rating, claims] = await db.batch([
+    db.prepare('SELECT COUNT(*) AS n FROM tags WHERE merchant_id=? AND first_checked_at>=? AND first_checked_at<?').bind(merchantId, prevFrom, from),
+    db.prepare('SELECT COUNT(*) AS n,ROUND(AVG(stars),1) AS avg FROM ratings WHERE merchant_id=? AND created_at>=? AND created_at<?').bind(merchantId, from, to),
+    db.prepare("SELECT COUNT(*) AS n,SUM(status='approved') AS approved FROM guarantee_claims WHERE merchant_id=? AND created_at>=? AND created_at<?").bind(merchantId, from, to),
+  ]);
+  return {
+    prev_sold: prev.results[0].n,
+    ratings: { count: rating.results[0].n, avg: rating.results[0].avg },
+    guarantee: { claims: claims.results[0].n, approved: claims.results[0].approved || 0 },
+  };
+}
+
 export async function monthlyReport(db, merchantId, month) {
   const { from, to } = monthRange(month);
   const merchant = await db.prepare('SELECT id,name,slug,logo_url,logo_key FROM merchants WHERE id=?').bind(merchantId).first();
@@ -185,6 +200,7 @@ export async function monthlyReport(db, merchantId, month) {
     reports: reports.results[0].n,
     new_fake_codes: unknownCodes.results[0].n,
     hotspots: (await hotspots(db, merchantId, Math.max(1, Math.round((Math.min(to, now()) - from) / 86400)))).slice(0, 5),
+    ...(await monthExtras(db, merchantId, from, to)),
     generated_at: now(),
   };
 }

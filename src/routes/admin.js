@@ -1,6 +1,7 @@
 // اللوحة الأم: المدير العام يدير التجار والحسابات والدفعات وكل العلامات.
 import { pushAlert } from '../lib/push.js';
 import { handleAdminTrust } from './trust.js';
+import { handleAdminGrowth } from './growth.js';
 import { hashPassword, requireUser, validPassword } from '../lib/auth.js';
 import { createResetLink } from './auth.js';
 import { adminPush } from './push.js';
@@ -54,7 +55,7 @@ export async function handleAdmin(req, env, path) {
   const user = await requireUser(db, req, 'admin');
   const m = req.method;
   let match;
-  const trust = await handleAdminTrust(req, env, path, user);
+  const trust = (await handleAdminTrust(req, env, path, user)) || (await handleAdminGrowth(req, env, path, user));
   if (trust) return trust;
   if (path.startsWith('/api/admin/push')) {
     const r = await adminPush(req, db, path, user);
@@ -65,7 +66,7 @@ export async function handleAdmin(req, env, path) {
     const [ov, merchants, alerts, unknown] = await Promise.all([
       overviewFor(db, null),
       listMerchants(db),
-      db.prepare("SELECT a.*,m.name AS merchant_name FROM alerts a LEFT JOIN merchants m ON m.id=a.merchant_id WHERE a.kind NOT IN ('store_blocked','staff_password','weekly_summary') ORDER BY a.id DESC LIMIT 20").all(),
+      db.prepare("SELECT a.*,m.name AS merchant_name FROM alerts a LEFT JOIN merchants m ON m.id=a.merchant_id WHERE a.kind NOT IN ('store_blocked','staff_password','weekly_summary','monthly_report') ORDER BY a.id DESC LIMIT 20").all(),
       db.prepare('SELECT u.preview,u.count,u.city,u.country,u.last_at,m.name AS merchant_name FROM unknown_codes u LEFT JOIN merchants m ON m.id=u.merchant_id ORDER BY u.last_at DESC LIMIT 20').all(),
     ]);
     const totals = merchants.reduce(
