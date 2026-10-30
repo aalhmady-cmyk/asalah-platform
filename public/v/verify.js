@@ -8,6 +8,12 @@ import { alertBox, confirmBox } from '/assets/dialog.js';
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => ($(id).hidden = !on);
 
+// الروابط القديمة على workers.dev تنتقل للنطاق الرسمي، عشان العلامة السرية والتسجيل يكونون في مكان واحد
+if (location.hostname.endsWith('.workers.dev')) {
+  location.replace('https://alsalah-sa.com' + location.pathname + location.search + location.hash);
+  throw new Error('redirect');
+}
+
 function store(kind) {
   try { const s = window[kind]; s.setItem('__t', '1'); s.removeItem('__t'); return s; } catch { return null; }
 }
@@ -39,6 +45,58 @@ if (!DEMO && fresh) {
   history.replaceState(null, '', location.pathname);
 }
 const sid = deviceId();
+
+// علامتك السرية: شكل ولون يختارهم العميل، محفوظين في جواله لهذا النطاق فقط.
+// الصفحة المقلّدة على نطاق ثاني ما تقدر تقرأها، فما تقدر تعرضها
+const SECRET_ICONS = ['🐪', '🦅', '🌴', '⭐', '🌙', '💎', '🔑', '🌹', '🐎', '☕', '🎯', '🍃'];
+const SECRET_COLORS = ['#0E6B4E', '#D9B45A', '#B4232A', '#1F5FBF', '#7A3DB8', '#E06A1B'];
+function readSecret() {
+  try { const v = JSON.parse(local?.getItem('asalah_secret') || 'null'); return SECRET_ICONS.includes(v?.i) && SECRET_COLORS.includes(v?.c) ? v : null; } catch { return null; }
+}
+function showSecret() {
+  const v = readSecret();
+  show('secret', Boolean(v));
+  if (!v) return false;
+  $('secret-ic').textContent = v.i;
+  $('secret-ic').style.background = v.c;
+  return true;
+}
+function pickSecret() {
+  const cur = readSecret() || {};
+  let icon = cur.i, color = cur.c;
+  const sync = () => {
+    $('sp-icons').querySelectorAll('button').forEach((b) => { b.setAttribute('aria-checked', String(b.dataset.v === icon)); b.style.background = b.dataset.v === icon && color ? color : ''; });
+    $('sp-colors').querySelectorAll('button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.v === color)));
+    $('sp-save').disabled = !(icon && color);
+  };
+  const btns = (box, list, label, onPick) => {
+    box.replaceChildren(...list.map((v) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.v = v;
+      b.setAttribute('role', 'radio');
+      if (label) b.textContent = v; else { b.style.background = v; b.setAttribute('aria-label', v); }
+      b.onclick = () => { onPick(v); sync(); };
+      return b;
+    }));
+  };
+  // تحت بطاقة النتيجة مباشرة، مو آخر الصفحة
+  const res = ['ok', 'bad'].map($).find((el) => el && !el.hidden);
+  if (res) res.after($('secret-pick'));
+  btns($('sp-icons'), SECRET_ICONS, true, (v) => (icon = v));
+  btns($('sp-colors'), SECRET_COLORS, false, (v) => (color = v));
+  sync();
+  $('sp-save').onclick = () => {
+    local?.setItem('asalah_secret', JSON.stringify({ i: icon, c: color }));
+    show('secret-pick', false);
+    showSecret();
+    $('secret').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  show('secret-pick');
+}
+$('secret-edit').onclick = () => { pickSecret(); $('secret-pick').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+// تظهر من أول لحظة، قبل النتيجة. صفحة التجربة للتجار ما تلمسها
+if (!DEMO && local) showSecret();
 
 function demoResult() {
   const t = Math.floor(Date.now() / 1000);
@@ -170,6 +228,7 @@ async function run() {
   }
   show('loading', false);
   lastData = d;
+  if (!DEMO && local && !readSecret()) setTimeout(pickSecret, 1200);
   applyBrand(d.brand);
   lastResult = d.result;
   if (d.result === 'original') return ok(d);

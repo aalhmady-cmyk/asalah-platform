@@ -196,3 +196,18 @@
 .demo-bar.pulse { animation: dpulse 1.6s ease-in-out 3; }
 @keyframes dpulse { 50% { filter: brightness(1.25); transform: scale(1.02); } }
 @media (prefers-reduced-motion: reduce) { .demo-bar.pulse { animation: none; } }
+
+/* علامتك السرية */
+.secret { margin: 12px 20px 0; padding: 10px 14px; border-radius: 16px; border: 2px solid var(--gold); background: var(--surface); display: flex; align-items: center; gap: 12px; }
+.secret div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.secret b { font-size: 14px; }
+.secret small { font-size: 12px; opacity: .75; }
+.secret-ic, .sp-grid button { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 24px; flex: none; }
+.secret-pick { border: 2px dashed var(--gold); }
+.sp-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.sp-grid button { width: 100%; aspect-ratio: 1; height: auto; border: 2px solid var(--line); background: var(--surface); cursor: pointer; }
+.sp-grid button[aria-checked="true"] { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(217,180,90,.35); }
+.sp-colors { display: flex; gap: 10px; justify-content: center; }
+.sp-colors button { width: 36px; height: 36px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; }
+.sp-colors button[aria-checked="true"] { border-color: var(--gold); outline: 2px solid var(--surface); outline-offset: -5px; }
+.vdomain { margin: 18px 20px 0; text-align: center; font-size: 13px; opacity: .8; }

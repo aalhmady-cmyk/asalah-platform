@@ -17,6 +17,8 @@
     <div class="vbrand"><span id="b-logo" class="vlogo" aria-hidden="true"></span><b id="b-name">أصالة</b></div>
     <button type="button" id="lang" class="vlang" aria-label="English">EN</button>
   </header>
+  <!-- علامتك السرية: يختارها العميل مرة وتنحفظ في جواله لهذا الموقع فقط. أي صفحة تحقق مقلّدة ما تقدر تعرفها -->
+  <div id="secret" class="secret" hidden><span id="secret-ic" class="secret-ic" aria-hidden="true"></span><div><b id="secret-t">علامتك السرية ظاهرة: الصفحة أصلية</b><small id="secret-s">لو فتحت صفحة تحقق وما شفت علامتك هنا، فهي مزيّفة</small></div><button id="secret-edit" class="linkish" type="button">تغيير</button></div>
 
   <!-- شاشة المسح: العلامة في النص وموجات وخط مسح، والخطوات تنعلّم وحدة وحدة -->
   <section id="loading" class="vcard scan-card" aria-live="polite">
@@ -180,6 +182,15 @@
   </section>
   <section id="reported" class="vcard center" hidden><h2>وصلنا بلاغك</h2><p class="muted">شكراً لمساعدتك في وقف التقليد.</p><div id="ai-box" class="ai-box" hidden><b>🤖 رأي الذكاء الصناعي في الصورة</b><div class="ai-meter"><i id="ai-bar"></i></div><small id="ai-score"></small><p id="ai-verdict"></p></div><a class="linkish" href="/map/">🗺️ شوف خريطة التقليد الحية</a></section>
 
+  <section id="secret-pick" class="vcard secret-pick" hidden>
+    <h2 id="sp-title">🔐 اختر علامتك السرية</h2>
+    <p class="muted small" id="sp-sub">المقلّد يقدر ينسخ شكل الصفحة، لكن ما يقدر يعرف علامتك. اختر شكل ولون، ومن الحين كل صفحة تحقق أصلية تعرض علامتك فوق. لو ما شفتها، الصفحة مزيّفة.</p>
+    <div class="sp-grid" id="sp-icons" role="radiogroup" aria-label="الشكل"></div>
+    <div class="sp-colors" id="sp-colors" role="radiogroup" aria-label="اللون"></div>
+    <button id="sp-save" class="btn btn-gold big-btn" type="button" disabled>احفظ علامتي</button>
+  </section>
+
+  <p class="vdomain" id="vdomain">🔒 الصفحة الأصلية دايم على <b class="ltr">alsalah-sa.com</b></p>
   <p class="vscan"><a href="/scan/">📷 تحقق من منتج ثاني بالكاميرا</a></p>
   <footer class="vfoot">
     <svg width="18" height="18" viewBox="0 0 40 40" aria-hidden="true"><rect x="2" y="2" width="36" height="36" rx="10" fill="none" stroke="#0E6B4E" stroke-width="3"/><path d="M12 21l5 5 11-12" fill="none" stroke="#0E6B4E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>

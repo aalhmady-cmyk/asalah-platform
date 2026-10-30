@@ -7,6 +7,15 @@ export const EN = lang === 'en';
 export const tx = (ar, en) => (EN ? en : ar);
 
 const STATIC = {
+  'علامتك السرية ظاهرة: الصفحة أصلية': 'Your secret mark is showing: this page is genuine',
+  'لو فتحت صفحة تحقق وما شفت علامتك هنا، فهي مزيّفة': 'If a verify page does not show your mark here, it is fake',
+  'تغيير': 'Change',
+  '🔐 اختر علامتك السرية': '🔐 Pick your secret mark',
+  'المقلّد يقدر ينسخ شكل الصفحة، لكن ما يقدر يعرف علامتك. اختر شكل ولون، ومن الحين كل صفحة تحقق أصلية تعرض علامتك فوق. لو ما شفتها، الصفحة مزيّفة.': 'A counterfeiter can copy how this page looks, but cannot know your mark. Pick a symbol and a colour, and every genuine verify page will show it at the top. If it is missing, the page is fake.',
+  'احفظ علامتي': 'Save my mark',
+  'الشكل': 'Symbol',
+  'اللون': 'Colour',
+  '🔒 الصفحة الأصلية دايم على': '🔒 The genuine page is always on',
   'أصالة': 'Asalah',
   'جاري التحقق من المنتج': 'Verifying your product',
   'قراءة العلامة': 'Reading the tag',
